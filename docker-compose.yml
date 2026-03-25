@@ -1,0 +1,70 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_ADDR: ${APP_ADDR}
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL}
+      APP_STORAGE_ROOT: ${APP_STORAGE_ROOT}
+      APP_MAX_UPLOAD_SIZE_BYTES: ${APP_MAX_UPLOAD_SIZE_BYTES}
+      APP_MAX_MULTIPART_MEMORY_BYTES: ${APP_MAX_MULTIPART_MEMORY_BYTES}
+      APP_RATE_LIMIT_RPS: ${APP_RATE_LIMIT_RPS}
+      APP_RATE_LIMIT_BURST: ${APP_RATE_LIMIT_BURST}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS}
+      APP_BEARER_TOKENS: ${APP_BEARER_TOKENS}
+      APP_SIGNING_SECRET: ${APP_SIGNING_SECRET}
+      APP_DEFAULT_SIGNED_URL_TTL_SECONDS: ${APP_DEFAULT_SIGNED_URL_TTL_SECONDS}
+      APP_MAX_SIGNED_URL_TTL_SECONDS: ${APP_MAX_SIGNED_URL_TTL_SECONDS}
+      APP_READ_HEADER_TIMEOUT_SECONDS: ${APP_READ_HEADER_TIMEOUT_SECONDS}
+      APP_SHUTDOWN_TIMEOUT_SECONDS: ${APP_SHUTDOWN_TIMEOUT_SECONDS}
+      DB_DSN: ${DB_DSN}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS}
+      DB_CONN_MAX_LIFETIME_MINUTES: ${DB_CONN_MAX_LIFETIME_MINUTES}
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend_storage:/data/storage
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_DEFAULT_API_BASE_URL: ${VITE_DEFAULT_API_BASE_URL}
+        VITE_DEFAULT_BEARER_TOKEN: ${VITE_DEFAULT_BEARER_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  mysql_data:
+  backend_storage:

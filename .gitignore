@@ -1,0 +1,12 @@
+backend/server.exe
+backend/coverage.out
+backend/*.test
+
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+
+*.log
+Thumbs.db
+.DS_Store
