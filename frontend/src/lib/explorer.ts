@@ -1,9 +1,3 @@
-import type { FolderNode } from "@/api/types";
-
-export interface FolderTreeNode extends FolderNode {
-  children: FolderTreeNode[];
-}
-
 export const explorerPageSizes = [50, 100, 200] as const;
 
 export function normalizeExplorerPrefix(value: string | null | undefined) {
@@ -22,35 +16,6 @@ export function parseExplorerLimit(value: string | null | undefined) {
   }
 
   return 100;
-}
-
-export function buildFolderTree(nodes: FolderNode[]) {
-  const map = new Map<string, FolderTreeNode>();
-  for (const node of nodes) {
-    map.set(node.path, {
-      ...node,
-      children: [],
-    });
-  }
-
-  const roots: FolderTreeNode[] = [];
-  for (const node of map.values()) {
-    if (node.parent_path && map.has(node.parent_path)) {
-      map.get(node.parent_path)?.children.push(node);
-      continue;
-    }
-    roots.push(node);
-  }
-
-  const sortNodes = (items: FolderTreeNode[]) => {
-    items.sort((left, right) => left.path.localeCompare(right.path));
-    for (const item of items) {
-      sortNodes(item.children);
-    }
-  };
-  sortNodes(roots);
-
-  return roots;
 }
 
 export function getExplorerBreadcrumbs(prefix: string) {

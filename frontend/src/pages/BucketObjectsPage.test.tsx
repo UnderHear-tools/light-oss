@@ -6,7 +6,6 @@ import { BucketObjectsPage } from "./BucketObjectsPage";
 import { renderWithApp } from "../test/test-utils";
 
 vi.mock("../api/objects", () => ({
-  listFolderTree: vi.fn(),
   listExplorerEntries: vi.fn(),
   createFolder: vi.fn(),
   uploadObject: vi.fn(),
@@ -20,7 +19,6 @@ import {
   createFolder,
   deleteObject,
   listExplorerEntries,
-  listFolderTree,
   uploadObject,
 } from "../api/objects";
 
@@ -29,21 +27,7 @@ describe("BucketObjectsPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders folder tree and navigates into a directory", async () => {
-    vi.mocked(listFolderTree).mockResolvedValue({
-      items: [
-        {
-          path: "docs/",
-          name: "docs",
-          parent_path: "",
-        },
-        {
-          path: "docs/images/",
-          name: "images",
-          parent_path: "docs/",
-        },
-      ],
-    });
+  it("navigates into a directory from the table", async () => {
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({
         items: [
@@ -106,15 +90,6 @@ describe("BucketObjectsPage", () => {
   });
 
   it("supports upload flow in the current folder", async () => {
-    vi.mocked(listFolderTree).mockResolvedValue({
-      items: [
-        {
-          path: "docs/",
-          name: "docs",
-          parent_path: "",
-        },
-      ],
-    });
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({ items: [], next_cursor: "" })
       .mockResolvedValueOnce({
@@ -181,7 +156,6 @@ describe("BucketObjectsPage", () => {
   });
 
   it("creates a folder from the toolbar dialog", async () => {
-    vi.mocked(listFolderTree).mockResolvedValue({ items: [] });
     vi.mocked(listExplorerEntries).mockResolvedValue({ items: [], next_cursor: "" });
     vi.mocked(createFolder).mockResolvedValue({
       path: "assets/",
@@ -216,7 +190,6 @@ describe("BucketObjectsPage", () => {
   });
 
   it("confirms file deletion before removing an object", async () => {
-    vi.mocked(listFolderTree).mockResolvedValue({ items: [] });
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [
         {

@@ -3,7 +3,6 @@ import type { AxiosProgressEvent } from "axios";
 import type { AppSettings } from "../lib/settings";
 import type {
   ExplorerEntriesResult,
-  FolderListResult,
   ObjectItem,
   ObjectListResult,
   ObjectVisibility,
@@ -48,13 +47,6 @@ export function listObjects(settings: AppSettings, params: ListObjectsParams) {
       limit: params.limit,
       cursor: params.cursor || undefined,
     },
-  });
-}
-
-export function listFolderTree(settings: AppSettings, bucket: string) {
-  return apiRequest<FolderListResult>(settings, {
-    method: "GET",
-    url: `/api/v1/buckets/${encodeURIComponent(bucket)}/folders`,
   });
 }
 

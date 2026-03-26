@@ -40,16 +40,6 @@ export interface ObjectListResult {
   next_cursor: string;
 }
 
-export interface FolderNode {
-  path: string;
-  name: string;
-  parent_path: string;
-}
-
-export interface FolderListResult {
-  items: FolderNode[];
-}
-
 export interface ExplorerDirectoryEntry {
   type: "directory";
   path: string;

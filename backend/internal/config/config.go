@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -31,12 +32,16 @@ type Config struct {
 
 func Load() (Config, error) {
 	v := viper.New()
+	v.SetConfigType("env")
+	if err := loadLocalEnv(v); err != nil {
+		return Config{}, err
+	}
 	v.AutomaticEnv()
 
 	v.SetDefault("APP_ENV", "development")
 	v.SetDefault("APP_ADDR", ":8080")
 	v.SetDefault("APP_PUBLIC_BASE_URL", "http://localhost:8080")
-	v.SetDefault("DB_DSN", "root:112233ss@tcp(115.190.254.60:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC")
+	v.SetDefault("DB_DSN", "root:112233ss@tcp(localhost:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 5)
 	v.SetDefault("DB_CONN_MAX_LIFETIME_MINUTES", 30)
@@ -93,6 +98,25 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadLocalEnv(v *viper.Viper) error {
+	for _, path := range []string{".env", "../.env"} {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("stat %s: %w", path, err)
+		}
+
+		v.SetConfigFile(path)
+		if err := v.ReadInConfig(); err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		return nil
+	}
+
+	return nil
 }
 
 func splitCSV(input string) []string {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -7,7 +7,6 @@ import {
   FolderSearchIcon,
   RefreshCcwIcon,
   SearchIcon,
-  TreePineIcon,
 } from "lucide-react";
 import {
   useNavigate,
@@ -21,12 +20,10 @@ import {
   deleteFolder,
   deleteObject,
   listExplorerEntries,
-  listFolderTree,
   uploadObject,
 } from "@/api/objects";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -48,22 +45,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ToastProvider";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
-import { FolderTree } from "@/features/explorer/FolderTree";
 import { UploadObjectDialog, type UploadDialogValue } from "@/features/explorer/UploadObjectDialog";
 import {
-  buildFolderTree,
   explorerPageSizes,
   getExplorerBreadcrumbs,
   normalizeExplorerPrefix,
@@ -92,17 +79,14 @@ export function BucketObjectsPage() {
   const search = normalizeExplorerSearch(searchParams.get("search"));
   const cursor = searchParams.get("cursor") ?? "";
   const limit = parseExplorerLimit(searchParams.get("limit"));
-  const folderQueryKey = [
-    "folders",
+  const entriesBaseQueryKey = [
+    "explorer-entries",
     settings.apiBaseUrl,
     settings.bearerToken,
     bucket,
   ] as const;
   const entriesQueryKey = [
-    "explorer-entries",
-    settings.apiBaseUrl,
-    settings.bearerToken,
-    bucket,
+    ...entriesBaseQueryKey,
     prefix,
     search,
     cursor,
@@ -116,12 +100,6 @@ export function BucketObjectsPage() {
   useEffect(() => {
     setCursorHistory([]);
   }, [bucket, prefix, search, limit]);
-
-  const foldersQuery = useQuery({
-    queryKey: folderQueryKey,
-    queryFn: () => listFolderTree(settings, bucket),
-    enabled: bucket !== "",
-  });
 
   const entriesQuery = useQuery({
     queryKey: entriesQueryKey,
@@ -148,17 +126,7 @@ export function BucketObjectsPage() {
     onSuccess: async () => {
       setUploadProgress(0);
       pushToast("success", t("toast.objectUploaded"));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: folderQueryKey }),
-        queryClient.invalidateQueries({
-          queryKey: [
-            "explorer-entries",
-            settings.apiBaseUrl,
-            settings.bearerToken,
-            bucket,
-          ],
-        }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       setUploadProgress(0);
@@ -176,17 +144,7 @@ export function BucketObjectsPage() {
       }),
     onSuccess: async () => {
       pushToast("success", t("toast.folderCreated"));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: folderQueryKey }),
-        queryClient.invalidateQueries({
-          queryKey: [
-            "explorer-entries",
-            settings.apiBaseUrl,
-            settings.bearerToken,
-            bucket,
-          ],
-        }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : t("errors.createFolder");
@@ -202,12 +160,7 @@ export function BucketObjectsPage() {
     onSuccess: async () => {
       pushToast("success", t("toast.objectDeleted"));
       await queryClient.invalidateQueries({
-        queryKey: [
-          "explorer-entries",
-          settings.apiBaseUrl,
-          settings.bearerToken,
-          bucket,
-        ],
+        queryKey: entriesBaseQueryKey,
       });
     },
     onError: (error) => {
@@ -226,17 +179,7 @@ export function BucketObjectsPage() {
     },
     onSuccess: async () => {
       pushToast("success", t("toast.folderDeleted"));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: folderQueryKey }),
-        queryClient.invalidateQueries({
-          queryKey: [
-            "explorer-entries",
-            settings.apiBaseUrl,
-            settings.bearerToken,
-            bucket,
-          ],
-        }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : t("errors.deleteFolder");
@@ -265,10 +208,6 @@ export function BucketObjectsPage() {
     },
   });
 
-  const folderTree = useMemo(
-    () => buildFolderTree(foldersQuery.data?.items ?? []),
-    [foldersQuery.data?.items],
-  );
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
   const entries = entriesQuery.data?.items ?? [];
 
@@ -363,7 +302,7 @@ export function BucketObjectsPage() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-6">
-      <Card className="flex min-h-[720px] flex-1 flex-col overflow-hidden border-border/70 bg-card py-0">
+      <Card className="flex min-h-[720px] flex-1 flex-col overflow-hidden border-border/70 bg-card py-0 gap-0">
         <div className="border-b border-border/70 px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -417,133 +356,63 @@ export function BucketObjectsPage() {
           </div>
         </div>
 
-        <div className="border-b border-border/70 px-4 py-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="md:hidden">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button type="button" variant="outline">
-                      <TreePineIcon data-icon="inline-start" />
-                      {t("explorer.toolbar.tree")}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col min-w-0">
+            <div className="border-b border-border/70 px-4 py-3">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <div className="flex flex-wrap items-center gap-2">
+                  <UploadObjectDialog
+                    currentPrefix={prefix}
+                    onSubmit={handleUpload}
+                    pending={uploadMutation.isPending}
+                    progress={uploadProgress}
+                  />
+
+                  <CreateFolderDialog
+                    currentPrefix={prefix}
+                    onSubmit={handleCreateFolder}
+                    pending={createFolderMutation.isPending}
+                  />
+
+                  <Button
+                    onClick={() => {
+                      void queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    <RefreshCcwIcon data-icon="inline-start" />
+                    {t("explorer.toolbar.refresh")}
+                  </Button>
+                </div>
+
+                <div className="flex w-full min-w-0 flex-col gap-3 lg:ml-auto lg:max-w-md">
+                  <form
+                    className="flex w-full min-w-0 items-center gap-2"
+                    onSubmit={handleSearchSubmit}
+                  >
+                    <FieldGroup className="min-w-0 flex-1">
+                      <Field className="min-w-0" orientation="responsive">
+                        <FieldLabel className="sr-only" htmlFor="explorer-search">
+                          {t("explorer.toolbar.search")}
+                        </FieldLabel>
+                        <Input
+                          className="min-w-0"
+                          id="explorer-search"
+                          onChange={(event) => setSearchInput(event.target.value)}
+                          placeholder={t("explorer.toolbar.searchPlaceholder")}
+                          value={searchInput}
+                        />
+                      </Field>
+                    </FieldGroup>
+                    <Button className="shrink-0" size="icon-sm" type="submit" variant="outline">
+                      <SearchIcon />
+                      <span className="sr-only">{t("common.apply")}</span>
                     </Button>
-                  </SheetTrigger>
-                  <SheetContent className="p-0" side="left">
-                    <SheetHeader className="border-b border-border/70">
-                      <SheetTitle>{t("explorer.tree.title")}</SheetTitle>
-                      <SheetDescription>
-                        {t("explorer.tree.mobileDescription")}
-                      </SheetDescription>
-                    </SheetHeader>
-                    <div className="min-h-0 flex-1">
-                      <FolderTree
-                        activePrefix={prefix}
-                        bucketName={bucket}
-                        loading={foldersQuery.isLoading}
-                        nodes={folderTree}
-                        onNavigate={handleNavigatePrefix}
-                      />
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                  </form>
+                </div>
               </div>
-
-              <UploadObjectDialog
-                currentPrefix={prefix}
-                onSubmit={handleUpload}
-                pending={uploadMutation.isPending}
-                progress={uploadProgress}
-              />
-
-              <CreateFolderDialog
-                currentPrefix={prefix}
-                onSubmit={handleCreateFolder}
-                pending={createFolderMutation.isPending}
-              />
-
-              <Button
-                onClick={() => {
-                  void Promise.all([
-                    queryClient.invalidateQueries({ queryKey: folderQueryKey }),
-                    queryClient.invalidateQueries({ queryKey: entriesQueryKey }),
-                  ]);
-                }}
-                type="button"
-                variant="outline"
-              >
-                <RefreshCcwIcon data-icon="inline-start" />
-                {t("explorer.toolbar.refresh")}
-              </Button>
             </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <form className="flex items-center gap-2" onSubmit={handleSearchSubmit}>
-                <FieldGroup>
-                  <Field orientation="responsive">
-                    <FieldLabel className="sr-only" htmlFor="explorer-search">
-                      {t("explorer.toolbar.search")}
-                    </FieldLabel>
-                    <Input
-                      id="explorer-search"
-                      onChange={(event) => setSearchInput(event.target.value)}
-                      placeholder={t("explorer.toolbar.searchPlaceholder")}
-                      value={searchInput}
-                    />
-                  </Field>
-                </FieldGroup>
-                <Button size="icon-sm" type="submit" variant="outline">
-                  <SearchIcon />
-                  <span className="sr-only">{t("common.apply")}</span>
-                </Button>
-              </form>
-
-              <Select
-                onValueChange={(value) =>
-                  updateSearchParams({
-                    limit: value,
-                    cursor: "",
-                  })
-                }
-                value={String(limit)}
-              >
-                <SelectTrigger aria-label={t("explorer.toolbar.limit")} className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end" position="popper">
-                  <SelectGroup>
-                    {explorerPageSizes.map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {t("explorer.limit.option", { count: size })}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid min-h-0 flex-1 md:grid-cols-[288px_minmax(0,1fr)]">
-          <aside className="hidden min-h-0 border-r border-border/70 bg-muted md:flex">
-            <FolderTree
-              activePrefix={prefix}
-              bucketName={bucket}
-              loading={foldersQuery.isLoading}
-              nodes={folderTree}
-              onNavigate={handleNavigatePrefix}
-            />
-          </aside>
-
-          <div className="min-w-0">
-            {foldersQuery.isError ? (
-              <div className="border-b border-border/70 p-4">
-                <Alert variant="destructive">
-                  <CircleAlertIcon />
-                  <AlertTitle>{t("errors.loadFolders")}</AlertTitle>
-                  <AlertDescription>{foldersQuery.error.message}</AlertDescription>
-                </Alert>
-              </div>
-            ) : null}
 
             {entriesQuery.isError ? (
               <div className="border-b border-border/70 p-4">
@@ -581,23 +450,51 @@ export function BucketObjectsPage() {
                       page: cursorHistory.length + 1,
                     })}
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={cursorHistory.length === 0}
-                      onClick={handlePrevPage}
-                      type="button"
-                      variant="outline"
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Select
+                      onValueChange={(value) =>
+                        updateSearchParams({
+                          limit: value,
+                          cursor: "",
+                        })
+                      }
+                      value={String(limit)}
                     >
-                      {t("objects.pagination.previous")}
-                    </Button>
-                    <Button
-                      disabled={!entriesQuery.data?.next_cursor}
-                      onClick={handleNextPage}
-                      type="button"
-                      variant="outline"
-                    >
-                      {t("objects.pagination.next")}
-                    </Button>
+                      <SelectTrigger
+                        aria-label={t("explorer.toolbar.limit")}
+                        className="w-full sm:w-[140px]"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent align="end" position="popper">
+                        <SelectGroup>
+                          {explorerPageSizes.map((size) => (
+                            <SelectItem key={size} value={String(size)}>
+                              {t("explorer.limit.option", { count: size })}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex gap-2">
+                      <Button
+                        disabled={cursorHistory.length === 0}
+                        onClick={handlePrevPage}
+                        type="button"
+                        variant="outline"
+                      >
+                        {t("objects.pagination.previous")}
+                      </Button>
+                      <Button
+                        disabled={!entriesQuery.data?.next_cursor}
+                        onClick={handleNextPage}
+                        type="button"
+                        variant="outline"
+                      >
+                        {t("objects.pagination.next")}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </>

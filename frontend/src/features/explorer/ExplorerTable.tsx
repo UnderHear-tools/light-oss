@@ -74,7 +74,9 @@ export function ExplorerTable({
                   type="button"
                   variant="ghost"
                 >
-                  <FolderIcon className="text-amber-500" data-icon="inline-start" />
+                  <span className="inline-flex size-5 items-center justify-center text-amber-500 [&_svg]:size-5">
+                    <FolderIcon data-icon="inline-start" />
+                  </span>
                   <span className="truncate">{entry.name}</span>
                 </Button>
               </TableCell>
