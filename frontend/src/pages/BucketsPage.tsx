@@ -1,11 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BoxesIcon, CircleAlertIcon } from "lucide-react";
-import { listBuckets } from "@/api/buckets";
-import { EmptyState } from "@/components/EmptyState";
+import { createBucket, listBuckets } from "@/api/buckets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ToastProvider";
 import { BucketList } from "@/features/buckets/BucketList";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
@@ -13,12 +11,33 @@ import { useAppSettings } from "@/lib/settings";
 export function BucketsPage() {
   const { settings } = useAppSettings();
   const { t } = useI18n();
+  const { pushToast } = useToast();
+  const queryClient = useQueryClient();
 
   const bucketsQuery = useQuery({
     queryKey: ["buckets", settings.apiBaseUrl, settings.bearerToken],
     queryFn: () => listBuckets(settings),
     enabled: settings.apiBaseUrl.trim() !== "",
   });
+
+  const createBucketMutation = useMutation({
+    mutationFn: (name: string) => createBucket(settings, name),
+    onSuccess: async () => {
+      pushToast("success", t("toast.bucketCreated"));
+      await queryClient.invalidateQueries({
+        queryKey: ["buckets", settings.apiBaseUrl, settings.bearerToken],
+      });
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t("errors.createBucket");
+      pushToast("error", message);
+    },
+  });
+
+  async function handleCreateBucket(name: string) {
+    await createBucketMutation.mutateAsync(name);
+  }
 
   const buckets = bucketsQuery.data?.items ?? [];
 
@@ -39,8 +58,6 @@ export function BucketsPage() {
         </div>
       </div>
 
-      {bucketsQuery.isLoading ? <BucketsLoadingState /> : null}
-
       {bucketsQuery.isError ? (
         <Alert variant="destructive">
           <CircleAlertIcon />
@@ -49,41 +66,12 @@ export function BucketsPage() {
         </Alert>
       ) : null}
 
-      {!bucketsQuery.isLoading &&
-      !bucketsQuery.isError &&
-      bucketsQuery.data &&
-      buckets.length > 0 ? (
-        <BucketList buckets={buckets} />
-      ) : null}
-
-      {!bucketsQuery.isLoading &&
-      !bucketsQuery.isError &&
-      bucketsQuery.data &&
-      buckets.length === 0 ? (
-        <EmptyState
-          description={t("buckets.empty.description")}
-          icon={BoxesIcon}
-          title={t("buckets.empty.title")}
-        />
-      ) : null}
+      <BucketList
+        buckets={buckets}
+        createPending={createBucketMutation.isPending}
+        loading={bucketsQuery.isLoading}
+        onCreateBucket={handleCreateBucket}
+      />
     </section>
-  );
-}
-
-function BucketsLoadingState() {
-  return (
-    <div className="grid gap-4">
-      <Card className="border-border/70 bg-card/80 shadow-sm">
-        <CardContent className="flex flex-col gap-3 p-6">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-4 w-64" />
-          <div className="grid gap-2 pt-2">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
   );
 }

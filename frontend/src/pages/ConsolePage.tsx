@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   BoxesIcon,
   CircleAlertIcon,
@@ -7,13 +7,11 @@ import {
   ServerCogIcon,
   ShieldCheckIcon,
 } from "lucide-react";
-import { createBucket, listBuckets } from "@/api/buckets";
+import { listBuckets } from "@/api/buckets";
 import { StatCard } from "@/components/StatCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useToast } from "@/components/ToastProvider";
-import { CreateBucketForm } from "@/features/buckets/CreateBucketForm";
 import { getApiHostLabel, hasBearerToken } from "@/lib/connection";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
@@ -22,33 +20,12 @@ import { useAppSettings } from "@/lib/settings";
 export function ConsolePage() {
   const { settings } = useAppSettings();
   const { locale, t } = useI18n();
-  const { pushToast } = useToast();
-  const queryClient = useQueryClient();
 
   const bucketsQuery = useQuery({
     queryKey: ["buckets", settings.apiBaseUrl, settings.bearerToken],
     queryFn: () => listBuckets(settings),
     enabled: settings.apiBaseUrl.trim() !== "",
   });
-
-  const createBucketMutation = useMutation({
-    mutationFn: (name: string) => createBucket(settings, name),
-    onSuccess: async () => {
-      pushToast("success", t("toast.bucketCreated"));
-      await queryClient.invalidateQueries({
-        queryKey: ["buckets", settings.apiBaseUrl, settings.bearerToken],
-      });
-    },
-    onError: (error) => {
-      const message =
-        error instanceof Error ? error.message : t("errors.createBucket");
-      pushToast("error", message);
-    },
-  });
-
-  async function handleCreateBucket(name: string) {
-    await createBucketMutation.mutateAsync(name);
-  }
 
   const buckets = bucketsQuery.data?.items ?? [];
   const latestBucket = buckets.reduce<(typeof buckets)[number] | null>(
@@ -145,30 +122,21 @@ export function ConsolePage() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <Card className="border-border/70 bg-card/90 shadow-sm">
-          <CardContent className="flex flex-col gap-3 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">{t("header.connection")}</p>
-              <Badge variant="outline">
-                {tokenConfigured
-                  ? t("common.configured")
-                  : t("common.missing")}
-              </Badge>
-            </div>
-            <div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-              {host}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="xl:sticky xl:top-20">
-          <CreateBucketForm
-            onSubmit={handleCreateBucket}
-            pending={createBucketMutation.isPending}
-          />
-        </div>
-      </div>
+      <Card className="border-border/70 bg-card">
+        <CardContent className="flex flex-col gap-3 p-5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">{t("header.connection")}</p>
+            <Badge variant="outline">
+              {tokenConfigured
+                ? t("common.configured")
+                : t("common.missing")}
+            </Badge>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-muted px-3 py-3 text-sm text-muted-foreground">
+            {host}
+          </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }

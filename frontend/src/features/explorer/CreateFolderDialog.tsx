@@ -57,7 +57,7 @@ export function CreateFolderDialog({
           <FieldGroup>
             <Field>
               <FieldLabel>{t("explorer.currentFolder")}</FieldLabel>
-              <div className="rounded-lg border border-border/70 bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {currentPrefix || t("explorer.rootFolder")}
               </div>
             </Field>

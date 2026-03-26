@@ -49,7 +49,7 @@ export function SettingsPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <Card className="border-border/70 bg-card/90 shadow-sm">
+        <Card className="border-border/70 bg-card">
           <CardHeader>
             <CardTitle>{t("settings.connection.title")}</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -98,7 +98,7 @@ export function SettingsPage() {
         </Card>
 
         <div className="grid gap-4 xl:sticky xl:top-20">
-          <Card className="border-border/70 bg-card/90 shadow-sm">
+          <Card className="border-border/70 bg-card">
             <CardHeader>
               <CardTitle>{t("settings.preferences.title")}</CardTitle>
               <p className="text-sm text-muted-foreground">

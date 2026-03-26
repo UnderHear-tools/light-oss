@@ -13,12 +13,12 @@ export function StatCard({
   icon: LucideIcon;
 }) {
   return (
-    <Card className="border-border/70 bg-card/80 shadow-sm backdrop-blur-sm">
+    <Card className="border-border/70 bg-card">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        <div className="rounded-md border border-border/80 bg-background/80 p-2 text-primary">
+        <div className="rounded-md border border-border/80 bg-background p-2 text-primary">
           <Icon className="size-4" />
         </div>
       </CardHeader>

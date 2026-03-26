@@ -17,7 +17,7 @@ export function EmptyState({
   icon: LucideIcon;
 }) {
   return (
-    <Empty className="border-border/70 bg-card/70 py-12 shadow-sm">
+    <Empty className="border-border/70 bg-card py-12">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <Icon />

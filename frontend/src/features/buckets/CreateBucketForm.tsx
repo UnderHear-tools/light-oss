@@ -1,7 +1,15 @@
 import { FormEvent, useState } from "react";
 import { LoaderCircleIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -11,15 +19,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/lib/i18n";
 
-export function CreateBucketForm({
+export function CreateBucketDialog({
   onSubmit,
   pending,
 }: {
   onSubmit: (name: string) => Promise<void>;
   pending: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const { t } = useI18n();
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+
+    if (!nextOpen && !pending) {
+      setName("");
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,18 +46,28 @@ export function CreateBucketForm({
 
     await onSubmit(name.trim());
     setName("");
+    setOpen(false);
   }
 
   return (
-    <Card className="border-border/70 bg-card/90 shadow-sm">
-      <CardHeader>
-        <CardTitle>{t("buckets.create.title")}</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {t("buckets.create.description")}
-        </p>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent>
+    <Dialog onOpenChange={handleOpenChange} open={open}>
+      <DialogTrigger asChild>
+        <button
+          aria-label={t("buckets.create.title")}
+          className="flex min-h-64 cursor-pointer items-center justify-center rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          type="button"
+        >
+          <PlusIcon aria-hidden="true" className="size-10 text-muted-foreground" />
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("buckets.create.title")}</DialogTitle>
+          <DialogDescription>
+            {t("buckets.create.description")}
+          </DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
           <FieldGroup>
             <Field data-disabled={pending || undefined}>
               <FieldLabel htmlFor="bucket-name">
@@ -58,20 +85,23 @@ export function CreateBucketForm({
               </FieldDescription>
             </Field>
           </FieldGroup>
-        </CardContent>
-        <CardFooter className="justify-end">
-          <Button disabled={pending || !name.trim()} type="submit">
-            {pending ? (
-              <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <PlusIcon data-icon="inline-start" />
-            )}
-            {pending
-              ? t("buckets.form.submitting")
-              : t("buckets.form.submit")}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+          <DialogFooter>
+            <Button disabled={pending || !name.trim()} type="submit">
+              {pending ? (
+                <LoaderCircleIcon
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
+              ) : (
+                <PlusIcon data-icon="inline-start" />
+              )}
+              {pending
+                ? t("buckets.form.submitting")
+                : t("buckets.form.submit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -16,7 +16,7 @@ describe("Layout", () => {
 
     expect(screen.getAllByText("Light OSS Console")).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Console" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Buckets" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "bucket" })).toBeInTheDocument();
     expect(screen.getAllByText("Console")[0]).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Console body")).toBeInTheDocument();

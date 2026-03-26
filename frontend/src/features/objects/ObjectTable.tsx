@@ -46,7 +46,7 @@ export function ObjectTable({
   const { locale, t } = useI18n();
 
   return (
-    <Card className="border-border/70 bg-card/80 shadow-sm backdrop-blur-sm">
+    <Card className="border-border/70 bg-card">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <CardTitle>{t("objects.table.title")}</CardTitle>

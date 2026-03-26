@@ -67,7 +67,7 @@ export function UploadPanel({
   }
 
   return (
-    <Card className="border-border/70 bg-card/80 shadow-sm backdrop-blur-sm">
+    <Card className="border-border/70 bg-card">
       <CardHeader>
         <CardTitle>{t("objects.upload.title")}</CardTitle>
         <p className="text-sm text-muted-foreground">

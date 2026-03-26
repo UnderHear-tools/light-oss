@@ -363,33 +363,7 @@ export function BucketObjectsPage() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{bucket}</Badge>
-            <Badge variant="secondary">
-              {prefix || t("explorer.rootFolder")}
-            </Badge>
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {t("explorer.title")}
-          </h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            {t("objects.description")}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">
-            {t("explorer.pagination.summary", {
-              count: entries.length,
-              page: cursorHistory.length + 1,
-            })}
-          </Badge>
-        </div>
-      </div>
-
-      <Card className="flex min-h-[720px] flex-1 flex-col overflow-hidden border-border/70 bg-card/92 shadow-sm backdrop-blur-sm">
+      <Card className="flex min-h-[720px] flex-1 flex-col overflow-hidden border-border/70 bg-card py-0">
         <div className="border-b border-border/70 px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -550,7 +524,7 @@ export function BucketObjectsPage() {
         </div>
 
         <div className="grid min-h-0 flex-1 md:grid-cols-[288px_minmax(0,1fr)]">
-          <aside className="hidden min-h-0 border-r border-border/70 bg-muted/20 md:flex">
+          <aside className="hidden min-h-0 border-r border-border/70 bg-muted md:flex">
             <FolderTree
               activePrefix={prefix}
               bucketName={bucket}

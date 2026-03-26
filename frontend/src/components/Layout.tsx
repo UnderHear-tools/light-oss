@@ -29,9 +29,9 @@ export function Layout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="min-h-svh overflow-hidden bg-transparent">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 bg-background/85 backdrop-blur-xl transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14">
           <div className="flex w-full items-center gap-2 px-4 md:px-6">
-            <SidebarTrigger className="-ml-1" />
+            <SidebarTrigger className="-ml-1 cursor-pointer" />
             <Separator
               orientation="vertical"
               className="mr-1 hidden data-vertical:h-4 data-vertical:self-auto sm:block"
@@ -71,7 +71,7 @@ export function Layout() {
         </header>
 
         <main className="flex flex-1 overflow-hidden">
-          <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col gap-6 overflow-auto px-4 py-4 md:px-6 md:py-6">
+          <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-auto px-2 py-2 md:px-3 md:py-3">
             <Outlet />
           </div>
         </main>
@@ -87,9 +87,7 @@ function buildBreadcrumbs(
     key: "breadcrumbs.console" | "nav.console" | "nav.buckets" | "nav.settings",
   ) => string,
 ) {
-  const items: Array<{ label: string; href?: string }> = [
-    { label: t("breadcrumbs.console"), href: "/console" },
-  ];
+  const items: Array<{ label: string; href?: string }> = [];
 
   if (pathname === "/" || pathname.startsWith("/console")) {
     items.push({ label: t("nav.console") });

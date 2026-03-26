@@ -1,28 +1,41 @@
-import { ArrowUpRightIcon, Clock3Icon } from "lucide-react";
+import { ArrowUpRightIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Bucket } from "@/api/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CreateBucketDialog } from "@/features/buckets/CreateBucketForm";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 
-export function BucketList({ buckets }: { buckets: Bucket[] }) {
+export function BucketList({
+  buckets,
+  createPending,
+  loading = false,
+  onCreateBucket,
+}: {
+  buckets: Bucket[];
+  createPending: boolean;
+  loading?: boolean;
+  onCreateBucket: (name: string) => Promise<void>;
+}) {
   const { locale, t } = useI18n();
 
   return (
-    <Card className="overflow-hidden border-border/70 bg-card/90 shadow-sm">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
-          <CardTitle>{t("buckets.list.title")}</CardTitle>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {t("buckets.list.title")}
+          </h2>
           <p className="text-sm text-muted-foreground">
             {t("buckets.list.description", { count: buckets.length })}
           </p>
@@ -30,59 +43,73 @@ export function BucketList({ buckets }: { buckets: Bucket[] }) {
         <Badge variant="secondary">
           {t("buckets.list.total", { count: buckets.length })}
         </Badge>
-      </CardHeader>
-      <CardContent className="px-0 pb-1">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("buckets.table.name")}</TableHead>
-              <TableHead className="hidden md:table-cell">
-                {t("buckets.table.createdAt")}
-              </TableHead>
-              <TableHead className="hidden lg:table-cell">
-                {t("buckets.table.updatedAt")}
-              </TableHead>
-              <TableHead className="text-right">
-                {t("buckets.table.actions")}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {buckets.map((bucket) => (
-              <TableRow key={bucket.id}>
-                <TableCell className="max-w-[280px]">
-                  <div className="flex flex-col gap-1">
-                    <Link
-                      className="truncate font-medium transition-colors hover:text-primary"
-                      to={`/buckets/${bucket.name}`}
-                    >
-                      {bucket.name}
-                    </Link>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground md:hidden">
-                      <Clock3Icon className="size-3.5" />
-                      {formatDate(bucket.updated_at, locale)}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <CreateBucketDialog
+          onSubmit={onCreateBucket}
+          pending={createPending}
+        />
+
+        {buckets.map((bucket) => (
+          <Card className="border-border/70 bg-card" key={bucket.id}>
+            <CardHeader className="flex flex-col gap-3">
+              <CardTitle className="text-2xl leading-tight break-all">
+                <Link className="hover:underline" to={`/buckets/${bucket.name}`}>
+                  {bucket.name}
+                </Link>
+              </CardTitle>
+              <CardDescription>{t("buckets.list.openHint")}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("buckets.table.createdAt")}
+                </span>
+                <span className="text-sm">{formatDate(bucket.created_at, locale)}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("buckets.table.updatedAt")}
+                </span>
+                <span className="text-sm">{formatDate(bucket.updated_at, locale)}</span>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button asChild size="sm" variant="outline">
+                <Link to={`/buckets/${bucket.name}`}>
+                  <ArrowUpRightIcon data-icon="inline-start" />
+                  {t("common.open")}
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+
+        {loading
+          ? Array.from({ length: 5 }).map((_, index) => (
+              <Card className="border-border/70 bg-card" key={`skeleton-${index}`}>
+                <CardContent className="flex flex-col gap-4 p-6">
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-7 w-36" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-4 w-32" />
                     </div>
                   </div>
-                </TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">
-                  {formatDate(bucket.created_at, locale)}
-                </TableCell>
-                <TableCell className="hidden text-muted-foreground lg:table-cell">
-                  {formatDate(bucket.updated_at, locale)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button asChild size="sm" variant="outline">
-                    <Link to={`/buckets/${bucket.name}`}>
-                      <ArrowUpRightIcon data-icon="inline-start" />
-                      {t("common.open")}
-                    </Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                  <Skeleton className="h-8 w-24" />
+                </CardContent>
+              </Card>
+            ))
+          : null}
+      </div>
+    </div>
   );
 }
