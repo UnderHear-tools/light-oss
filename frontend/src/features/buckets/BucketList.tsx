@@ -1,4 +1,4 @@
-import { ArrowUpRightIcon } from "lucide-react";
+import { ArrowUpRightIcon, HardDriveIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Bucket } from "@/api/types";
 import { Badge } from "@/components/ui/badge";
@@ -31,28 +31,32 @@ export function BucketList({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-semibold tracking-tight">
             {t("buckets.list.title")}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            {t("buckets.list.description", { count: buckets.length })}
-          </p>
+          <Badge className="w-fit" variant="secondary">
+            {t("buckets.list.total", { count: buckets.length })}
+          </Badge>
         </div>
-        <Badge variant="secondary">
-          {t("buckets.list.total", { count: buckets.length })}
-        </Badge>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-5">
         <CreateBucketDialog
           onSubmit={onCreateBucket}
           pending={createPending}
         />
 
         {buckets.map((bucket) => (
-          <Card className="border-border/70 bg-card" key={bucket.id}>
+          <Card
+            className="relative overflow-hidden border-border/70 bg-card"
+            key={bucket.id}
+          >
+            <HardDriveIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-2 size-36 -translate-y-2/3 text-muted-foreground/10"
+            />
             <CardHeader className="flex flex-col gap-3">
               <CardTitle className="text-2xl leading-tight break-all">
                 <Link className="hover:underline" to={`/buckets/${bucket.name}`}>
@@ -75,7 +79,7 @@ export function BucketList({
                 <span className="text-sm">{formatDate(bucket.updated_at, locale)}</span>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="justify-end">
               <Button asChild size="sm" variant="outline">
                 <Link to={`/buckets/${bucket.name}`}>
                   <ArrowUpRightIcon data-icon="inline-start" />

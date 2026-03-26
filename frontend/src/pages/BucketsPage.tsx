@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BoxesIcon, CircleAlertIcon } from "lucide-react";
+import { CircleAlertIcon } from "lucide-react";
 import { createBucket, listBuckets } from "@/api/buckets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ToastProvider";
 import { BucketList } from "@/features/buckets/BucketList";
 import { useI18n } from "@/lib/i18n";
@@ -45,10 +44,6 @@ export function BucketsPage() {
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
-          <Badge className="w-fit gap-1.5" variant="outline">
-            <BoxesIcon className="size-3.5" />
-            {t("buckets.title")}
-          </Badge>
           <h1 className="text-3xl font-semibold tracking-tight">
             {t("buckets.title")}
           </h1>

@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
   CircleAlertIcon,
   FolderSearchIcon,
+  LoaderCircleIcon,
   RefreshCcwIcon,
   SearchIcon,
 } from "lucide-react";
@@ -45,7 +46,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ToastProvider";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
@@ -424,8 +424,10 @@ export function BucketObjectsPage() {
               </div>
             ) : null}
 
-            {entriesQuery.isLoading ? (
-              <ExplorerEntriesLoading />
+            {entriesQuery.isLoading || entriesQuery.isFetching ? (
+              <div className="flex min-h-[320px] items-center justify-center p-4">
+                <LoaderCircleIcon className="animate-spin text-muted-foreground" />
+              </div>
             ) : entries.length > 0 ? (
               <>
                 <div className="min-h-0 flex-1 overflow-auto">
@@ -511,16 +513,5 @@ export function BucketObjectsPage() {
         </div>
       </Card>
     </section>
-  );
-}
-
-function ExplorerEntriesLoading() {
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      <Skeleton className="h-10 w-full" />
-      {Array.from({ length: 8 }).map((_, index) => (
-        <Skeleton className="h-12 w-full" key={index} />
-      ))}
-    </div>
   );
 }
