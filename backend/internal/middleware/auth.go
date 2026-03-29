@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strings"
 
@@ -47,4 +49,19 @@ func (v *TokenValidator) HasValidRequest(authorization string) bool {
 
 	_, ok := v.allowed[strings.TrimSpace(parts[1])]
 	return ok
+}
+
+func BearerScope(authorization string) (string, bool) {
+	parts := strings.SplitN(strings.TrimSpace(authorization), " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", false
+	}
+
+	token := strings.TrimSpace(parts[1])
+	if token == "" {
+		return "", false
+	}
+
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:]), true
 }

@@ -19,6 +19,10 @@ type Config struct {
 	StorageRoot                    string
 	MaxUploadSizeBytes             int64
 	MaxMultipartMemoryBytes        int64
+	MultipartThresholdBytes        int64
+	ChunkSizeBytes                 int64
+	UploadSessionTTLSeconds        int64
+	UploadChunkCacheTTLSeconds     int64
 	RateLimitRPS                   float64
 	RateLimitBurst                 int
 	CORSAllowedOrigins             []string
@@ -48,6 +52,10 @@ func Load() (Config, error) {
 	v.SetDefault("APP_STORAGE_ROOT", `\light-oss-data\storage`)
 	v.SetDefault("APP_MAX_UPLOAD_SIZE_BYTES", int64(50*1024*1024))
 	v.SetDefault("APP_MAX_MULTIPART_MEMORY_BYTES", int64(8*1024*1024))
+	v.SetDefault("APP_MULTIPART_THRESHOLD_BYTES", int64(16*1024*1024))
+	v.SetDefault("APP_CHUNK_SIZE_BYTES", int64(8*1024*1024))
+	v.SetDefault("APP_UPLOAD_SESSION_TTL_SECONDS", int64(86400))
+	v.SetDefault("APP_UPLOAD_CHUNK_CACHE_TTL_SECONDS", int64(172800))
 	v.SetDefault("APP_RATE_LIMIT_RPS", 5.0)
 	v.SetDefault("APP_RATE_LIMIT_BURST", 10)
 	v.SetDefault("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000")
@@ -69,6 +77,10 @@ func Load() (Config, error) {
 		StorageRoot:                    v.GetString("APP_STORAGE_ROOT"),
 		MaxUploadSizeBytes:             v.GetInt64("APP_MAX_UPLOAD_SIZE_BYTES"),
 		MaxMultipartMemoryBytes:        v.GetInt64("APP_MAX_MULTIPART_MEMORY_BYTES"),
+		MultipartThresholdBytes:        v.GetInt64("APP_MULTIPART_THRESHOLD_BYTES"),
+		ChunkSizeBytes:                 v.GetInt64("APP_CHUNK_SIZE_BYTES"),
+		UploadSessionTTLSeconds:        v.GetInt64("APP_UPLOAD_SESSION_TTL_SECONDS"),
+		UploadChunkCacheTTLSeconds:     v.GetInt64("APP_UPLOAD_CHUNK_CACHE_TTL_SECONDS"),
 		RateLimitRPS:                   v.GetFloat64("APP_RATE_LIMIT_RPS"),
 		RateLimitBurst:                 v.GetInt("APP_RATE_LIMIT_BURST"),
 		CORSAllowedOrigins:             splitCSV(v.GetString("APP_CORS_ALLOWED_ORIGINS")),
@@ -91,6 +103,16 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("APP_SIGNING_SECRET is required")
 	case cfg.MaxUploadSizeBytes <= 0:
 		return Config{}, fmt.Errorf("APP_MAX_UPLOAD_SIZE_BYTES must be greater than zero")
+	case cfg.MultipartThresholdBytes <= 0:
+		return Config{}, fmt.Errorf("APP_MULTIPART_THRESHOLD_BYTES must be greater than zero")
+	case cfg.ChunkSizeBytes <= 0:
+		return Config{}, fmt.Errorf("APP_CHUNK_SIZE_BYTES must be greater than zero")
+	case cfg.UploadSessionTTLSeconds <= 0:
+		return Config{}, fmt.Errorf("APP_UPLOAD_SESSION_TTL_SECONDS must be greater than zero")
+	case cfg.UploadChunkCacheTTLSeconds <= 0:
+		return Config{}, fmt.Errorf("APP_UPLOAD_CHUNK_CACHE_TTL_SECONDS must be greater than zero")
+	case cfg.ChunkSizeBytes > cfg.MaxUploadSizeBytes:
+		return Config{}, fmt.Errorf("APP_CHUNK_SIZE_BYTES must not exceed APP_MAX_UPLOAD_SIZE_BYTES")
 	case cfg.RateLimitRPS <= 0:
 		return Config{}, fmt.Errorf("APP_RATE_LIMIT_RPS must be greater than zero")
 	case cfg.RateLimitBurst <= 0:

@@ -63,6 +63,7 @@ func (r *ObjectRepository) Upsert(ctx context.Context, object *model.Object) (*m
 			"size":              object.Size,
 			"content_type":      object.ContentType,
 			"etag":              object.ETag,
+			"file_fingerprint":  object.FileFingerprint,
 			"visibility":        object.Visibility,
 			"is_deleted":        object.IsDeleted,
 			"created_at":        now,
@@ -80,6 +81,19 @@ func (r *ObjectRepository) FindActive(ctx context.Context, bucketName string, ob
 	var object model.Object
 	err := r.db.WithContext(ctx).
 		Where("bucket_name = ? AND object_key = ? AND is_deleted = ?", bucketName, objectKey, false).
+		First(&object).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &object, nil
+}
+
+func (r *ObjectRepository) FindAnyActiveByFingerprint(ctx context.Context, fileFingerprint string) (*model.Object, error) {
+	var object model.Object
+	err := r.db.WithContext(ctx).
+		Where("file_fingerprint = ? AND is_deleted = ?", fileFingerprint, false).
+		Order("created_at DESC").
 		First(&object).Error
 	if err != nil {
 		return nil, err
