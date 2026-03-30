@@ -1,10 +1,12 @@
 package service
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 
 	"light-oss/backend/internal/model"
@@ -12,6 +14,7 @@ import (
 )
 
 var bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+var siteDomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
 func ValidateBucketName(name string) error {
 	if !bucketNamePattern.MatchString(name) {
@@ -154,6 +157,102 @@ func SanitizeOriginalFilename(name string) string {
 	return candidate
 }
 
+func NormalizeSiteRootPrefix(prefix string) (string, error) {
+	normalized := strings.TrimSpace(strings.ReplaceAll(prefix, "\\", "/"))
+	normalized = strings.TrimPrefix(normalized, "/")
+	if normalized == "" {
+		return "", nil
+	}
+	if !strings.HasSuffix(normalized, "/") {
+		normalized += "/"
+	}
+	if err := ValidateFolderPrefix(normalized); err != nil {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_website_config", "root_prefix is invalid")
+	}
+
+	return normalized, nil
+}
+
+func NormalizeSiteDocument(value string, defaultValue string, allowEmpty bool) (string, error) {
+	normalized := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	normalized = strings.TrimPrefix(normalized, "/")
+	if normalized == "" {
+		if allowEmpty {
+			return "", nil
+		}
+		normalized = defaultValue
+	}
+	if err := ValidateObjectKey(normalized); err != nil {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_website_config", "document path is invalid")
+	}
+
+	return normalized, nil
+}
+
+func NormalizeSiteDomain(value string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.TrimSuffix(normalized, ".")
+	if normalized == "" {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain is required")
+	}
+	if strings.Contains(normalized, "://") || strings.ContainsAny(normalized, "/?#") {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain must not include scheme, path or query")
+	}
+	if host, port, err := net.SplitHostPort(normalized); err == nil && port != "" {
+		_ = host
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain must not include a port")
+	}
+	if strings.Contains(normalized, ":") {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain must not include a port")
+	}
+	if !siteDomainPattern.MatchString(normalized) {
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain format is invalid")
+	}
+
+	return normalized, nil
+}
+
+func NormalizeSiteDomains(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return []string{}, nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		domain, err := NormalizeSiteDomain(value)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[domain]; exists {
+			continue
+		}
+		seen[domain] = struct{}{}
+		normalized = append(normalized, domain)
+	}
+
+	sort.Strings(normalized)
+	return normalized, nil
+}
+
+func NormalizeRequestHost(host string) string {
+	normalized := strings.ToLower(strings.TrimSpace(host))
+	normalized = strings.TrimSuffix(normalized, ".")
+	if normalized == "" {
+		return ""
+	}
+	if parsedHost, _, err := net.SplitHostPort(normalized); err == nil {
+		return strings.TrimSuffix(parsedHost, ".")
+	}
+
+	return normalized
+}
+
 func isDuplicateError(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), "duplicate")
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate") || strings.Contains(message, "unique constraint failed")
 }

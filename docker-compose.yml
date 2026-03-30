@@ -44,12 +44,12 @@ services:
       APP_MAX_SIGNED_URL_TTL_SECONDS: ${APP_MAX_SIGNED_URL_TTL_SECONDS}
       APP_READ_HEADER_TIMEOUT_SECONDS: ${APP_READ_HEADER_TIMEOUT_SECONDS}
       APP_SHUTDOWN_TIMEOUT_SECONDS: ${APP_SHUTDOWN_TIMEOUT_SECONDS}
-      DB_DSN: ${DB_DSN}
+      DB_DSN: ${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true
       DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS}
       DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS}
       DB_CONN_MAX_LIFETIME_MINUTES: ${DB_CONN_MAX_LIFETIME_MINUTES}
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     volumes:
       - backend_storage:/data/storage
 
@@ -62,8 +62,18 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    expose:
+      - "80"
+
+  gateway:
+    build:
+      context: ./gateway
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
     ports:
-      - "3000:80"
+      - "80:80"
 
 volumes:
   mysql_data:

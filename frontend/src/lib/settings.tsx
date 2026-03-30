@@ -20,7 +20,7 @@ const storageKey = "light-oss-settings";
 
 const defaultSettings: AppSettings = {
   apiBaseUrl:
-    import.meta.env.VITE_DEFAULT_API_BASE_URL ?? "http://localhost:8080",
+    import.meta.env.VITE_DEFAULT_API_BASE_URL ?? "http://api.underhear.cn",
   bearerToken: import.meta.env.VITE_DEFAULT_BEARER_TOKEN ?? "dev-token",
 };
 

@@ -16,6 +16,27 @@ type Bucket struct {
 	UpdatedAt time.Time `gorm:"not null"`
 }
 
+type Site struct {
+	ID            uint64       `gorm:"primaryKey"`
+	BucketName    string       `gorm:"size:128;not null;index:idx_sites_bucket_name"`
+	RootPrefix    string       `gorm:"size:512;not null"`
+	Enabled       bool         `gorm:"not null;default:true"`
+	IndexDocument string       `gorm:"size:255;not null"`
+	ErrorDocument string       `gorm:"size:255;not null;default:''"`
+	SPAFallback   bool         `gorm:"not null;default:false"`
+	CreatedAt     time.Time    `gorm:"not null"`
+	UpdatedAt     time.Time    `gorm:"not null"`
+	Domains       []SiteDomain `gorm:"foreignKey:SiteID"`
+}
+
+type SiteDomain struct {
+	ID        uint64    `gorm:"primaryKey"`
+	SiteID    uint64    `gorm:"not null;index:idx_site_domains_site_id"`
+	Domain    string    `gorm:"size:255;not null;uniqueIndex:udx_site_domains_domain"`
+	CreatedAt time.Time `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"not null"`
+}
+
 type Object struct {
 	ID               uint64     `gorm:"primaryKey"`
 	BucketName       string     `gorm:"size:128;not null;uniqueIndex:udx_objects_bucket_key,priority:1;index:idx_objects_bucket_created,priority:1;index:idx_objects_bucket_key,priority:1"`
@@ -69,12 +90,12 @@ type UploadSessionChunk struct {
 }
 
 type UploadChunkBlob struct {
-	SHA256     string    `gorm:"primaryKey;size:64"`
-	StoragePath string   `gorm:"size:512;not null"`
-	Size       int64     `gorm:"not null"`
-	ExpiresAt  time.Time `gorm:"not null;index:idx_upload_chunk_blobs_expires_at"`
-	CreatedAt  time.Time `gorm:"not null"`
-	UpdatedAt  time.Time `gorm:"not null"`
+	SHA256      string    `gorm:"primaryKey;size:64"`
+	StoragePath string    `gorm:"size:512;not null"`
+	Size        int64     `gorm:"not null"`
+	ExpiresAt   time.Time `gorm:"not null;index:idx_upload_chunk_blobs_expires_at"`
+	CreatedAt   time.Time `gorm:"not null"`
+	UpdatedAt   time.Time `gorm:"not null"`
 }
 
 type FolderUploadSession struct {

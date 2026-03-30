@@ -214,6 +214,62 @@ docker compose logs -f frontend
 docker compose logs -f mysql
 ```
 
+## Bucket Website Hosting MVP
+
+This repository now supports bucket-backed website hosting for public static assets.
+
+### Deployment topology
+
+- `console.underhear.cn` -> frontend console
+- `api.underhear.cn` -> backend API
+- `*.underhear.cn` -> backend website hosting resolver
+
+Use the new `gateway` container as the only public entrypoint on port `80`.
+
+### Upload a site build
+
+Upload your Vue or React `dist/` output into a bucket prefix, for example:
+
+- bucket: `websites`
+- prefix: `demo/`
+
+Typical object keys:
+
+- `demo/index.html`
+- `demo/assets/index.js`
+- `demo/assets/index.css`
+
+All website files must be uploaded as `public`.
+
+### Create a site binding
+
+Create a site that binds a domain to a bucket prefix:
+
+```bash
+curl -X POST http://api.underhear.cn/api/v1/sites \
+  -H "Authorization: Bearer light-oss" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucket": "websites",
+    "root_prefix": "demo/",
+    "index_document": "index.html",
+    "error_document": "404.html",
+    "spa_fallback": true,
+    "domains": ["demo.underhear.cn"]
+  }'
+```
+
+After that:
+
+- `http://demo.underhear.cn/` -> `websites/demo/index.html`
+- `http://demo.underhear.cn/assets/index.js` -> `websites/demo/assets/index.js`
+
+### Gateway notes
+
+The Nginx gateway does not map domains to buckets directly. It only preserves the incoming `Host` header and proxies requests to the backend. The backend resolves `Host -> site -> bucket + prefix`.
+
+This MVP only handles HTTP. DNS, HTTPS certificates, and TLS termination should be managed separately when you move beyond local validation.
+
 ## 常见问题
 
 ### 前端提示 401

@@ -85,9 +85,11 @@ func main() {
 	tokenValidator := middleware.NewTokenValidator(cfg.BearerTokens)
 	bucketRepo := repository.NewBucketRepository(gormDB)
 	objectRepo := repository.NewObjectRepository(gormDB)
+	siteRepo := repository.NewSiteRepository(gormDB)
 	localStorage := storage.NewLocalStorage(cfg.StorageRoot)
 	bucketService := service.NewBucketService(bucketRepo)
 	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage)
+	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	signService := service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds)
 
 	router := handler.NewRouter(handler.Dependencies{
@@ -98,6 +100,7 @@ func main() {
 		AuthValidator: tokenValidator,
 		BucketService: bucketService,
 		ObjectService: objectService,
+		SiteService:   siteService,
 		SignService:   signService,
 	})
 
