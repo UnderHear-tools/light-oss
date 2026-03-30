@@ -1061,7 +1061,7 @@ func TestSiteManagementCRUDAndDomainConflict(t *testing.T) {
 		bytes.NewBufferString(`{
 			"bucket":"websites",
 			"root_prefix":"demo/",
-			"domains":["demo.underhear.cn","www.demo.underhear.cn"],
+			"domains":["demo.underhear.cn","www.underhear.cn"],
 			"enabled":false,
 			"index_document":"home.html",
 			"error_document":"404.html",
@@ -1107,6 +1107,29 @@ func TestSiteManagementCRUDAndDomainConflict(t *testing.T) {
 	router.ServeHTTP(deleteRec, deleteReq)
 	if deleteRec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func TestSiteManagementRejectsDeepSubdomains(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "websites")
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/sites",
+		bytes.NewBufferString(`{
+			"bucket":"websites",
+			"root_prefix":"demo/",
+			"domains":["www.demo.underhear.cn"]
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -35,6 +35,7 @@ describe("Layout", () => {
     expect(screen.getAllByText("Light OSS Dashboard")).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "bucket" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Site management" })).toBeInTheDocument();
     expect(screen.getAllByText("Dashboard")[0]).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Dashboard body")).toBeInTheDocument();
@@ -77,5 +78,34 @@ describe("Layout", () => {
 
     expect(await screen.findByText("Service Token error")).toBeInTheDocument();
     expect(screen.getByText("DB Token error")).toBeInTheDocument();
+  });
+
+  it("shows the site management breadcrumb and active navigation on /sites", async () => {
+    vi.mocked(getHealthStatus).mockResolvedValueOnce({
+      status: {
+        service: "ok",
+        db: "ok",
+      },
+      version: "mvp",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/sites" element={<div>Sites body</div>} />
+        </Route>
+      </Routes>,
+      { route: "/sites" },
+    );
+
+    const siteLink = screen
+      .getAllByRole("link", { name: "Site management" })
+      .find((element) => element.getAttribute("href") === "/sites");
+
+    expect(siteLink).toBeInTheDocument();
+    expect(siteLink?.closest("[data-active='true']")).not.toBeNull();
+    expect(screen.getAllByText("Site management")[0]).toBeInTheDocument();
+    expect(screen.getByText("Sites body")).toBeInTheDocument();
+    expect(await screen.findByText("Service OK")).toBeInTheDocument();
   });
 });

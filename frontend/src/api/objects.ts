@@ -130,6 +130,7 @@ export async function uploadObject(
       url: `/api/v1/buckets/${encodeURIComponent(params.bucket)}/objects/${encodeObjectKey(
         params.objectKey,
       )}`,
+      timeout: 0,
       data: params.file,
       headers: {
         "Content-Type": params.file.type || "application/octet-stream",
@@ -185,6 +186,7 @@ export async function uploadFolder(
     const response = await createApiClient(settings).request({
       method: "POST",
       url: `/api/v1/buckets/${encodeURIComponent(params.bucket)}/objects/batch`,
+      timeout: 0,
       data: formData,
       onUploadProgress: (event: AxiosProgressEvent) => {
         if (!params.onProgress || !event.total) {

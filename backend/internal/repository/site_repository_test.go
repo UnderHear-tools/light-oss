@@ -35,7 +35,7 @@ func TestSiteRepositoryFindByDomainPreloadsDomains(t *testing.T) {
 			IndexDocument: "index.html",
 			ErrorDocument: "",
 			SPAFallback:   false,
-		}, []string{"www.demo.underhear.cn", "demo.underhear.cn"})
+		}, []string{"www.underhear.cn", "demo.underhear.cn"})
 		return createErr
 	}); err != nil {
 		t.Fatalf("create site: %v", err)

@@ -118,6 +118,7 @@ function buildBreadcrumbs(
       | "breadcrumbs.dashboard"
       | "nav.dashboard"
       | "nav.buckets"
+      | "nav.sites"
       | "nav.settings",
   ) => string,
 ) {
@@ -130,6 +131,11 @@ function buildBreadcrumbs(
 
   if (pathname.startsWith("/settings")) {
     items.push({ label: t("nav.settings") });
+    return items;
+  }
+
+  if (pathname.startsWith("/sites")) {
+    items.push({ label: t("nav.sites") });
     return items;
   }
 

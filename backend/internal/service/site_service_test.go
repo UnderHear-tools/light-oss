@@ -153,6 +153,27 @@ func TestSiteServiceOpenContentUsesFallbacksAndHidesPrivateObjects(t *testing.T)
 	}
 }
 
+func TestNormalizeSiteDomainOnlyAcceptsSingleLevelUnderhearSubdomains(t *testing.T) {
+	valid, err := NormalizeSiteDomain("Demo.Underhear.Cn")
+	if err != nil {
+		t.Fatalf("expected valid domain, got %v", err)
+	}
+	if valid != "demo.underhear.cn" {
+		t.Fatalf("expected normalized domain, got %q", valid)
+	}
+
+	invalidDomains := []string{
+		"underhear.cn",
+		"www.demo.underhear.cn",
+		"demo.example.com",
+	}
+	for _, domain := range invalidDomains {
+		if _, err := NormalizeSiteDomain(domain); err == nil {
+			t.Fatalf("expected %q to be rejected", domain)
+		}
+	}
+}
+
 func newTestSiteServices(t *testing.T) (*repository.BucketRepository, *ObjectService, *SiteService) {
 	t.Helper()
 

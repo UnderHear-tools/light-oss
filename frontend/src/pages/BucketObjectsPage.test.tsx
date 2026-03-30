@@ -17,6 +17,10 @@ vi.mock("../api/objects", () => ({
   buildPublicObjectURL: vi.fn(() => "http://localhost:8080/download"),
 }));
 
+vi.mock("../api/sites", () => ({
+  createSite: vi.fn(),
+}));
+
 import {
   createFolder,
   deleteFolder,
@@ -26,6 +30,7 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "../api/objects";
+import { createSite } from "../api/sites";
 
 describe("BucketObjectsPage", () => {
   beforeEach(() => {
@@ -452,6 +457,169 @@ describe("BucketObjectsPage", () => {
         { recursive: true },
       );
     });
+  });
+
+  it("shows publish site only for directory rows", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+        {
+          type: "file",
+          path: "docs/readme.txt",
+          name: "readme.txt",
+          is_empty: null,
+          object_key: "docs/readme.txt",
+          original_filename: "readme.txt",
+          size: 12,
+          content_type: "text/plain",
+          etag: "abcdef1234567890",
+          visibility: "public",
+          updated_at: "2026-03-25T00:00:00Z",
+        },
+      ],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Publish site" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
+  });
+
+  it("publishes a folder as a site from the explorer table", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+    vi.mocked(createSite).mockResolvedValue({
+      id: 1,
+      bucket: "demo",
+      root_prefix: "docs/",
+      enabled: true,
+      index_document: "index.html",
+      error_document: "",
+      spa_fallback: true,
+      domains: ["demo.underhear.cn", "www.underhear.cn"],
+      created_at: "2026-03-30T00:00:00Z",
+      updated_at: "2026-03-30T00:00:00Z",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Publish site" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("demo")).toBeInTheDocument();
+    expect(within(dialog).getByText("docs/")).toBeInTheDocument();
+
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn, www.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Publish site" }),
+    );
+
+    await waitFor(() => {
+      expect(createSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "demo",
+          root_prefix: "docs/",
+          enabled: true,
+          index_document: "index.html",
+          error_document: "",
+          spa_fallback: true,
+          domains: ["demo.underhear.cn", "www.underhear.cn"],
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
+  });
+
+  it("shows a site publish error toast when the request fails", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+    vi.mocked(createSite).mockRejectedValue(new Error("publish failed"));
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Publish site" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Publish site" }),
+    );
+
+    expect(await screen.findByText("publish failed")).toBeInTheDocument();
   });
 
   it("shows a success toast after copying a public URL", async () => {

@@ -21,6 +21,7 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "@/api/objects";
+import { createSite } from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -47,6 +48,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ToastProvider";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
+import { type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
 import {
   UploadFolderDialog,
   type UploadFolderDialogValue,
@@ -78,6 +80,7 @@ export function BucketObjectsPage() {
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deletingPath, setDeletingPath] = useState("");
+  const [publishingPath, setPublishingPath] = useState("");
   const [signingPath, setSigningPath] = useState("");
 
   const prefix = normalizeExplorerPrefix(searchParams.get("prefix"));
@@ -255,6 +258,35 @@ export function BucketObjectsPage() {
     },
   });
 
+  const publishSiteMutation = useMutation({
+    mutationFn: async (input: {
+      folderPath: string;
+      value: PublishSiteValue;
+    }) => {
+      setPublishingPath(input.folderPath);
+      return createSite(settings, {
+        bucket,
+        root_prefix: input.folderPath,
+        enabled: input.value.enabled,
+        index_document: input.value.indexDocument,
+        error_document: input.value.errorDocument,
+        spa_fallback: input.value.spaFallback,
+        domains: input.value.domains,
+      });
+    },
+    onSuccess: () => {
+      pushToast("success", t("toast.sitePublished"));
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
+      pushToast("error", message);
+    },
+    onSettled: () => {
+      setPublishingPath("");
+    },
+  });
+
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
   const entries = entriesQuery.data?.items ?? [];
   const uploadPending =
@@ -314,6 +346,10 @@ export function BucketObjectsPage() {
 
   async function handleDeleteFolder(folderPath: string) {
     await deleteFolderMutation.mutateAsync(folderPath);
+  }
+
+  async function handlePublishSite(folderPath: string, value: PublishSiteValue) {
+    await publishSiteMutation.mutateAsync({ folderPath, value });
   }
 
   async function handleSignDownload(objectKey: string) {
@@ -543,8 +579,10 @@ export function BucketObjectsPage() {
                     onDeleteFile={handleDeleteFile}
                     onDeleteFolder={handleDeleteFolder}
                     onOpenDirectory={handleNavigatePrefix}
+                    onPublishSite={handlePublishSite}
                     onSignDownload={handleSignDownload}
                     onUpdateVisibility={handleUpdateVisibility}
+                    publishingPath={publishingPath}
                     signingPath={signingPath}
                   />
                 </div>

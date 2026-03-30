@@ -17,6 +17,7 @@ import {
 import {
   LayoutDashboardIcon,
   DatabaseZapIcon,
+  GlobeIcon,
   HardDriveIcon,
   Settings2Icon,
 } from "lucide-react"
@@ -47,6 +48,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         url: "/buckets",
         icon: <HardDriveIcon />,
         isActive: pathname.startsWith("/buckets"),
+      },
+      {
+        title: t("nav.sites"),
+        url: "/sites",
+        icon: <GlobeIcon />,
+        isActive: pathname.startsWith("/sites"),
       },
       {
         title: t("nav.settings"),

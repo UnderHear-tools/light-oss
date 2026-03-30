@@ -54,6 +54,7 @@ describe("objects api helpers", () => {
 
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
+        timeout: 0,
         url: "/api/v1/buckets/demo/objects/docs/underhear%2Epostgresql%2Esql",
       }),
     );
@@ -110,6 +111,7 @@ describe("objects api helpers", () => {
     expect(request).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "POST",
+        timeout: 0,
         url: "/api/v1/buckets/demo/objects/batch",
       }),
     );

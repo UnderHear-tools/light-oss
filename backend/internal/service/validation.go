@@ -14,7 +14,7 @@ import (
 )
 
 var bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-var siteDomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
+var siteDomainPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?\.underhear\.cn$`)
 
 func ValidateBucketName(name string) error {
 	if !bucketNamePattern.MatchString(name) {
@@ -206,7 +206,7 @@ func NormalizeSiteDomain(value string) (string, error) {
 		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain must not include a port")
 	}
 	if !siteDomainPattern.MatchString(normalized) {
-		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain format is invalid")
+		return "", apperrors.New(http.StatusBadRequest, "invalid_domain", "domain must match *.underhear.cn")
 	}
 
 	return normalized, nil

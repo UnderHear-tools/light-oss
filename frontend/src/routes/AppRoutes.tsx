@@ -3,6 +3,7 @@ import { Layout } from "../components/Layout";
 import { DashboardPage } from "../pages/DashboardPage";
 import { BucketsPage } from "../pages/BucketsPage";
 import { BucketObjectsPage } from "../pages/BucketObjectsPage";
+import { SitesPage } from "../pages/SitesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 
 export function AppRoutes() {
@@ -14,6 +15,7 @@ export function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/buckets" element={<BucketsPage />} />
         <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+        <Route path="/sites" element={<SitesPage />} />
       </Route>
     </Routes>
   );

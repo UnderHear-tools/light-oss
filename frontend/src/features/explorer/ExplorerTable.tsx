@@ -5,6 +5,7 @@ import {
   FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
+  GlobeIcon,
   LoaderCircleIcon,
   ShieldAlertIcon,
   Trash2Icon,
@@ -48,6 +49,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { PublishSiteDialog, type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
 
 export function ExplorerTable({
   bucket,
@@ -57,8 +59,10 @@ export function ExplorerTable({
   onDeleteFile,
   onDeleteFolder,
   onOpenDirectory,
+  onPublishSite,
   onSignDownload,
   onUpdateVisibility,
+  publishingPath,
   signingPath,
 }: {
   bucket: string;
@@ -68,8 +72,10 @@ export function ExplorerTable({
   onDeleteFile: (objectKey: string) => Promise<void>;
   onDeleteFolder: (folderPath: string) => Promise<void>;
   onOpenDirectory: (folderPath: string) => void;
+  onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
   onSignDownload: (objectKey: string) => Promise<void>;
   onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
+  publishingPath: string;
   signingPath: string;
 }) {
   const { locale, t } = useI18n();
@@ -138,6 +144,13 @@ export function ExplorerTable({
                     >
                       <FolderOpenIcon className="text-amber-500" />
                     </ExplorerIconButton>
+
+                    <PublishFolderSiteButton
+                      bucket={bucket}
+                      entry={entry}
+                      onPublishSite={onPublishSite}
+                      publishingPath={publishingPath}
+                    />
 
                     <DeleteFolderButton
                       bucket={bucket}
@@ -574,6 +587,45 @@ function DeleteFolderButton({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function PublishFolderSiteButton({
+  bucket,
+  entry,
+  onPublishSite,
+  publishingPath,
+}: {
+  bucket: string;
+  entry: ExplorerDirectoryEntry;
+  onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
+  publishingPath: string;
+}) {
+  const { t } = useI18n();
+  const pending = publishingPath === entry.path;
+
+  return (
+    <PublishSiteDialog
+      bucket={bucket}
+      onSubmit={(value) => onPublishSite(entry.path, value)}
+      pending={pending}
+      prefix={entry.path}
+      trigger={
+        <span className="inline-flex">
+          <ExplorerIconButton
+            disabled={pending}
+            label={t("explorer.actions.publishSite")}
+            onClick={() => undefined}
+          >
+            {pending ? (
+              <LoaderCircleIcon className="animate-spin text-emerald-500" />
+            ) : (
+              <GlobeIcon className="text-emerald-500" />
+            )}
+          </ExplorerIconButton>
+        </span>
+      }
+    />
   );
 }
 

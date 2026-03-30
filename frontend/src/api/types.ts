@@ -80,6 +80,35 @@ export interface BatchUploadResult {
   items: ObjectItem[];
 }
 
+export interface Site {
+  id: number;
+  bucket: string;
+  root_prefix: string;
+  enabled: boolean;
+  index_document: string;
+  error_document: string;
+  spa_fallback: boolean;
+  domains: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiteListResult {
+  items: Site[];
+}
+
+export interface CreateSiteRequest {
+  bucket: string;
+  root_prefix: string;
+  enabled: boolean;
+  index_document: string;
+  error_document: string;
+  spa_fallback: boolean;
+  domains: string[];
+}
+
+export interface UpdateSiteRequest extends CreateSiteRequest {}
+
 export interface SignedDownloadResult {
   url: string;
   expires_at: number;
