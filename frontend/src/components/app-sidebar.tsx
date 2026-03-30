@@ -37,10 +37,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
     navMain: [
       {
-        title: t("nav.console"),
-        url: "/console",
+        title: t("nav.dashboard"),
+        url: "/dashboard",
         icon: <LayoutDashboardIcon />,
-        isActive: pathname === "/" || pathname.startsWith("/console"),
+        isActive: pathname === "/" || pathname.startsWith("/dashboard"),
       },
       {
         title: t("nav.buckets"),

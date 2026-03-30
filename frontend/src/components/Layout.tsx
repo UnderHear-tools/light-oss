@@ -114,13 +114,17 @@ function buildBreadcrumbs(
   pathname: string,
   bucket: string | undefined,
   t: (
-    key: "breadcrumbs.console" | "nav.console" | "nav.buckets" | "nav.settings",
+    key:
+      | "breadcrumbs.dashboard"
+      | "nav.dashboard"
+      | "nav.buckets"
+      | "nav.settings",
   ) => string,
 ) {
   const items: Array<{ label: string; href?: string }> = [];
 
-  if (pathname === "/" || pathname.startsWith("/console")) {
-    items.push({ label: t("nav.console") });
+  if (pathname === "/" || pathname.startsWith("/dashboard")) {
+    items.push({ label: t("nav.dashboard") });
     return items;
   }
 

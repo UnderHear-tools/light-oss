@@ -16,7 +16,7 @@ import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
 
-export function ConsolePage() {
+export function DashboardPage() {
   const { settings } = useAppSettings();
   const { locale, t } = useI18n();
 
@@ -48,10 +48,10 @@ export function ConsolePage() {
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold tracking-tight">
-            {t("console.title")}
+            {t("dashboard.title")}
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            {t("console.description")}
+            {t("dashboard.description")}
           </p>
         </div>
 

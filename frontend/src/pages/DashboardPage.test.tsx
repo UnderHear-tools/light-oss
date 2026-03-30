@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
-import { ConsolePage } from "./ConsolePage";
+import { DashboardPage } from "./DashboardPage";
 import { renderWithApp } from "../test/test-utils";
 
 vi.mock("../api/buckets", () => ({
@@ -10,7 +10,7 @@ vi.mock("../api/buckets", () => ({
 
 import { listBuckets } from "../api/buckets";
 
-describe("ConsolePage", () => {
+describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -29,13 +29,13 @@ describe("ConsolePage", () => {
 
     renderWithApp(
       <Routes>
-        <Route path="/console" element={<ConsolePage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
       </Routes>,
-      { route: "/console" },
+      { route: "/dashboard" },
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Console" }),
+      await screen.findByRole("heading", { name: "Dashboard" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Total bucket")).toBeInTheDocument();
     expect(

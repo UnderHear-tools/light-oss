@@ -2,15 +2,15 @@ import { useAppPreferences, type AppLocale } from "./preferences";
 
 // Keep "bucket" untranslated in every locale. Do not replace it with "存储桶".
 const enUS = {
-  "app.name": "Light OSS Console",
+  "app.name": "Light OSS Dashboard",
   "app.tagline": "Object storage admin dashboard",
-  "nav.console": "Console",
+  "nav.dashboard": "Dashboard",
   "nav.buckets": "bucket",
   "nav.settings": "Settings",
   "sidebar.section.platform": "Platform",
   "sidebar.section.explorer": "Explorer",
   "sidebar.action.localOnly": "Local mode",
-  "breadcrumbs.console": "Console",
+  "breadcrumbs.dashboard": "Dashboard",
   "header.connection": "Connection",
   "header.apiHost": "API host",
   "header.authConfigured": "Token configured",
@@ -46,9 +46,9 @@ const enUS = {
   "common.localStorage": "Stored locally",
   "common.ready": "Ready",
   "common.notAvailable": "Not available",
-  "console.title": "Console",
-  "console.description":
-    "Monitor bucket activity, connection health, and create new bucket.",
+  "dashboard.title": "Dashboard",
+  "dashboard.description":
+    "Monitor bucket activity, connection health, and manage storage from one place.",
   "buckets.title": "bucket",
   "buckets.description":
     "Browse available bucket and open a bucket to manage its files.",
@@ -250,15 +250,15 @@ const enUS = {
 } as const;
 
 const zhCN: Record<keyof typeof enUS, string> = {
-  "app.name": "Light OSS 控制台",
+  "app.name": "Light OSS 仪表盘",
   "app.tagline": "对象存储管理面板",
-  "nav.console": "控制台",
+  "nav.dashboard": "仪表盘",
   "nav.buckets": "bucket",
   "nav.settings": "设置",
   "sidebar.section.platform": "平台",
   "sidebar.section.explorer": "浏览器",
   "sidebar.action.localOnly": "本地模式",
-  "breadcrumbs.console": "控制台",
+  "breadcrumbs.dashboard": "仪表盘",
   "header.connection": "连接",
   "header.apiHost": "API 地址",
   "header.authConfigured": "令牌已配置",
@@ -294,8 +294,8 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "common.localStorage": "已存储到本地",
   "common.ready": "就绪",
   "common.notAvailable": "不可用",
-  "console.title": "控制台",
-  "console.description": "监控 bucket 活动、连接状态，并创建新的 bucket。",
+  "dashboard.title": "仪表盘",
+  "dashboard.description": "在一个页面中监控 bucket 活动、连接状态，并管理存储资源。",
   "buckets.title": "bucket",
   "buckets.description": "查看当前可用的 bucket，并进入对应 bucket 管理文件。",
   "buckets.overview.totalBuckets": "bucket 总数",

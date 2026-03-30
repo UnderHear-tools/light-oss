@@ -26,18 +26,18 @@ describe("Layout", () => {
     renderWithApp(
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/console" element={<div>Console body</div>} />
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
         </Route>
       </Routes>,
-      { route: "/console" },
+      { route: "/dashboard" },
     );
 
-    expect(screen.getAllByText("Light OSS Console")).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Console" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Light OSS Dashboard")).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "bucket" })).toBeInTheDocument();
-    expect(screen.getAllByText("Console")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Dashboard")[0]).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
-    expect(screen.getByText("Console body")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard body")).toBeInTheDocument();
     expect(await screen.findByText("Service OK")).toBeInTheDocument();
     expect(screen.getByText("DB OK")).toBeInTheDocument();
   });
@@ -48,10 +48,10 @@ describe("Layout", () => {
     renderWithApp(
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/console" element={<div>Console body</div>} />
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
         </Route>
       </Routes>,
-      { route: "/console" },
+      { route: "/dashboard" },
     );
 
     expect(await screen.findByText("Service Unreachable")).toBeInTheDocument();
@@ -69,10 +69,10 @@ describe("Layout", () => {
     renderWithApp(
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/console" element={<div>Console body</div>} />
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
         </Route>
       </Routes>,
-      { route: "/console" },
+      { route: "/dashboard" },
     );
 
     expect(await screen.findByText("Service Token error")).toBeInTheDocument();
