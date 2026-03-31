@@ -1,0 +1,2586 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Light OSS API",
+    "version": "1.0.0",
+    "description": "OpenAPI 3.0 JSON for APIFOX import. Route coverage is derived from backend/internal/handler/router.go and excludes site content routes outside /api/v1 and /healthz."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local backend default"
+    },
+    {
+      "url": "http://api.underhear.cn",
+      "description": "Gateway example"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Buckets"
+    },
+    {
+      "name": "Folders"
+    },
+    {
+      "name": "Objects"
+    },
+    {
+      "name": "Sites"
+    },
+    {
+      "name": "Signing"
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "getHealthz",
+        "summary": "Unauthenticated health check",
+        "description": "Returns service and database health without authentication.",
+        "responses": {
+          "200": {
+            "description": "Service and database are healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service is up but the database check degraded. The body keeps the normal success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/healthz": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "getProtectedHealthz",
+        "summary": "Authenticated health check",
+        "description": "Same payload as /healthz, but requires a Bearer token.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service and database are healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service is up but the database check degraded. The body keeps the normal success envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets": {
+      "get": {
+        "tags": [
+          "Buckets"
+        ],
+        "operationId": "listBuckets",
+        "summary": "List buckets",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bucket list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BucketListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list buckets. Error code: bucket_list_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Buckets"
+        ],
+        "operationId": "createBucket",
+        "summary": "Create a bucket",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BucketCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bucket created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BucketEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body or bucket name is invalid. Error codes: invalid_request, invalid_bucket_name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Bucket already exists. Error code: bucket_exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create bucket. Error code: bucket_create_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/folders": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "operationId": "listFolders",
+        "summary": "List the full folder tree",
+        "description": "Returns all known folder nodes for a bucket, including empty folders created through the folder marker object.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Folder tree.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderNodeListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name is invalid. Error code: invalid_bucket_name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list folders. Error code: folder_list_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Folders"
+        ],
+        "operationId": "createFolder",
+        "summary": "Create an empty folder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Folder created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderNodeEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body or folder input is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_prefix, invalid_folder_name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket or parent folder was not found. Error codes: bucket_not_found, folder_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Folder already exists. Error code: folder_exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Folder creation failed. Error codes: bucket_lookup_failed, folder_lookup_failed, object_store_failed, object_metadata_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Folders"
+        ],
+        "operationId": "deleteFolder",
+        "summary": "Delete a folder",
+        "description": "When recursive is omitted or false, only empty folders can be deleted. When recursive is true, the folder and all nested files/subfolders are soft-deleted.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FolderPathQuery"
+          },
+          {
+            "$ref": "#/components/parameters/RecursiveQuery"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Folder deleted. No response body."
+          },
+          "400": {
+            "description": "Bucket name, folder path, or recursive query is invalid. Error codes: invalid_bucket_name, invalid_folder_path, invalid_request, invalid_prefix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Folder not found. Error code: folder_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Folder is not empty and recursive delete was not enabled. Error code: folder_not_empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Folder deletion failed. Error codes: folder_lookup_failed, folder_delete_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/entries": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "operationId": "listExplorerEntries",
+        "summary": "List direct entries under a folder prefix",
+        "description": "Entries are ordered with directories first, then files, both sorted by name. next_cursor is an opaque cursor for the same prefix/search combination.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PrefixQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ExplorerLimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explorer entries page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplorerEntryListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name, prefix, or cursor is invalid. Error codes: invalid_bucket_name, invalid_prefix, invalid_cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list explorer entries. Error code: explorer_list_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/objects": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "listObjects",
+        "summary": "List objects",
+        "description": "Objects are returned newest first. next_cursor is an opaque cursor for the same prefix filter.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PrefixQuery"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectListLimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/CursorQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name, prefix, or cursor is invalid. Error codes: invalid_bucket_name, invalid_prefix, invalid_cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list objects. Error code: object_list_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/objects/batch": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "uploadObjectBatch",
+        "summary": "Batch upload files with multipart/form-data",
+        "description": "manifest is a JSON string array. Each item declares file_field and relative_path. Additional file parts must use the exact field names referenced by manifest[].file_field.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadBatchForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Files uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadBatchEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Multipart payload, manifest, bucket name, prefix, visibility, or final object key is invalid. Error codes include invalid_multipart_request, invalid_batch_manifest, batch_file_missing, invalid_bucket_name, invalid_prefix, invalid_visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Batch upload failed. Error codes may include bucket_lookup_failed, batch_file_buffer_failed, batch_file_open_failed, object_store_failed, object_metadata_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/objects/{key}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        },
+        {
+          "$ref": "#/components/parameters/KeyParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "downloadObject",
+        "summary": "Download an object",
+        "description": "Public objects can be downloaded anonymously. Private objects require either Authorization: Bearer <token> or a signed URL using expires and signature query parameters.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OptionalAuthorizationHeader"
+          },
+          {
+            "$ref": "#/components/parameters/DownloadExpiresQuery"
+          },
+          {
+            "$ref": "#/components/parameters/DownloadSignatureQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object content. The actual media type mirrors the stored object Content-Type header.",
+            "headers": {
+              "Content-Type": {
+                "$ref": "#/components/headers/ContentTypeHeader"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLengthHeader"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETagHeader"
+              },
+              "X-Object-Visibility": {
+                "$ref": "#/components/headers/ObjectVisibilityHeader"
+              },
+              "X-Original-Filename": {
+                "$ref": "#/components/headers/OriginalFilenameHeader"
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Private object access was not authorized. Error codes: unauthorized, invalid_signature, signature_expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found. Error code: object_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to open object content. Error codes: object_lookup_failed, object_open_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "headObject",
+        "summary": "Get object headers",
+        "description": "Returns metadata headers without a body. Public objects can be inspected anonymously. Private objects require Authorization: Bearer <token>; signed URLs are not accepted for HEAD.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OptionalAuthorizationHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object headers only. No response body.",
+            "headers": {
+              "Content-Type": {
+                "$ref": "#/components/headers/ContentTypeHeader"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLengthHeader"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETagHeader"
+              },
+              "X-Object-Visibility": {
+                "$ref": "#/components/headers/ObjectVisibilityHeader"
+              },
+              "X-Original-Filename": {
+                "$ref": "#/components/headers/OriginalFilenameHeader"
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Private object access requires a valid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found. Error code: object_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to open object content. Error codes: object_lookup_failed, object_open_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "uploadObject",
+        "summary": "Upload or replace an object",
+        "description": "The request body is streamed directly into storage. X-Object-Visibility defaults to private when omitted.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UploadVisibilityHeader"
+          },
+          {
+            "$ref": "#/components/parameters/OriginalFilenameHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Object uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name, object key, or visibility is invalid. Error codes: invalid_bucket_name, invalid_object_key, invalid_visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Upload failed. Error codes: bucket_lookup_failed, object_store_failed, object_metadata_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "deleteObject",
+        "summary": "Soft delete an object",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Object deleted. No response body."
+          },
+          "400": {
+            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found. Error code: object_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete object. Error code: object_delete_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buckets/{bucket}/objects/visibility/{key}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        },
+        {
+          "$ref": "#/components/parameters/KeyParam"
+        }
+      ],
+      "patch": {
+        "tags": [
+          "Objects"
+        ],
+        "operationId": "updateObjectVisibility",
+        "summary": "Update object visibility",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateObjectVisibilityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Visibility updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body, bucket name, object key, or visibility is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_object_key, invalid_visibility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found. Error code: object_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update object visibility. Error code: object_update_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "listSites",
+        "summary": "List site bindings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Site list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list sites. Error code: site_list_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "createSite",
+        "summary": "Create a site binding",
+        "description": "Site domains must match *.underhear.cn. root_prefix is normalized to end with a trailing slash. index_document defaults to index.html when omitted or empty. enabled defaults to true. spa_fallback defaults to false.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Site created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body or site configuration is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_website_config, invalid_domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "One of the domains is already bound to another site. Error code: domain_conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Site creation failed. Error codes: bucket_lookup_failed, site_create_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{siteID}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/SiteIDParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "getSite",
+        "summary": "Get a site binding",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Site detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "siteID is invalid. Error code: invalid_site_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found. Error code: site_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to look up site. Error code: site_lookup_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "updateSite",
+        "summary": "Update a site binding",
+        "description": "The same validation rules and defaults as createSite apply to the incoming body.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Site updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "siteID, request body, or site configuration is invalid. Error codes: invalid_site_id, invalid_request, invalid_bucket_name, invalid_website_config, invalid_domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site or bucket not found. Error codes: site_not_found, bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "One of the domains is already bound to another site. Error code: domain_conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Site update failed. Error codes: bucket_lookup_failed, site_update_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "deleteSite",
+        "summary": "Delete a site binding",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Site deleted. No response body."
+          },
+          "400": {
+            "description": "siteID is invalid. Error code: invalid_site_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Site not found. Error code: site_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Site deletion failed. Error code: site_delete_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sign/download": {
+      "post": {
+        "tags": [
+          "Signing"
+        ],
+        "operationId": "signDownload",
+        "summary": "Generate a signed download URL",
+        "description": "Creates a temporary signed URL for GET object downloads. The current environment defaults expires_in_seconds to 300 when the client sends 0 or a negative value, and rejects values above 86400.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignDownloadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed download URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedDownloadEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body, bucket name, object key, or expiry is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_object_key, invalid_expiry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "parameters": {
+      "BucketParam": {
+        "name": "bucket",
+        "in": "path",
+        "required": true,
+        "description": "Bucket name. Must match ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+          "minLength": 3,
+          "maxLength": 63
+        }
+      },
+      "KeyParam": {
+        "name": "key",
+        "in": "path",
+        "required": true,
+        "allowReserved": true,
+        "style": "simple",
+        "explode": false,
+        "description": "Object key. This placeholder represents Gin's /*key wildcard and may contain '/'. Pass the raw key path without a leading slash. Max length: 512. Path traversal and reserved folder marker names are rejected where applicable.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "SiteIDParam": {
+        "name": "siteID",
+        "in": "path",
+        "required": true,
+        "description": "Positive site identifier.",
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "PrefixQuery": {
+        "name": "prefix",
+        "in": "query",
+        "required": false,
+        "description": "Optional prefix filter. Max length: 512. Folder-style prefixes should usually end with '/'.",
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "SearchQuery": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "description": "Case-insensitive substring filter applied to direct entry names.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ObjectListLimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Page size. Defaults to 20. Maximum 100.",
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        }
+      },
+      "ExplorerLimitQuery": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Page size. Defaults to 100. Maximum 200.",
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 100
+        }
+      },
+      "CursorQuery": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "description": "Opaque cursor returned by the previous page.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FolderPathQuery": {
+        "name": "path",
+        "in": "query",
+        "required": true,
+        "description": "Folder path to delete. Must be a non-empty folder path ending with '/'.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "RecursiveQuery": {
+        "name": "recursive",
+        "in": "query",
+        "required": false,
+        "description": "When true, delete the folder recursively. When omitted or false, only empty folders can be deleted.",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "OptionalAuthorizationHeader": {
+        "name": "Authorization",
+        "in": "header",
+        "required": false,
+        "description": "Optional bearer token in the form `Bearer <token>`. Required for protected management endpoints, and conditionally required for private object reads as documented on each operation.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "UploadVisibilityHeader": {
+        "name": "X-Object-Visibility",
+        "in": "header",
+        "required": false,
+        "description": "Object visibility. Defaults to private when omitted.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ]
+        }
+      },
+      "OriginalFilenameHeader": {
+        "name": "X-Original-Filename",
+        "in": "header",
+        "required": false,
+        "description": "Original file name shown in metadata and download headers. URL-escaped values are decoded by the backend and sanitized to a safe base name.",
+        "schema": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      },
+      "DownloadExpiresQuery": {
+        "name": "expires",
+        "in": "query",
+        "required": false,
+        "description": "UNIX timestamp used together with signature for signed private-object downloads.",
+        "schema": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "DownloadSignatureQuery": {
+        "name": "signature",
+        "in": "query",
+        "required": false,
+        "description": "Signature used together with expires for signed private-object downloads.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "headers": {
+      "ContentTypeHeader": {
+        "description": "Stored object content type.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ContentLengthHeader": {
+        "description": "Stored object size in bytes.",
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        }
+      },
+      "ETagHeader": {
+        "description": "Entity tag generated for the stored object content.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ObjectVisibilityHeader": {
+        "description": "Stored object visibility.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ]
+        }
+      },
+      "OriginalFilenameHeader": {
+        "description": "Stored original file name.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "SuccessEnvelope": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "description": "Request correlation ID returned by middleware."
+          },
+          "data": {
+            "type": "object",
+            "description": "Endpoint-specific payload."
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "error"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        }
+      },
+      "HealthStatus": {
+        "type": "object",
+        "required": [
+          "service",
+          "db"
+        ],
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          }
+        }
+      },
+      "HealthzResult": {
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          },
+          "version": {
+            "type": "string",
+            "example": "mvp"
+          }
+        }
+      },
+      "BucketCreateRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63,
+            "description": "Bucket name. Lowercase letters, digits, dot, and hyphen only."
+          }
+        }
+      },
+      "Bucket": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BucketList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Bucket"
+            }
+          }
+        }
+      },
+      "FolderCreateRequest": {
+        "type": "object",
+        "required": [
+          "prefix",
+          "name"
+        ],
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Parent folder prefix. Use an empty string for the bucket root. Non-empty values must end with '/'."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Folder name. Must not contain '/', '\\\\', NUL, '.', '..', or '.light-oss-folder'."
+          }
+        }
+      },
+      "FolderNode": {
+        "type": "object",
+        "required": [
+          "path",
+          "name",
+          "parent_path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parent_path": {
+            "type": "string"
+          }
+        }
+      },
+      "FolderNodeList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolderNode"
+            }
+          }
+        }
+      },
+      "Object": {
+        "type": "object",
+        "required": [
+          "id",
+          "bucket_name",
+          "object_key",
+          "original_filename",
+          "size",
+          "content_type",
+          "etag",
+          "visibility",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "bucket_name": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "original_filename": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "etag": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ObjectList": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Opaque cursor for the next page. Empty string when there is no next page."
+          }
+        }
+      },
+      "ExplorerEntry": {
+        "type": "object",
+        "required": [
+          "type",
+          "path",
+          "name"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "directory",
+              "file"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "is_empty": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Only set for directory entries."
+          },
+          "object_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "original_filename": {
+            "type": "string",
+            "nullable": true
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "content_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "etag": {
+            "type": "string",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "ExplorerEntryList": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerEntry"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Opaque cursor for the next page. Empty string when there is no next page."
+          }
+        }
+      },
+      "UploadBatchManifestItem": {
+        "type": "object",
+        "required": [
+          "file_field",
+          "relative_path"
+        ],
+        "properties": {
+          "file_field": {
+            "type": "string",
+            "description": "Multipart file field name."
+          },
+          "relative_path": {
+            "type": "string",
+            "description": "Relative object path under the supplied prefix. Must not start with '/'."
+          }
+        }
+      },
+      "UploadBatchForm": {
+        "type": "object",
+        "required": [
+          "manifest"
+        ],
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Optional folder prefix. Non-empty values must end with '/'."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "description": "Visibility applied to every uploaded object. Defaults to private when omitted."
+          },
+          "manifest": {
+            "type": "string",
+            "description": "JSON string array of UploadBatchManifestItem objects.",
+            "example": "[{\"file_field\":\"file_0\",\"relative_path\":\"index.html\"},{\"file_field\":\"file_1\",\"relative_path\":\"assets/app.js\"}]"
+          }
+        },
+        "additionalProperties": {
+          "type": "string",
+          "format": "binary",
+          "description": "Additional multipart file parts referenced by manifest[].file_field."
+        }
+      },
+      "UploadBatchResult": {
+        "type": "object",
+        "required": [
+          "uploaded_count",
+          "items"
+        ],
+        "properties": {
+          "uploaded_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        }
+      },
+      "UpdateObjectVisibilityRequest": {
+        "type": "object",
+        "required": [
+          "visibility"
+        ],
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          }
+        }
+      },
+      "SignDownloadRequest": {
+        "type": "object",
+        "required": [
+          "bucket",
+          "object_key",
+          "expires_in_seconds"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63
+          },
+          "object_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 86400,
+            "description": "TTL in seconds. Values <= 0 use the server default in the current environment."
+          }
+        }
+      },
+      "SignedDownloadResult": {
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "UNIX timestamp in seconds."
+          }
+        }
+      },
+      "SiteRequest": {
+        "type": "object",
+        "required": [
+          "bucket"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63
+          },
+          "root_prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "",
+            "description": "Root folder prefix. Leading slash is stripped. Non-empty values are normalized to end with '/'."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "index_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "index.html",
+            "description": "Document path relative to root_prefix. Defaults to index.html."
+          },
+          "error_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "",
+            "description": "Optional error document path relative to root_prefix."
+          },
+          "spa_fallback": {
+            "type": "boolean",
+            "default": false
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?\\.underhear\\.cn$"
+            },
+            "description": "Optional domain bindings. Each item must match *.underhear.cn with exactly one label before underhear.cn."
+          }
+        }
+      },
+      "Site": {
+        "type": "object",
+        "required": [
+          "id",
+          "bucket",
+          "root_prefix",
+          "enabled",
+          "index_document",
+          "error_document",
+          "spa_fallback",
+          "domains",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "root_prefix": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "index_document": {
+            "type": "string"
+          },
+          "error_document": {
+            "type": "string"
+          },
+          "spa_fallback": {
+            "type": "boolean"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SiteList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Site"
+            }
+          }
+        }
+      },
+      "HealthzEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/HealthzResult"
+              }
+            }
+          }
+        ]
+      },
+      "BucketEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Bucket"
+              }
+            }
+          }
+        ]
+      },
+      "BucketListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/BucketList"
+              }
+            }
+          }
+        ]
+      },
+      "FolderNodeEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/FolderNode"
+              }
+            }
+          }
+        ]
+      },
+      "FolderNodeListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/FolderNodeList"
+              }
+            }
+          }
+        ]
+      },
+      "ObjectEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Object"
+              }
+            }
+          }
+        ]
+      },
+      "ObjectListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/ObjectList"
+              }
+            }
+          }
+        ]
+      },
+      "ExplorerEntryListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/ExplorerEntryList"
+              }
+            }
+          }
+        ]
+      },
+      "SiteEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/Site"
+              }
+            }
+          }
+        ]
+      },
+      "SiteListEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/SiteList"
+              }
+            }
+          }
+        ]
+      },
+      "SignedDownloadEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/SignedDownloadResult"
+              }
+            }
+          }
+        ]
+      },
+      "UploadBatchEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/UploadBatchResult"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

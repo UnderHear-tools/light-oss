@@ -15,7 +15,7 @@ Light OSS 由四部分组成：
 
 项目内还提供了：
 
-- OpenAPI 文档：`backend/docs/openapi.yaml`
+- OpenAPI 文档：`backend/docs/openapi.apifox.json`
 - 数据库 migration：`backend/migrations/`
 - Makefile 快捷命令：`make up`、`make test` 等
 
@@ -43,7 +43,7 @@ Light OSS 由四部分组成：
 .
 ├─ backend/
 │  ├─ cmd/server
-│  ├─ docs/openapi.yaml
+│  ├─ docs/openapi.apifox.json
 │  ├─ internal/
 │  └─ migrations/
 ├─ frontend/
