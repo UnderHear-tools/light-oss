@@ -8,8 +8,8 @@ ARG VITE_DEFAULT_BEARER_TOKEN=dev-token
 ENV VITE_DEFAULT_API_BASE_URL=$VITE_DEFAULT_API_BASE_URL
 ENV VITE_DEFAULT_BEARER_TOKEN=$VITE_DEFAULT_BEARER_TOKEN
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 RUN npm run build

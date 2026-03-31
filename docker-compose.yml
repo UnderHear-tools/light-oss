@@ -4,19 +4,14 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     command:
-      - --default-authentication-plugin=mysql_native_password
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -31,7 +26,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV}
       APP_ADDR: ${APP_ADDR}
-      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL}
+      APP_PUBLIC_BASE_URL: http://localhost
       APP_STORAGE_ROOT: ${APP_STORAGE_ROOT}
       APP_MAX_UPLOAD_SIZE_BYTES: ${APP_MAX_UPLOAD_SIZE_BYTES}
       APP_MAX_MULTIPART_MEMORY_BYTES: ${APP_MAX_MULTIPART_MEMORY_BYTES}
@@ -44,7 +39,7 @@ services:
       APP_MAX_SIGNED_URL_TTL_SECONDS: ${APP_MAX_SIGNED_URL_TTL_SECONDS}
       APP_READ_HEADER_TIMEOUT_SECONDS: ${APP_READ_HEADER_TIMEOUT_SECONDS}
       APP_SHUTDOWN_TIMEOUT_SECONDS: ${APP_SHUTDOWN_TIMEOUT_SECONDS}
-      DB_DSN: ${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true
+      DB_DSN: root:${MYSQL_ROOT_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true
       DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS}
       DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS}
       DB_CONN_MAX_LIFETIME_MINUTES: ${DB_CONN_MAX_LIFETIME_MINUTES}
@@ -57,11 +52,13 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_DEFAULT_API_BASE_URL: ${VITE_DEFAULT_API_BASE_URL}
+        VITE_DEFAULT_API_BASE_URL: http://localhost
         VITE_DEFAULT_BEARER_TOKEN: ${VITE_DEFAULT_BEARER_TOKEN}
     restart: unless-stopped
     depends_on:
       - backend
+    ports:
+      - "3000:80"
     expose:
       - "80"
 
