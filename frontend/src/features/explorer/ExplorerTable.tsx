@@ -50,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatBytes, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { PublishSiteDialog, type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
+import { downloadFile } from "@/lib/utils";
 
 export function ExplorerTable({
   bucket,
@@ -730,12 +731,27 @@ function ExplorerIconLink({
   href: string;
   label: string;
 }) {
+  // 从 href 中提取文件名（最后一个 '/' 之后的部分，并解码）
+  const getFileName = (url: string) => {
+    const decodedUrl = decodeURIComponent(url);
+    const parts = decodedUrl.split('/');
+    // 数组的 pop方法移除数组的 最后一个元素并返回
+    const lastPart = parts.pop() || 'download';
+    return lastPart;
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const filename = getFileName(href);
+    downloadFile(href, filename);
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex">
           <Button asChild className="[&_svg]:size-4" size="icon-sm" variant="ghost">
-            <a href={href} rel="noreferrer" target="_blank">
+            <a href={href} rel="noreferrer" target="_blank" onClick={handleClick}>
               {children}
               <span className="sr-only">{label}</span>
             </a>
