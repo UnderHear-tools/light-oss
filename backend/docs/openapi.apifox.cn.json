@@ -3,50 +3,50 @@
   "info": {
     "title": "Light OSS API",
     "version": "1.0.0",
-    "description": "OpenAPI 3.0 JSON for APIFOX import. Route coverage is derived from backend/internal/handler/router.go and excludes site content routes outside /api/v1 and /healthz."
+    "description": "供 APIFOX 导入的 OpenAPI 3.0 JSON。路由覆盖范围来自 backend/internal/handler/router.go，不包含 /api/v1 与 /healthz 之外的站点内容路由。"
   },
   "servers": [
     {
       "url": "http://localhost:8080",
-      "description": "Local backend default"
+      "description": "本地后端默认地址"
     },
     {
       "url": "http://oss.underhear.cn",
-      "description": "Gateway example"
+      "description": "服务器运行地址"
     }
   ],
   "tags": [
     {
-      "name": "Health"
+      "name": "健康检查"
     },
     {
-      "name": "Buckets"
+      "name": "存储桶"
     },
     {
-      "name": "Folders"
+      "name": "文件夹"
     },
     {
-      "name": "Objects"
+      "name": "对象"
     },
     {
-      "name": "Sites"
+      "name": "站点"
     },
     {
-      "name": "Signing"
+      "name": "签名"
     }
   ],
   "paths": {
     "/healthz": {
       "get": {
         "tags": [
-          "Health"
+          "健康检查"
         ],
         "operationId": "getHealthz",
-        "summary": "Unauthenticated health check",
-        "description": "Returns service and database health without authentication.",
+        "summary": "无需认证的健康检查",
+        "description": "返回服务和数据库的健康状态，无需认证。",
         "responses": {
           "200": {
-            "description": "Service and database are healthy.",
+            "description": "服务和数据库均正常。",
             "content": {
               "application/json": {
                 "schema": {
@@ -56,7 +56,7 @@
             }
           },
           "503": {
-            "description": "Service is up but the database check degraded. The body keeps the normal success envelope.",
+            "description": "服务可用，但数据库检查处于降级状态。响应体仍保持标准成功结构。",
             "content": {
               "application/json": {
                 "schema": {
@@ -71,11 +71,11 @@
     "/api/v1/healthz": {
       "get": {
         "tags": [
-          "Health"
+          "健康检查"
         ],
         "operationId": "getProtectedHealthz",
-        "summary": "Authenticated health check",
-        "description": "Same payload as /healthz, but requires a Bearer token.",
+        "summary": "需要认证的健康检查",
+        "description": "返回与 /healthz 相同的响应体，但需要 Bearer Token。",
         "security": [
           {
             "bearerAuth": []
@@ -83,7 +83,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Service and database are healthy.",
+            "description": "服务和数据库均正常。",
             "content": {
               "application/json": {
                 "schema": {
@@ -93,7 +93,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -103,7 +103,7 @@
             }
           },
           "503": {
-            "description": "Service is up but the database check degraded. The body keeps the normal success envelope.",
+            "description": "服务可用，但数据库检查处于降级状态。响应体仍保持标准成功结构。",
             "content": {
               "application/json": {
                 "schema": {
@@ -118,10 +118,10 @@
     "/api/v1/buckets": {
       "get": {
         "tags": [
-          "Buckets"
+          "存储桶"
         ],
         "operationId": "listBuckets",
-        "summary": "List buckets",
+        "summary": "列出存储桶",
         "security": [
           {
             "bearerAuth": []
@@ -129,7 +129,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bucket list.",
+            "description": "存储桶列表。",
             "content": {
               "application/json": {
                 "schema": {
@@ -139,7 +139,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -149,7 +149,7 @@
             }
           },
           "500": {
-            "description": "Failed to list buckets. Error code: bucket_list_failed.",
+            "description": "无法列出存储桶。错误代码： bucket_list_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -162,10 +162,10 @@
       },
       "post": {
         "tags": [
-          "Buckets"
+          "存储桶"
         ],
         "operationId": "createBucket",
-        "summary": "Create a bucket",
+        "summary": "创建存储桶",
         "security": [
           {
             "bearerAuth": []
@@ -183,7 +183,7 @@
         },
         "responses": {
           "201": {
-            "description": "Bucket created.",
+            "description": "存储桶已创建。",
             "content": {
               "application/json": {
                 "schema": {
@@ -193,7 +193,7 @@
             }
           },
           "400": {
-            "description": "Request body or bucket name is invalid. Error codes: invalid_request, invalid_bucket_name.",
+            "description": "请求体或存储桶名称无效。错误代码：invalid_request、invalid_bucket_name。",
             "content": {
               "application/json": {
                 "schema": {
@@ -203,7 +203,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -213,7 +213,7 @@
             }
           },
           "409": {
-            "description": "Bucket already exists. Error code: bucket_exists.",
+            "description": "存储桶已存在。错误代码： bucket_exists。",
             "content": {
               "application/json": {
                 "schema": {
@@ -223,7 +223,7 @@
             }
           },
           "500": {
-            "description": "Failed to create bucket. Error code: bucket_create_failed.",
+            "description": "创建存储桶失败。错误代码： bucket_create_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -243,11 +243,11 @@
       ],
       "get": {
         "tags": [
-          "Folders"
+          "文件夹"
         ],
         "operationId": "listFolders",
-        "summary": "List the full folder tree",
-        "description": "Returns all known folder nodes for a bucket, including empty folders created through the folder marker object.",
+        "summary": "列出完整的文件夹树",
+        "description": "返回存储桶的所有已知文件夹节点，包括通过文件夹标记对象创建的空文件夹。",
         "security": [
           {
             "bearerAuth": []
@@ -255,7 +255,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Folder tree.",
+            "description": "文件夹树",
             "content": {
               "application/json": {
                 "schema": {
@@ -265,7 +265,7 @@
             }
           },
           "400": {
-            "description": "Bucket name is invalid. Error code: invalid_bucket_name.",
+            "description": "存储桶名称无效。错误代码： invalid_bucket_name。",
             "content": {
               "application/json": {
                 "schema": {
@@ -275,7 +275,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -285,7 +285,7 @@
             }
           },
           "500": {
-            "description": "Failed to list folders. Error code: folder_list_failed.",
+            "description": "无法列出文件夹。错误代码： folder_list_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -298,10 +298,10 @@
       },
       "post": {
         "tags": [
-          "Folders"
+          "文件夹"
         ],
         "operationId": "createFolder",
-        "summary": "Create an empty folder",
+        "summary": "创建空文件夹",
         "security": [
           {
             "bearerAuth": []
@@ -319,7 +319,7 @@
         },
         "responses": {
           "201": {
-            "description": "Folder created.",
+            "description": "文件夹已创建",
             "content": {
               "application/json": {
                 "schema": {
@@ -329,7 +329,7 @@
             }
           },
           "400": {
-            "description": "Request body or folder input is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_prefix, invalid_folder_name.",
+            "description": "请求体或文件夹输入无效。错误代码：invalid_request、invalid_bucket_name、invalid_prefix、invalid_folder_name。",
             "content": {
               "application/json": {
                 "schema": {
@@ -339,7 +339,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -349,7 +349,7 @@
             }
           },
           "404": {
-            "description": "Bucket or parent folder was not found. Error codes: bucket_not_found, folder_not_found.",
+            "description": "未找到存储桶或父文件夹。错误代码： bucket_not_found, folder_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -359,7 +359,7 @@
             }
           },
           "409": {
-            "description": "Folder already exists. Error code: folder_exists.",
+            "description": "文件夹已存在。错误代码： folder_exists。",
             "content": {
               "application/json": {
                 "schema": {
@@ -369,7 +369,7 @@
             }
           },
           "500": {
-            "description": "Folder creation failed. Error codes: bucket_lookup_failed, folder_lookup_failed, object_store_failed, object_metadata_failed.",
+            "description": "文件夹创建失败。错误代码： bucket_lookup_failed、folder_lookup_failed、object_store_failed、object_metadata_failed]。",
             "content": {
               "application/json": {
                 "schema": {
@@ -382,11 +382,11 @@
       },
       "delete": {
         "tags": [
-          "Folders"
+          "文件夹"
         ],
         "operationId": "deleteFolder",
-        "summary": "Delete a folder",
-        "description": "When recursive is omitted or false, only empty folders can be deleted. When recursive is true, the folder and all nested files/subfolders are soft-deleted.",
+        "summary": "删除文件夹。",
+        "description": "当 `recursive` 省略或为 `false` 时，只能删除空文件夹。当 `recursive` 为 `true` 时，文件夹以及其所有嵌套文件和子文件夹都会被软删除。",
         "security": [
           {
             "bearerAuth": []
@@ -402,10 +402,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Folder deleted. No response body."
+            "description": "文件夹已删除。无响应正文。"
           },
           "400": {
-            "description": "Bucket name, folder path, or recursive query is invalid. Error codes: invalid_bucket_name, invalid_folder_path, invalid_request, invalid_prefix.",
+            "description": "存储桶名称、文件夹路径或递归查询无效。错误代码： invalid_bucket_name、invalid_folder_path、invalid_request、invalid_prefix。",
             "content": {
               "application/json": {
                 "schema": {
@@ -415,7 +415,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -425,7 +425,7 @@
             }
           },
           "404": {
-            "description": "Folder not found. Error code: folder_not_found.",
+            "description": "找不到文件夹。错误代码： folder_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -435,7 +435,7 @@
             }
           },
           "409": {
-            "description": "Folder is not empty and recursive delete was not enabled. Error code: folder_not_empty.",
+            "description": "文件夹不为空，且未启用递归删除。错误代码：folder_not_empty。",
             "content": {
               "application/json": {
                 "schema": {
@@ -445,7 +445,7 @@
             }
           },
           "500": {
-            "description": "Folder deletion failed. Error codes: folder_lookup_failed, folder_delete_failed.",
+            "description": "文件夹删除失败。错误代码： folder_lookup_failed ， folder_delete_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -465,11 +465,11 @@
       ],
       "get": {
         "tags": [
-          "Folders"
+          "文件夹"
         ],
         "operationId": "listExplorerEntries",
-        "summary": "List direct entries under a folder prefix",
-        "description": "Entries are ordered with directories first, then files, both sorted by name. next_cursor is an opaque cursor for the same prefix/search combination.",
+        "summary": "在文件夹前缀下列出直接条目",
+        "description": "条目先按目录排序，然后按文件名排序。next_cursor是相同前缀/search组合的不透明光标。",
         "security": [
           {
             "bearerAuth": []
@@ -491,7 +491,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Explorer entries page.",
+            "description": "资源管理器条目页面。",
             "content": {
               "application/json": {
                 "schema": {
@@ -501,7 +501,7 @@
             }
           },
           "400": {
-            "description": "Bucket name, prefix, or cursor is invalid. Error codes: invalid_bucket_name, invalid_prefix, invalid_cursor.",
+            "description": "存储桶名称、前缀或光标无效。错误代码： invalid_bucket_name、invalid_prefix、invalid_cursor。",
             "content": {
               "application/json": {
                 "schema": {
@@ -511,7 +511,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -521,7 +521,7 @@
             }
           },
           "500": {
-            "description": "Failed to list explorer entries. Error code: explorer_list_failed.",
+            "description": "无法列出资源管理器条目。错误代码： explorer_list_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -541,11 +541,11 @@
       ],
       "get": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "listObjects",
-        "summary": "List objects",
-        "description": "Objects are returned newest first. next_cursor is an opaque cursor for the same prefix filter.",
+        "summary": "列表对象",
+        "description": "对象首先返回最新。next_cursor是相同前缀过滤器的不透明光标。",
         "security": [
           {
             "bearerAuth": []
@@ -564,7 +564,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Object page.",
+            "description": "对象页面。",
             "content": {
               "application/json": {
                 "schema": {
@@ -574,7 +574,7 @@
             }
           },
           "400": {
-            "description": "Bucket name, prefix, or cursor is invalid. Error codes: invalid_bucket_name, invalid_prefix, invalid_cursor.",
+            "description": "存储桶名称、前缀或光标无效。错误代码： invalid_bucket_name、invalid_prefix、invalid_cursor。",
             "content": {
               "application/json": {
                 "schema": {
@@ -584,7 +584,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -594,7 +594,7 @@
             }
           },
           "500": {
-            "description": "Failed to list objects. Error code: object_list_failed.",
+            "description": "无法列出对象。错误代码： object_list_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -614,11 +614,11 @@
       ],
       "post": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "uploadObjectBatch",
-        "summary": "Batch upload files with multipart/form-data",
-        "description": "manifest is a JSON string array. Each item declares file_field and relative_path. Additional file parts must use the exact field names referenced by manifest[].file_field.",
+        "summary": "使用 multipart/form-data 批量上传文件",
+        "description": "`manifest` 是 JSON 字符串数组。每个项目都声明 `file_field` 与 `relative_path`。其他文件分段必须使用 `manifest[].file_field` 中引用的精确字段名。",
         "security": [
           {
             "bearerAuth": []
@@ -636,7 +636,7 @@
         },
         "responses": {
           "201": {
-            "description": "Files uploaded.",
+            "description": "上传的文件",
             "content": {
               "application/json": {
                 "schema": {
@@ -646,7 +646,7 @@
             }
           },
           "400": {
-            "description": "Multipart payload, manifest, bucket name, prefix, visibility, or final object key is invalid. Error codes include invalid_multipart_request, invalid_batch_manifest, batch_file_missing, invalid_bucket_name, invalid_prefix, invalid_visibility.",
+            "description": "multipart 请求体、manifest、存储桶名称、前缀、可见性或最终对象键无效。错误代码可能包括 invalid_multipart_request、invalid_batch_manifest、batch_file_missing、invalid_bucket_name、invalid_prefix、invalid_visibility。",
             "content": {
               "application/json": {
                 "schema": {
@@ -656,7 +656,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -666,7 +666,7 @@
             }
           },
           "404": {
-            "description": "Bucket not found. Error code: bucket_not_found.",
+            "description": "未找到存储桶。错误代码： bucket_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -676,7 +676,7 @@
             }
           },
           "413": {
-            "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
+            "description": "请求正文超过配置的上传大小。错误代码： payload_too_large。",
             "content": {
               "application/json": {
                 "schema": {
@@ -686,7 +686,7 @@
             }
           },
           "500": {
-            "description": "Batch upload failed. Error codes may include bucket_lookup_failed, batch_file_buffer_failed, batch_file_open_failed, object_store_failed, object_metadata_failed.",
+            "description": "批量上传失败。错误代码可能包括 bucket_lookup_failed、batch_file_buffer_failed、batch_file_open_failed、object_store_failed、object_metadata_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -709,11 +709,11 @@
       ],
       "get": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "downloadObject",
-        "summary": "Download an object",
-        "description": "Public objects can be downloaded anonymously. Private objects require either Authorization: Bearer <token> or a signed URL using expires and signature query parameters.",
+        "summary": "下载对象",
+        "description": "公开对象可匿名下载。私有对象需要 `Authorization: Bearer <token>`，或使用 `expires` 与 `signature` 查询参数的签名 URL。",
         "parameters": [
           {
             "$ref": "#/components/parameters/OptionalAuthorizationHeader"
@@ -727,7 +727,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Object content. The actual media type mirrors the stored object Content-Type header.",
+            "description": "对象内容。实际媒体类型与对象存储时的 Content-Type 响应头一致。",
             "headers": {
               "Content-Type": {
                 "$ref": "#/components/headers/ContentTypeHeader"
@@ -755,7 +755,7 @@
             }
           },
           "400": {
-            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "description": "存储桶名称或对象键无效。错误代码：invalid_bucket_name、invalid_object_key。",
             "content": {
               "application/json": {
                 "schema": {
@@ -765,7 +765,7 @@
             }
           },
           "401": {
-            "description": "Private object access was not authorized. Error codes: unauthorized, invalid_signature, signature_expired.",
+            "description": "私有对象访问未获授权。错误代码：unauthorized、invalid_signature、signature_expired。",
             "content": {
               "application/json": {
                 "schema": {
@@ -775,7 +775,7 @@
             }
           },
           "404": {
-            "description": "Object not found. Error code: object_not_found.",
+            "description": "未找到对象。错误代码： object_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -785,7 +785,7 @@
             }
           },
           "500": {
-            "description": "Failed to open object content. Error codes: object_lookup_failed, object_open_failed.",
+            "description": "无法打开对象内容。错误代码： object_lookup_failed, object_open_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -798,11 +798,11 @@
       },
       "head": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "headObject",
-        "summary": "Get object headers",
-        "description": "Returns metadata headers without a body. Public objects can be inspected anonymously. Private objects require Authorization: Bearer <token>; signed URLs are not accepted for HEAD.",
+        "summary": "获取对象标头",
+        "description": "仅返回元数据响应头，不返回响应体。公开对象可匿名访问；私有对象需要 `Authorization: Bearer <token>`；HEAD 请求不接受签名 URL。",
         "parameters": [
           {
             "$ref": "#/components/parameters/OptionalAuthorizationHeader"
@@ -810,7 +810,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Object headers only. No response body.",
+            "description": "仅返回对象响应头，无响应体。",
             "headers": {
               "Content-Type": {
                 "$ref": "#/components/headers/ContentTypeHeader"
@@ -830,7 +830,7 @@
             }
           },
           "400": {
-            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "description": "存储桶名称或对象键无效。错误代码：invalid_bucket_name、invalid_object_key。",
             "content": {
               "application/json": {
                 "schema": {
@@ -840,7 +840,7 @@
             }
           },
           "401": {
-            "description": "Private object access requires a valid bearer token. Error code: unauthorized.",
+            "description": "访问私有对象需要有效的 Bearer Token。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -850,7 +850,7 @@
             }
           },
           "404": {
-            "description": "Object not found. Error code: object_not_found.",
+            "description": "未找到对象。错误代码： object_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -860,7 +860,7 @@
             }
           },
           "500": {
-            "description": "Failed to open object content. Error codes: object_lookup_failed, object_open_failed.",
+            "description": "无法打开对象内容。错误代码： object_lookup_failed, object_open_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -873,11 +873,11 @@
       },
       "put": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "uploadObject",
-        "summary": "Upload or replace an object",
-        "description": "The request body is streamed directly into storage. X-Object-Visibility defaults to private when omitted.",
+        "summary": "上传或替换对象",
+        "description": "请求体会直接以流式方式写入存储。省略时，`X-Object-Visibility` 默认为 `private`。",
         "security": [
           {
             "bearerAuth": []
@@ -904,7 +904,7 @@
         },
         "responses": {
           "201": {
-            "description": "Object uploaded.",
+            "description": "对象已上传。",
             "content": {
               "application/json": {
                 "schema": {
@@ -914,7 +914,7 @@
             }
           },
           "400": {
-            "description": "Bucket name, object key, or visibility is invalid. Error codes: invalid_bucket_name, invalid_object_key, invalid_visibility.",
+            "description": "存储桶名称、对象键或可见性无效。错误代码： invalid_bucket_name、invalid_object_key、invalid_visibility。",
             "content": {
               "application/json": {
                 "schema": {
@@ -924,7 +924,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -934,7 +934,7 @@
             }
           },
           "404": {
-            "description": "Bucket not found. Error code: bucket_not_found.",
+            "description": "未找到存储桶。错误代码： bucket_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -944,7 +944,7 @@
             }
           },
           "413": {
-            "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
+            "description": "请求正文超过配置的上传大小。错误代码： payload_too_large。",
             "content": {
               "application/json": {
                 "schema": {
@@ -954,7 +954,7 @@
             }
           },
           "500": {
-            "description": "Upload failed. Error codes: bucket_lookup_failed, object_store_failed, object_metadata_failed.",
+            "description": "上传失败。错误代码： bucket_lookup_failed、object_store_failed、object_metadata_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -967,10 +967,10 @@
       },
       "delete": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "deleteObject",
-        "summary": "Soft delete an object",
+        "summary": "软删除对象",
         "security": [
           {
             "bearerAuth": []
@@ -978,10 +978,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Object deleted. No response body."
+            "description": "对象已删除。无响应正文。"
           },
           "400": {
-            "description": "Bucket name or object key is invalid. Error codes: invalid_bucket_name, invalid_object_key.",
+            "description": "存储桶名称或对象键无效。错误代码：invalid_bucket_name、invalid_object_key。",
             "content": {
               "application/json": {
                 "schema": {
@@ -991,7 +991,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1001,7 +1001,7 @@
             }
           },
           "404": {
-            "description": "Object not found. Error code: object_not_found.",
+            "description": "未找到对象。错误代码： object_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1011,7 +1011,7 @@
             }
           },
           "500": {
-            "description": "Failed to delete object. Error code: object_delete_failed.",
+            "description": "无法删除对象。错误代码： object_delete_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1034,10 +1034,10 @@
       ],
       "patch": {
         "tags": [
-          "Objects"
+          "对象"
         ],
         "operationId": "updateObjectVisibility",
-        "summary": "Update object visibility",
+        "summary": "更新对象可见性",
         "security": [
           {
             "bearerAuth": []
@@ -1055,7 +1055,7 @@
         },
         "responses": {
           "200": {
-            "description": "Visibility updated.",
+            "description": "选项卡可见性已更新",
             "content": {
               "application/json": {
                 "schema": {
@@ -1065,7 +1065,7 @@
             }
           },
           "400": {
-            "description": "Request body, bucket name, object key, or visibility is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_object_key, invalid_visibility.",
+            "description": "请求体、存储桶名称、对象键或可见性无效。错误代码：invalid_request、invalid_bucket_name、invalid_object_key、invalid_visibility。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1075,7 +1075,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1085,7 +1085,7 @@
             }
           },
           "404": {
-            "description": "Object not found. Error code: object_not_found.",
+            "description": "未找到对象。错误代码： object_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1095,7 +1095,7 @@
             }
           },
           "500": {
-            "description": "Failed to update object visibility. Error code: object_update_failed.",
+            "description": "更新对象可见性失败。错误代码： object_update_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1110,10 +1110,10 @@
     "/api/v1/sites": {
       "get": {
         "tags": [
-          "Sites"
+          "站点"
         ],
         "operationId": "listSites",
-        "summary": "List site bindings",
+        "summary": "列出站点绑定",
         "security": [
           {
             "bearerAuth": []
@@ -1121,7 +1121,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Site list.",
+            "description": "站点列表。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1131,7 +1131,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1141,7 +1141,7 @@
             }
           },
           "500": {
-            "description": "Failed to list sites. Error code: site_list_failed.",
+            "description": "无法列出站点。错误代码： site_list_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1154,11 +1154,11 @@
       },
       "post": {
         "tags": [
-          "Sites"
+          "站点"
         ],
         "operationId": "createSite",
-        "summary": "Create a site binding",
-        "description": "Site domains must match *.underhear.cn. root_prefix is normalized to end with a trailing slash. index_document defaults to index.html when omitted or empty. enabled defaults to true. spa_fallback defaults to false.",
+        "summary": "创建网站绑定",
+        "description": "站点域名必须匹配 `*.underhear.cn`。`root_prefix` 会被规范化为以斜杠结尾；`index_document` 在省略或为空时默认为 `index.html`；`enabled` 默认为 `true`；`spa_fallback` 默认为 `false`。",
         "security": [
           {
             "bearerAuth": []
@@ -1176,7 +1176,7 @@
         },
         "responses": {
           "201": {
-            "description": "Site created.",
+            "description": "站点已创建。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1186,7 +1186,7 @@
             }
           },
           "400": {
-            "description": "Request body or site configuration is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_website_config, invalid_domain.",
+            "description": "请求正文或站点配置无效。错误代码： invalid_request、invalid_bucket_name、invalid_website_config、invalid_domain。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1196,7 +1196,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1206,7 +1206,7 @@
             }
           },
           "404": {
-            "description": "Bucket not found. Error code: bucket_not_found.",
+            "description": "未找到存储桶。错误代码： bucket_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1216,7 +1216,7 @@
             }
           },
           "409": {
-            "description": "One of the domains is already bound to another site. Error code: domain_conflict.",
+            "description": "其中一个域已绑定到另一个站点。错误代码： domain_conflict。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1226,7 +1226,7 @@
             }
           },
           "500": {
-            "description": "Site creation failed. Error codes: bucket_lookup_failed, site_create_failed.",
+            "description": "网站创建失败。错误代码： bucket_lookup_failed ， site_create_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1246,10 +1246,10 @@
       ],
       "get": {
         "tags": [
-          "Sites"
+          "站点"
         ],
         "operationId": "getSite",
-        "summary": "Get a site binding",
+        "summary": "获取网站绑定",
         "security": [
           {
             "bearerAuth": []
@@ -1257,7 +1257,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Site detail.",
+            "description": "地点详情",
             "content": {
               "application/json": {
                 "schema": {
@@ -1267,7 +1267,7 @@
             }
           },
           "400": {
-            "description": "siteID is invalid. Error code: invalid_site_id.",
+            "description": "siteID无效。错误代码： invalid_site_id。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1277,7 +1277,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1287,7 +1287,7 @@
             }
           },
           "404": {
-            "description": "Site not found. Error code: site_not_found.",
+            "description": "找不到站点。错误代码： site_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1297,7 +1297,7 @@
             }
           },
           "500": {
-            "description": "Failed to look up site. Error code: site_lookup_failed.",
+            "description": "查找站点失败。错误代码： site_lookup_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1310,11 +1310,11 @@
       },
       "put": {
         "tags": [
-          "Sites"
+          "站点"
         ],
         "operationId": "updateSite",
-        "summary": "Update a site binding",
-        "description": "The same validation rules and defaults as createSite apply to the incoming body.",
+        "summary": "更新网站绑定",
+        "description": "与 `createSite` 相同的校验规则和默认值同样适用于传入的请求体。",
         "security": [
           {
             "bearerAuth": []
@@ -1332,7 +1332,7 @@
         },
         "responses": {
           "200": {
-            "description": "Site updated.",
+            "description": "网站更新。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1342,7 +1342,7 @@
             }
           },
           "400": {
-            "description": "siteID, request body, or site configuration is invalid. Error codes: invalid_site_id, invalid_request, invalid_bucket_name, invalid_website_config, invalid_domain.",
+            "description": "siteID、请求正文或站点配置无效。错误代码： invalid_site_id、invalid_request、invalid_bucket_name、invalid_website_config、invalid_domain。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1352,7 +1352,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1362,7 +1362,7 @@
             }
           },
           "404": {
-            "description": "Site or bucket not found. Error codes: site_not_found, bucket_not_found.",
+            "description": "未找到站点或存储桶。错误代码： site_not_found, bucket_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1372,7 +1372,7 @@
             }
           },
           "409": {
-            "description": "One of the domains is already bound to another site. Error code: domain_conflict.",
+            "description": "其中一个域已绑定到另一个站点。错误代码： domain_conflict。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1382,7 +1382,7 @@
             }
           },
           "500": {
-            "description": "Site update failed. Error codes: bucket_lookup_failed, site_update_failed.",
+            "description": "站点更新失败。错误代码： bucket_lookup_failed ， site_update_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1395,10 +1395,10 @@
       },
       "delete": {
         "tags": [
-          "Sites"
+          "站点"
         ],
         "operationId": "deleteSite",
-        "summary": "Delete a site binding",
+        "summary": "删除网站绑定",
         "security": [
           {
             "bearerAuth": []
@@ -1406,10 +1406,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Site deleted. No response body."
+            "description": "网站已删除。无响应正文。"
           },
           "400": {
-            "description": "siteID is invalid. Error code: invalid_site_id.",
+            "description": "siteID无效。错误代码： invalid_site_id。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1419,7 +1419,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1429,7 +1429,7 @@
             }
           },
           "404": {
-            "description": "Site not found. Error code: site_not_found.",
+            "description": "找不到站点。错误代码： site_not_found。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1439,7 +1439,7 @@
             }
           },
           "500": {
-            "description": "Site deletion failed. Error code: site_delete_failed.",
+            "description": "网站删除失败。错误代码： site_delete_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1454,11 +1454,11 @@
     "/api/v1/sign/download": {
       "post": {
         "tags": [
-          "Signing"
+          "签名"
         ],
         "operationId": "signDownload",
-        "summary": "Generate a signed download URL",
-        "description": "Creates a temporary signed URL for GET object downloads. The current environment defaults expires_in_seconds to 300 when the client sends 0 or a negative value, and rejects values above 86400.",
+        "summary": "生成签名下载 URL",
+        "description": "为 GET 对象下载创建临时签名 URL。当客户端传入 0 或负值时，`expires_in_seconds` 默认为 `300`，且拒绝大于 `86400` 的值。",
         "security": [
           {
             "bearerAuth": []
@@ -1476,7 +1476,7 @@
         },
         "responses": {
           "200": {
-            "description": "Signed download URL.",
+            "description": "已签名的下载网址。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1486,7 +1486,7 @@
             }
           },
           "400": {
-            "description": "Request body, bucket name, object key, or expiry is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_object_key, invalid_expiry.",
+            "description": "请求正文、存储桶名称、对象密钥或过期无效。错误代码： invalid_request、invalid_bucket_name、invalid_object_key、invalid_expiry。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1496,7 +1496,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1521,7 +1521,7 @@
         "name": "bucket",
         "in": "path",
         "required": true,
-        "description": "Bucket name. Must match ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$.",
+        "description": "存储桶名称。必须匹配 `^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`。",
         "schema": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
@@ -1536,7 +1536,7 @@
         "allowReserved": true,
         "style": "simple",
         "explode": false,
-        "description": "Object key. This placeholder represents Gin's /*key wildcard and may contain '/'. Pass the raw key path without a leading slash. Max length: 512. Path traversal and reserved folder marker names are rejected where applicable.",
+        "description": "对象键。该占位符对应 Gin 的 `/*key` 通配符，可包含 `/`。传参时请使用不带前导斜杠的原始 key 路径。最大长度为 512；如适用，路径遍历和保留文件夹标记名称会被拒绝。",
         "schema": {
           "type": "string",
           "minLength": 1,
@@ -1547,7 +1547,7 @@
         "name": "siteID",
         "in": "path",
         "required": true,
-        "description": "Positive site identifier.",
+        "description": "正网站标识符。",
         "schema": {
           "type": "integer",
           "format": "int64",
@@ -1558,7 +1558,7 @@
         "name": "prefix",
         "in": "query",
         "required": false,
-        "description": "Optional prefix filter. Max length: 512. Folder-style prefixes should usually end with '/'.",
+        "description": "可选的前缀过滤器。最大长度： 512。文件夹样式前缀通常应以“/”结尾。",
         "schema": {
           "type": "string",
           "maxLength": 512
@@ -1568,7 +1568,7 @@
         "name": "search",
         "in": "query",
         "required": false,
-        "description": "Case-insensitive substring filter applied to direct entry names.",
+        "description": "应用于直接条目名称的不区分大小写的子字符串筛选器。",
         "schema": {
           "type": "string"
         }
@@ -1577,7 +1577,7 @@
         "name": "limit",
         "in": "query",
         "required": false,
-        "description": "Page size. Defaults to 20. Maximum 100.",
+        "description": "页面大小。默认值为20。最大值为100。",
         "schema": {
           "type": "integer",
           "format": "int32",
@@ -1590,7 +1590,7 @@
         "name": "limit",
         "in": "query",
         "required": false,
-        "description": "Page size. Defaults to 100. Maximum 200.",
+        "description": "页面大小。默认值为100。最大值为200。",
         "schema": {
           "type": "integer",
           "format": "int32",
@@ -1603,7 +1603,7 @@
         "name": "cursor",
         "in": "query",
         "required": false,
-        "description": "Opaque cursor returned by the previous page.",
+        "description": "上一页返回的不透明光标。",
         "schema": {
           "type": "string"
         }
@@ -1612,7 +1612,7 @@
         "name": "path",
         "in": "query",
         "required": true,
-        "description": "Folder path to delete. Must be a non-empty folder path ending with '/'.",
+        "description": "要删除的文件夹路径。必须是以“/”结尾的非空文件夹路径。",
         "schema": {
           "type": "string",
           "minLength": 1,
@@ -1623,7 +1623,7 @@
         "name": "recursive",
         "in": "query",
         "required": false,
-        "description": "When true, delete the folder recursively. When omitted or false, only empty folders can be deleted.",
+        "description": "`true` 时递归删除文件夹；省略或为 `false` 时，只能删除空文件夹。",
         "schema": {
           "type": "boolean",
           "default": false
@@ -1633,7 +1633,7 @@
         "name": "Authorization",
         "in": "header",
         "required": false,
-        "description": "Optional bearer token in the form `Bearer <token>`. Required for protected management endpoints, and conditionally required for private object reads as documented on each operation.",
+        "description": "可选的 Bearer Token，格式为 `Bearer <token>`。对于受保护的管理接口是必需的；对于私有对象读取，则按各接口文档说明按需提供。",
         "schema": {
           "type": "string"
         }
@@ -1642,7 +1642,7 @@
         "name": "X-Object-Visibility",
         "in": "header",
         "required": false,
-        "description": "Object visibility. Defaults to private when omitted.",
+        "description": "对象可见性。省略时默认为 `private`。",
         "schema": {
           "type": "string",
           "enum": [
@@ -1655,7 +1655,7 @@
         "name": "X-Original-Filename",
         "in": "header",
         "required": false,
-        "description": "Original file name shown in metadata and download headers. URL-escaped values are decoded by the backend and sanitized to a safe base name.",
+        "description": "元数据和下载标头中显示的原始文件名。URL转义的值由后端解码并清理到安全的基名称。",
         "schema": {
           "type": "string",
           "maxLength": 1024
@@ -1665,7 +1665,7 @@
         "name": "expires",
         "in": "query",
         "required": false,
-        "description": "UNIX timestamp used together with signature for signed private-object downloads.",
+        "description": "用于私有对象签名下载的 UNIX 时间戳，需与 `signature` 一起使用。",
         "schema": {
           "type": "integer",
           "format": "int64"
@@ -1675,7 +1675,7 @@
         "name": "signature",
         "in": "query",
         "required": false,
-        "description": "Signature used together with expires for signed private-object downloads.",
+        "description": "用于私有对象签名下载的签名，需与 `expires` 一起使用。",
         "schema": {
           "type": "string"
         }
@@ -1683,13 +1683,13 @@
     },
     "headers": {
       "ContentTypeHeader": {
-        "description": "Stored object content type.",
+        "description": "存储的对象内容类型。",
         "schema": {
           "type": "string"
         }
       },
       "ContentLengthHeader": {
-        "description": "Stored object size in bytes.",
+        "description": "存储的对象大小（以字节为单位）。",
         "schema": {
           "type": "integer",
           "format": "int64",
@@ -1697,13 +1697,13 @@
         }
       },
       "ETagHeader": {
-        "description": "Entity tag generated for the stored object content.",
+        "description": "为存储的对象内容生成的实体标记。",
         "schema": {
           "type": "string"
         }
       },
       "ObjectVisibilityHeader": {
-        "description": "Stored object visibility.",
+        "description": "存储的对象可见性。",
         "schema": {
           "type": "string",
           "enum": [
@@ -1713,7 +1713,7 @@
         }
       },
       "OriginalFilenameHeader": {
-        "description": "Stored original file name.",
+        "description": "已存储原始文件名。",
         "schema": {
           "type": "string"
         }
@@ -1729,11 +1729,11 @@
         "properties": {
           "request_id": {
             "type": "string",
-            "description": "Request correlation ID returned by middleware."
+            "description": "中间件返回的请求关联ID。"
           },
           "data": {
             "type": "object",
-            "description": "Endpoint-specific payload."
+            "description": "接口特定的响应数据。"
           }
         }
       },
@@ -1816,7 +1816,7 @@
             "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
             "minLength": 3,
             "maxLength": 63,
-            "description": "Bucket name. Lowercase letters, digits, dot, and hyphen only."
+            "description": "存储桶名称。仅允许小写字母、数字、点和连字符。"
           }
         }
       },
@@ -1871,12 +1871,12 @@
           "prefix": {
             "type": "string",
             "maxLength": 512,
-            "description": "Parent folder prefix. Use an empty string for the bucket root. Non-empty values must end with '/'."
+            "description": "父文件夹前缀。对存储桶根目录使用空字符串。非空值必须以“/”结尾。"
           },
           "name": {
             "type": "string",
             "maxLength": 255,
-            "description": "Folder name. Must not contain '/', '\\\\', NUL, '.', '..', or '.light-oss-folder'."
+            "description": "文件夹名称。不得包含“/”、“\\\\”、NUL、“.”、“..”或“.light-oss-folder”。"
           }
         }
       },
@@ -1987,7 +1987,7 @@
           },
           "next_cursor": {
             "type": "string",
-            "description": "Opaque cursor for the next page. Empty string when there is no next page."
+            "description": "下一页的不透明光标。没有下一页时为空字符串。"
           }
         }
       },
@@ -2015,7 +2015,7 @@
           "is_empty": {
             "type": "boolean",
             "nullable": true,
-            "description": "Only set for directory entries."
+            "description": "仅为目录条目设置。"
           },
           "object_key": {
             "type": "string",
@@ -2068,7 +2068,7 @@
           },
           "next_cursor": {
             "type": "string",
-            "description": "Opaque cursor for the next page. Empty string when there is no next page."
+            "description": "下一页的不透明光标。没有下一页时为空字符串。"
           }
         }
       },
@@ -2081,11 +2081,11 @@
         "properties": {
           "file_field": {
             "type": "string",
-            "description": "Multipart file field name."
+            "description": "多部分文件字段名称。"
           },
           "relative_path": {
             "type": "string",
-            "description": "Relative object path under the supplied prefix. Must not start with '/'."
+            "description": "提供的前缀下的相对对象路径。不得以“/”开头。"
           }
         }
       },
@@ -2098,7 +2098,7 @@
           "prefix": {
             "type": "string",
             "maxLength": 512,
-            "description": "Optional folder prefix. Non-empty values must end with '/'."
+            "description": "可选文件夹前缀。非空值必须以“/”结尾。"
           },
           "visibility": {
             "type": "string",
@@ -2106,18 +2106,18 @@
               "public",
               "private"
             ],
-            "description": "Visibility applied to every uploaded object. Defaults to private when omitted."
+            "description": "可见性应用于每个上传的对象。省略时默认为private。"
           },
           "manifest": {
             "type": "string",
-            "description": "JSON string array of UploadBatchManifestItem objects.",
+            "description": "UploadBatchManifestItem 对象的 JSON 字符串数组。",
             "example": "[{\"file_field\":\"file_0\",\"relative_path\":\"index.html\"},{\"file_field\":\"file_1\",\"relative_path\":\"assets/app.js\"}]"
           }
         },
         "additionalProperties": {
           "type": "string",
           "format": "binary",
-          "description": "Additional multipart file parts referenced by manifest[].file_field."
+          "description": "由 `manifest[].file_field` 引用的其他 multipart 文件分段。"
         }
       },
       "UploadBatchResult": {
@@ -2179,7 +2179,7 @@
             "format": "int64",
             "minimum": 0,
             "maximum": 86400,
-            "description": "TTL in seconds. Values <= 0 use the server default in the current environment."
+            "description": "以秒为单位的TTL。值< = 0使用当前环境中的服务器默认值。"
           }
         }
       },
@@ -2197,7 +2197,7 @@
           "expires_at": {
             "type": "integer",
             "format": "int64",
-            "description": "UNIX timestamp in seconds."
+            "description": "UNIX时间戳（以秒为单位）。"
           }
         }
       },
@@ -2217,7 +2217,7 @@
             "type": "string",
             "maxLength": 512,
             "default": "",
-            "description": "Root folder prefix. Leading slash is stripped. Non-empty values are normalized to end with '/'."
+            "description": "根文件夹前缀。前导斜杠被去除。非空值被标准化为以“/”结尾。"
           },
           "enabled": {
             "type": "boolean",
@@ -2227,13 +2227,13 @@
             "type": "string",
             "maxLength": 512,
             "default": "index.html",
-            "description": "Document path relative to root_prefix. Defaults to index.html."
+            "description": "相对于 `root_prefix` 的文档路径。默认为 `index.html`。"
           },
           "error_document": {
             "type": "string",
             "maxLength": 512,
             "default": "",
-            "description": "Optional error document path relative to root_prefix."
+            "description": "相对于 `root_prefix` 的可选错误文档路径。"
           },
           "spa_fallback": {
             "type": "boolean",
@@ -2245,7 +2245,7 @@
               "type": "string",
               "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?\\.underhear\\.cn$"
             },
-            "description": "Optional domain bindings. Each item must match *.underhear.cn with exactly one label before underhear.cn."
+            "description": "可选的域名绑定。每个项目都必须匹配 `*.underhear.cn`，且 `underhear.cn` 之前只能有一个标签。"
           }
         }
       },
