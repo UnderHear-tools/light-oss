@@ -457,6 +457,84 @@
         }
       }
     },
+    "/api/v1/buckets/{bucket}/folders/archive": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Folders"
+        ],
+        "operationId": "downloadFolderArchive",
+        "summary": "Download a folder as a ZIP archive",
+        "description": "Streams a ZIP archive for the requested non-root folder path. The archive keeps the current folder name as the top-level directory, includes nested files, preserves empty subfolders created by the folder marker object, and excludes the internal .light-oss-folder marker file.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FolderPathQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP archive stream.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bucket name or folder path is invalid. Error codes: invalid_bucket_name, invalid_folder_path, invalid_prefix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Folder not found. Error code: folder_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Folder archive preparation failed. Error codes: folder_lookup_failed, folder_archive_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/buckets/{bucket}/entries": {
       "parameters": [
         {

@@ -3,6 +3,7 @@ import type { AppSettings } from "../lib/settings";
 import {
   buildPublicObjectURL,
   deleteFolder,
+  downloadFolderZip,
   updateObjectVisibility,
   uploadFolder,
   uploadObject,
@@ -38,6 +39,11 @@ describe("objects api helpers", () => {
     apiRequestMock.mockResolvedValue({
       id: 1,
     });
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:folder-zip"),
+      revokeObjectURL: vi.fn(),
+    });
+    HTMLAnchorElement.prototype.click = vi.fn();
   });
 
   it("encodes dots in object keys for upload requests", async () => {
@@ -145,5 +151,58 @@ describe("objects api helpers", () => {
         },
       }),
     );
+  });
+
+  it("downloads folder archives as blobs and honors the response filename", async () => {
+    request.mockResolvedValue({
+      data: new Blob(["zip-content"], { type: "application/zip" }),
+      headers: {
+        "content-disposition": `attachment; filename*=UTF-8''docs%20archive.zip`,
+      },
+    });
+
+    await downloadFolderZip(settings, "demo", "docs/");
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        timeout: 0,
+        url: "/api/v1/buckets/demo/folders/archive",
+        params: {
+          path: "docs/",
+        },
+        responseType: "blob",
+      }),
+    );
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:folder-zip");
+  });
+
+  it("falls back to the folder name when archive headers are missing", async () => {
+    const createdLinks: HTMLAnchorElement[] = [];
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi.spyOn(document, "createElement");
+    createElementSpy.mockImplementation(
+      ((tagName: string, options?: ElementCreationOptions) => {
+        const element = originalCreateElement(tagName, options);
+        if (tagName.toLowerCase() === "a") {
+          createdLinks.push(element as HTMLAnchorElement);
+        }
+        return element;
+      }) as typeof document.createElement,
+    );
+
+    request.mockResolvedValue({
+      data: new Blob(["zip-content"], { type: "application/zip" }),
+      headers: {},
+    });
+
+    await downloadFolderZip(settings, "demo", "docs/nested/");
+
+    expect(createdLinks[0]?.download).toBe("nested.zip");
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
+
+    createElementSpy.mockRestore();
   });
 });

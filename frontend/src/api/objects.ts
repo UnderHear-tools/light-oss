@@ -1,3 +1,4 @@
+import axios from "axios";
 import { ApiError, apiRequest, createApiClient } from "./client";
 import type { AxiosProgressEvent } from "axios";
 import type { AppSettings } from "../lib/settings";
@@ -251,6 +252,48 @@ export function createSignedDownloadURL(
   });
 }
 
+export async function downloadFolderZip(
+  settings: AppSettings,
+  bucket: string,
+  folderPath: string,
+) {
+  const fallbackFilename = buildFolderArchiveFallbackName(folderPath);
+
+  try {
+    const response = await createApiClient(settings).request<Blob>({
+      method: "GET",
+      url: `/api/v1/buckets/${encodeURIComponent(bucket)}/folders/archive`,
+      timeout: 0,
+      params: {
+        path: folderPath,
+      },
+      responseType: "blob",
+    });
+
+    const blobUrl = URL.createObjectURL(response.data);
+    const filename = getDownloadFilename(
+      response.headers["content-disposition"],
+      fallbackFilename,
+    );
+
+    try {
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  } catch (error) {
+    throw await normalizeBlobDownloadError(
+      error,
+      "Folder ZIP download failed",
+    );
+  }
+}
+
 export function buildPublicObjectURL(
   apiBaseUrl: string,
   bucket: string,
@@ -268,6 +311,13 @@ function encodeObjectKey(objectKey: string) {
 
 function encodeHeaderFilename(filename: string) {
   return encodeURIComponent(filename);
+}
+
+function buildFolderArchiveFallbackName(folderPath: string) {
+  const trimmed = folderPath.replace(/\/+$/, "");
+  const segments = trimmed.split("/").filter(Boolean);
+  const leaf = segments.length > 0 ? segments[segments.length - 1] : "folder";
+  return `${leaf}.zip`;
 }
 
 function getFolderRelativePath(file: File) {
@@ -290,4 +340,72 @@ function getFolderRelativePath(file: File) {
 function encodeObjectKeySegment(segment: string) {
   // Keep dots percent-encoded so upstream proxies do not treat object keys as file extensions.
   return encodeURIComponent(segment).replace(/\./g, "%2E");
+}
+
+function getDownloadFilename(
+  contentDisposition: string | undefined,
+  fallbackFilename: string,
+) {
+  if (!contentDisposition) {
+    return fallbackFilename;
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallbackFilename;
+    }
+  }
+
+  const filenameMatch = contentDisposition.match(/filename\s*=\s*"([^"]+)"/i);
+  if (filenameMatch?.[1]) {
+    return filenameMatch[1];
+  }
+
+  const unquotedMatch = contentDisposition.match(/filename\s*=\s*([^;]+)/i);
+  if (unquotedMatch?.[1]) {
+    return unquotedMatch[1].trim();
+  }
+
+  return fallbackFilename;
+}
+
+async function normalizeBlobDownloadError(error: unknown, fallbackMessage: string) {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? 500;
+    const payload = error.response?.data;
+
+    if (payload instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await payload.text()) as {
+          error?: { code?: string; message?: string };
+        };
+        return new ApiError(
+          parsed.error?.message ?? error.message ?? fallbackMessage,
+          status,
+          parsed.error?.code,
+        );
+      } catch {
+        return new ApiError(error.message || fallbackMessage, status);
+      }
+    }
+
+    const parsed =
+      payload && typeof payload === "object"
+        ? (payload as { error?: { code?: string; message?: string } })
+        : undefined;
+    return new ApiError(
+      parsed?.error?.message ?? error.message ?? fallbackMessage,
+      status,
+      parsed?.error?.code,
+    );
+  }
+
+  if (error instanceof Error) {
+    return new ApiError(error.message, 500);
+  }
+
+  return new ApiError(fallbackMessage, 500);
 }

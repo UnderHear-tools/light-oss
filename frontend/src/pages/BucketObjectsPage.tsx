@@ -16,6 +16,7 @@ import {
   createSignedDownloadURL,
   deleteFolder,
   deleteObject,
+  downloadFolderZip,
   listExplorerEntries,
   uploadFolder,
   updateObjectVisibility,
@@ -80,6 +81,7 @@ export function BucketObjectsPage() {
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deletingPath, setDeletingPath] = useState("");
+  const [downloadingFolderPath, setDownloadingFolderPath] = useState("");
   const [publishingPath, setPublishingPath] = useState("");
   const [signingPath, setSigningPath] = useState("");
 
@@ -243,6 +245,21 @@ export function BucketObjectsPage() {
     },
   });
 
+  const downloadFolderMutation = useMutation({
+    mutationFn: async (folderPath: string) => {
+      setDownloadingFolderPath(folderPath);
+      await downloadFolderZip(settings, bucket, folderPath);
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t("errors.downloadFolderZip");
+      pushToast("error", message);
+    },
+    onSettled: () => {
+      setDownloadingFolderPath("");
+    },
+  });
+
   const updateVisibilityMutation = useMutation({
     mutationFn: (input: {
       objectKey: string;
@@ -346,6 +363,10 @@ export function BucketObjectsPage() {
 
   async function handleDeleteFolder(folderPath: string) {
     await deleteFolderMutation.mutateAsync(folderPath);
+  }
+
+  async function handleDownloadFolder(folderPath: string) {
+    await downloadFolderMutation.mutateAsync(folderPath);
   }
 
   async function handlePublishSite(folderPath: string, value: PublishSiteValue) {
@@ -575,9 +596,11 @@ export function BucketObjectsPage() {
                       )
                     }
                     deletingPath={deletingPath}
+                    downloadingFolderPath={downloadingFolderPath}
                     entries={entries}
                     onDeleteFile={handleDeleteFile}
                     onDeleteFolder={handleDeleteFolder}
+                    onDownloadFolder={handleDownloadFolder}
                     onOpenDirectory={handleNavigatePrefix}
                     onPublishSite={handlePublishSite}
                     onSignDownload={handleSignDownload}

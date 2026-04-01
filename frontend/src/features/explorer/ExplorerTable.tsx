@@ -55,9 +55,11 @@ export function ExplorerTable({
   bucket,
   buildPublicUrl,
   deletingPath,
+  downloadingFolderPath,
   entries,
   onDeleteFile,
   onDeleteFolder,
+  onDownloadFolder,
   onOpenDirectory,
   onPublishSite,
   onSignDownload,
@@ -68,9 +70,11 @@ export function ExplorerTable({
   bucket: string;
   buildPublicUrl: (objectKey: string) => string;
   deletingPath: string;
+  downloadingFolderPath: string;
   entries: ExplorerEntry[];
   onDeleteFile: (objectKey: string) => Promise<void>;
   onDeleteFolder: (folderPath: string) => Promise<void>;
+  onDownloadFolder: (folderPath: string) => Promise<void>;
   onOpenDirectory: (folderPath: string) => void;
   onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
   onSignDownload: (objectKey: string) => Promise<void>;
@@ -144,6 +148,12 @@ export function ExplorerTable({
                     >
                       <FolderOpenIcon className="text-amber-500" />
                     </ExplorerIconButton>
+
+                    <DownloadFolderZipButton
+                      downloadingFolderPath={downloadingFolderPath}
+                      entry={entry}
+                      onDownloadFolder={onDownloadFolder}
+                    />
 
                     <PublishFolderSiteButton
                       bucket={bucket}
@@ -587,6 +597,39 @@ function DeleteFolderButton({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function DownloadFolderZipButton({
+  downloadingFolderPath,
+  entry,
+  onDownloadFolder,
+}: {
+  downloadingFolderPath: string;
+  entry: ExplorerDirectoryEntry;
+  onDownloadFolder: (folderPath: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const pending = downloadingFolderPath === entry.path;
+
+  return (
+    <ExplorerIconButton
+      disabled={pending}
+      label={
+        pending
+          ? t("explorer.actions.downloadingFolderZip")
+          : t("explorer.actions.downloadFolderZip")
+      }
+      onClick={() => {
+        void onDownloadFolder(entry.path).catch(() => undefined);
+      }}
+    >
+      {pending ? (
+        <LoaderCircleIcon className="animate-spin text-sky-500" />
+      ) : (
+        <DownloadIcon className="text-sky-500" />
+      )}
+    </ExplorerIconButton>
   );
 }
 

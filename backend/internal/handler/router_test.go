@@ -1,9 +1,11 @@
 package handler_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -829,6 +831,88 @@ func TestCreateAndDeleteFolder(t *testing.T) {
 	}
 }
 
+func TestDownloadFolderArchive(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "archive-bucket")
+	uploadObject(t, router, "/api/v1/buckets/archive-bucket/objects/docs/readme.txt", "hello", "public")
+	uploadObject(t, router, "/api/v1/buckets/archive-bucket/objects/docs/nested/guide.txt", "nested", "private")
+	createFolder(t, router, "archive-bucket", "docs/", "empty")
+
+	unauthorizedReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/archive-bucket/folders/archive?path="+url.QueryEscape("docs/"),
+		nil,
+	)
+	unauthorizedRec := httptest.NewRecorder()
+	router.ServeHTTP(unauthorizedRec, unauthorizedReq)
+	if unauthorizedRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", unauthorizedRec.Code)
+	}
+
+	invalidReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/archive-bucket/folders/archive?path="+url.QueryEscape("docs"),
+		nil,
+	)
+	invalidReq.Header.Set("Authorization", "Bearer dev-token")
+	invalidRec := httptest.NewRecorder()
+	router.ServeHTTP(invalidRec, invalidReq)
+	if invalidRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", invalidRec.Code, invalidRec.Body.String())
+	}
+
+	missingReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/archive-bucket/folders/archive?path="+url.QueryEscape("missing/"),
+		nil,
+	)
+	missingReq.Header.Set("Authorization", "Bearer dev-token")
+	missingRec := httptest.NewRecorder()
+	router.ServeHTTP(missingRec, missingReq)
+	if missingRec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d, body=%s", missingRec.Code, missingRec.Body.String())
+	}
+
+	downloadReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/archive-bucket/folders/archive?path="+url.QueryEscape("docs/"),
+		nil,
+	)
+	downloadReq.Header.Set("Authorization", "Bearer dev-token")
+	downloadRec := httptest.NewRecorder()
+	router.ServeHTTP(downloadRec, downloadReq)
+	if downloadRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", downloadRec.Code, downloadRec.Body.String())
+	}
+	if got := downloadRec.Header().Get("Content-Type"); got != "application/zip" {
+		t.Fatalf("expected application/zip, got %q", got)
+	}
+	if got := downloadRec.Header().Get("Content-Disposition"); !strings.Contains(got, "filename=docs.zip") {
+		t.Fatalf("expected docs.zip content disposition, got %q", got)
+	}
+
+	entries := unzipEntries(t, downloadRec.Body.Bytes())
+	if len(entries) != 4 {
+		t.Fatalf("expected 4 zip entries, got %+v", entries)
+	}
+	if entries["docs/"] != "" {
+		t.Fatalf("expected docs/ directory entry, got %q", entries["docs/"])
+	}
+	if entries["docs/empty/"] != "" {
+		t.Fatalf("expected docs/empty/ directory entry, got %q", entries["docs/empty/"])
+	}
+	if entries["docs/readme.txt"] != "hello" {
+		t.Fatalf("unexpected docs/readme.txt content %q", entries["docs/readme.txt"])
+	}
+	if entries["docs/nested/guide.txt"] != "nested" {
+		t.Fatalf("unexpected docs/nested/guide.txt content %q", entries["docs/nested/guide.txt"])
+	}
+	if _, exists := entries["docs/.light-oss-folder"]; exists {
+		t.Fatalf("folder marker should not be archived")
+	}
+}
+
 func TestRecursiveDeleteEscapesLikeWildcards(t *testing.T) {
 	router := newTestRouter(t, 1024)
 
@@ -1443,6 +1527,41 @@ func decodeJSON(t *testing.T, body []byte, target any) {
 	if err := json.Unmarshal(body, target); err != nil {
 		t.Fatalf("decode json: %v, body=%s", err, string(body))
 	}
+}
+
+func unzipEntries(t *testing.T, data []byte) map[string]string {
+	t.Helper()
+
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+
+	entries := make(map[string]string, len(reader.File))
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() {
+			entries[file.Name] = ""
+			continue
+		}
+
+		rc, err := file.Open()
+		if err != nil {
+			t.Fatalf("open zip entry %s: %v", file.Name, err)
+		}
+
+		content, err := io.ReadAll(rc)
+		closeErr := rc.Close()
+		if err != nil {
+			t.Fatalf("read zip entry %s: %v", file.Name, err)
+		}
+		if closeErr != nil {
+			t.Fatalf("close zip entry %s: %v", file.Name, closeErr)
+		}
+
+		entries[file.Name] = string(content)
+	}
+
+	return entries
 }
 
 type multipartUploadFile struct {

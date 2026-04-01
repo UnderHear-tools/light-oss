@@ -12,6 +12,7 @@ vi.mock("../api/objects", () => ({
   uploadObject: vi.fn(),
   deleteObject: vi.fn(),
   deleteFolder: vi.fn(),
+  downloadFolderZip: vi.fn(),
   updateObjectVisibility: vi.fn(),
   createSignedDownloadURL: vi.fn(),
   buildPublicObjectURL: vi.fn(() => "http://localhost:8080/download"),
@@ -25,6 +26,7 @@ import {
   createFolder,
   deleteFolder,
   deleteObject,
+  downloadFolderZip,
   listExplorerEntries,
   uploadFolder,
   updateObjectVisibility,
@@ -119,6 +121,111 @@ describe("BucketObjectsPage", () => {
         }),
       );
     });
+  });
+
+  it("downloads a directory archive and only disables the active row action", async () => {
+    let resolveDownload: (() => void) | undefined;
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+        {
+          type: "directory",
+          path: "images/",
+          name: "images",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+    vi.mocked(downloadFolderZip).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDownload = resolve;
+        }),
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    const buttons = await screen.findAllByRole("button", { name: "Download ZIP" });
+    await userEvent.click(buttons[0]);
+
+    await waitFor(() => {
+      expect(downloadFolderZip).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        "docs/",
+      );
+    });
+
+    const downloadingButtons = await screen.findAllByRole("button", {
+      name: "Downloading ZIP...",
+    });
+    expect(downloadingButtons[0]).toBeDisabled();
+    expect(buttons[1]).not.toBeDisabled();
+
+    resolveDownload?.();
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "Download ZIP" })).toHaveLength(2);
+    });
+  });
+
+  it("shows an error toast when folder archive download fails", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+    vi.mocked(downloadFolderZip).mockRejectedValue(new Error("archive failed"));
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Download ZIP" }),
+    );
+
+    expect(await screen.findByText("archive failed")).toBeInTheDocument();
   });
 
   it("supports upload flow in the current folder", async () => {

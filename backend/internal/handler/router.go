@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -176,6 +177,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.POST("/buckets", handler.createBucket)
 	protected.GET("/buckets", handler.listBuckets)
 	protected.GET("/buckets/:bucket/folders", handler.listFolders)
+	protected.GET("/buckets/:bucket/folders/archive", handler.downloadFolderArchive)
 	protected.POST("/buckets/:bucket/folders", handler.createFolder)
 	protected.DELETE("/buckets/:bucket/folders", handler.deleteFolder)
 	protected.GET("/buckets/:bucket/entries", handler.listExplorerEntries)
@@ -378,6 +380,21 @@ func (h *apiHandler) deleteFolder(c *gin.Context) {
 	}
 
 	response.NoContent(c, http.StatusNoContent)
+}
+
+func (h *apiHandler) downloadFolderArchive(c *gin.Context) {
+	archive, err := h.objectService.OpenFolderArchive(c.Request.Context(), c.Param("bucket"), c.Query("path"))
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	setFolderArchiveHeaders(c, archive.Filename)
+	c.Status(http.StatusOK)
+
+	if err := archive.WriteTo(c.Writer); err != nil {
+		h.logger.Error("stream folder archive", zap.Error(err))
+	}
 }
 
 func (h *apiHandler) listExplorerEntries(c *gin.Context) {
@@ -757,4 +774,11 @@ func setObjectHeaders(c *gin.Context, object *model.Object) {
 	c.Header("ETag", object.ETag)
 	c.Header("X-Object-Visibility", string(object.Visibility))
 	c.Header("X-Original-Filename", object.OriginalFilename)
+}
+
+func setFolderArchiveHeaders(c *gin.Context, filename string) {
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{
+		"filename": filename,
+	}))
 }

@@ -457,6 +457,84 @@
         }
       }
     },
+    "/api/v1/buckets/{bucket}/folders/archive": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BucketParam"
+        }
+      ],
+      "get": {
+        "tags": [
+          "文件夹"
+        ],
+        "operationId": "downloadFolderArchive",
+        "summary": "将文件夹下载为 ZIP 压缩包",
+        "description": "为指定的非根目录文件夹路径流式返回 ZIP 压缩包。压缩包会保留当前文件夹名称作为顶层目录，包含所有嵌套文件，保留通过文件夹标记对象创建的空子文件夹，并排除内部 .light-oss-folder 标记文件。",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FolderPathQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP 压缩包流。",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "存储桶名称或文件夹路径无效。错误代码： invalid_bucket_name、invalid_folder_path、invalid_prefix。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到文件夹。错误代码： folder_not_found。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "文件夹归档准备失败。错误代码： folder_lookup_failed、folder_archive_failed。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/buckets/{bucket}/entries": {
       "parameters": [
         {

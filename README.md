@@ -443,7 +443,17 @@ curl "$BASE_URL/api/v1/buckets/$BUCKET/entries?prefix=docs/&search=hello&limit=2
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 16. 修改对象可见性
+### 16. 下载文件夹 ZIP 压缩包
+
+只支持非根目录文件夹，且需要 Bearer Token：
+
+```bash
+curl "$BASE_URL/api/v1/buckets/$BUCKET/folders/archive?path=docs/" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o docs.zip
+```
+
+### 17. 修改对象可见性
 
 ```bash
 curl -X PATCH "$BASE_URL/api/v1/buckets/$BUCKET/objects/visibility/$PRIVATE_KEY" \
@@ -452,7 +462,7 @@ curl -X PATCH "$BASE_URL/api/v1/buckets/$BUCKET/objects/visibility/$PRIVATE_KEY"
   -d '{"visibility":"public"}'
 ```
 
-### 17. 生成 private 对象签名下载 URL
+### 18. 生成 private 对象签名下载 URL
 
 ```bash
 curl -X POST "$BASE_URL/api/v1/sign/download" \
@@ -463,7 +473,7 @@ curl -X POST "$BASE_URL/api/v1/sign/download" \
 
 返回结果中的 `data.url` 即可用于临时下载 private 对象。
 
-### 18. 创建站点绑定
+### 19. 创建站点绑定
 
 站点域名必须匹配 `*.underhear.cn`，并且被访问的站点资源必须是 public 对象。
 
@@ -474,21 +484,21 @@ curl -X POST "$BASE_URL/api/v1/sites" \
   -d "{\"bucket\":\"$BUCKET\",\"root_prefix\":\"$SITE_PREFIX\",\"enabled\":true,\"index_document\":\"index.html\",\"error_document\":\"404.html\",\"spa_fallback\":true,\"domains\":[\"$SITE_DOMAIN\"]}"
 ```
 
-### 19. 列出站点
+### 20. 列出站点
 
 ```bash
 curl "$BASE_URL/api/v1/sites" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 20. 查看单个站点
+### 21. 查看单个站点
 
 ```bash
 curl "$BASE_URL/api/v1/sites/$SITE_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 21. 更新站点
+### 22. 更新站点
 
 ```bash
 curl -X PUT "$BASE_URL/api/v1/sites/$SITE_ID" \
@@ -497,14 +507,14 @@ curl -X PUT "$BASE_URL/api/v1/sites/$SITE_ID" \
   -d "{\"bucket\":\"$BUCKET\",\"root_prefix\":\"$SITE_PREFIX\",\"enabled\":true,\"index_document\":\"index.html\",\"error_document\":\"404.html\",\"spa_fallback\":false,\"domains\":[\"$SITE_DOMAIN\"]}"
 ```
 
-### 22. 删除站点
+### 23. 删除站点
 
 ```bash
 curl -X DELETE "$BASE_URL/api/v1/sites/$SITE_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 23. 通过站点 ID 访问站点内容
+### 24. 通过站点 ID 访问站点内容
 
 这个方式直接走后端，不依赖网关域名。
 
@@ -512,7 +522,7 @@ curl -X DELETE "$BASE_URL/api/v1/sites/$SITE_ID" \
 curl "$BASE_URL/sites/$SITE_ID"
 ```
 
-### 24. 通过域名访问站点内容
+### 25. 通过域名访问站点内容
 
 如果你已经配置了 hosts，可直接访问：
 
@@ -556,6 +566,7 @@ curl -H "Host: $SITE_DOMAIN" http://127.0.0.1/
 - 上传单个文件
 - 上传整个文件夹
 - 创建文件夹
+- 将某个文件夹直接下载为 ZIP 压缩包
 - 删除文件或文件夹
 - 切换对象 `public/private` 可见性
 - 为 private 对象生成签名下载链接
