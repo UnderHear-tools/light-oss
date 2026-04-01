@@ -9,6 +9,7 @@ vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
   updateSite: vi.fn(),
   deleteSite: vi.fn(),
+  uploadAndPublishSite: vi.fn(),
 }));
 
 vi.mock("../api/buckets", () => ({
@@ -16,7 +17,13 @@ vi.mock("../api/buckets", () => ({
 }));
 
 import { listBuckets } from "../api/buckets";
-import { createSite, deleteSite, listSites, updateSite } from "../api/sites";
+import {
+  createSite,
+  deleteSite,
+  listSites,
+  updateSite,
+  uploadAndPublishSite,
+} from "../api/sites";
 
 const defaultBuckets = {
   items: [
@@ -105,23 +112,44 @@ describe("SitesPage", () => {
 
     renderWithApp(<SitesPage />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Create site" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Create site" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
     await userEvent.clear(within(dialog).getByLabelText("Root prefix"));
-    await userEvent.type(within(dialog).getByLabelText("Root prefix"), "landing/");
+    await userEvent.type(
+      within(dialog).getByLabelText("Root prefix"),
+      "landing/",
+    );
     await userEvent.type(
       within(dialog).getByLabelText("Domains"),
       "landing.underhear.cn, www.underhear.cn",
     );
-    await userEvent.click(within(dialog).getByRole("combobox", { name: "Enabled" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Disabled" }));
+    await userEvent.click(
+      within(dialog).getByRole("combobox", { name: "Enabled" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Disabled" }),
+    );
     await userEvent.clear(within(dialog).getByLabelText("Index document"));
-    await userEvent.type(within(dialog).getByLabelText("Index document"), "home.html");
-    await userEvent.type(within(dialog).getByLabelText("Error document"), "404.html");
-    await userEvent.click(within(dialog).getByRole("combobox", { name: "SPA fallback" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Disabled" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Create site" }));
+    await userEvent.type(
+      within(dialog).getByLabelText("Index document"),
+      "home.html",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText("Error document"),
+      "404.html",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("combobox", { name: "SPA fallback" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Disabled" }),
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Create site" }),
+    );
 
     await waitFor(() => {
       expect(createSite).toHaveBeenCalledWith(
@@ -139,6 +167,76 @@ describe("SitesPage", () => {
     });
 
     expect(await screen.findByText("Site created")).toBeInTheDocument();
+  }, 15000);
+
+  it("uploads a folder and publishes a site from the page header", async () => {
+    vi.mocked(listSites)
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [existingSite] });
+    vi.mocked(listBuckets).mockResolvedValue(defaultBuckets);
+    vi.mocked(uploadAndPublishSite).mockResolvedValue({
+      uploaded_count: 2,
+      site: existingSite,
+    });
+
+    renderWithApp(<SitesPage />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload and publish" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(
+      within(dialog).getByLabelText("Parent prefix"),
+      "deployments/",
+    );
+
+    const indexFile = new File(["<html>home</html>"], "index.html", {
+      type: "text/html",
+    });
+    const appFile = new File(["console.log('demo')"], "app.js", {
+      type: "application/javascript",
+    });
+    Object.defineProperty(indexFile, "webkitRelativePath", {
+      configurable: true,
+      value: "dist/index.html",
+    });
+    Object.defineProperty(appFile, "webkitRelativePath", {
+      configurable: true,
+      value: "dist/assets/app.js",
+    });
+
+    await userEvent.upload(within(dialog).getByLabelText("Folder"), [
+      indexFile,
+      appFile,
+    ]);
+    expect(within(dialog).getByText("deployments/dist/")).toBeInTheDocument();
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Upload and publish" }),
+    );
+
+    await waitFor(() => {
+      expect(uploadAndPublishSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "websites",
+          parentPrefix: "deployments/",
+          files: [indexFile, appFile],
+          domains: ["demo.underhear.cn"],
+          enabled: true,
+          indexDocument: "index.html",
+          errorDocument: "",
+          spaFallback: true,
+          onProgress: expect.any(Function),
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
   }, 15000);
 
   it("prefills the edit dialog and updates a site", async () => {
@@ -170,20 +268,35 @@ describe("SitesPage", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByDisplayValue("app/")).toBeInTheDocument();
-    expect(within(dialog).getByDisplayValue("demo.underhear.cn")).toBeInTheDocument();
+    expect(
+      within(dialog).getByDisplayValue("demo.underhear.cn"),
+    ).toBeInTheDocument();
 
     await userEvent.clear(within(dialog).getByLabelText("Root prefix"));
-    await userEvent.type(within(dialog).getByLabelText("Root prefix"), "app-v2/");
+    await userEvent.type(
+      within(dialog).getByLabelText("Root prefix"),
+      "app-v2/",
+    );
     await userEvent.clear(within(dialog).getByLabelText("Domains"));
     await userEvent.type(
       within(dialog).getByLabelText("Domains"),
       "app.underhear.cn, www.underhear.cn",
     );
-    await userEvent.click(within(dialog).getByRole("combobox", { name: "Enabled" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Disabled" }));
-    await userEvent.click(within(dialog).getByRole("combobox", { name: "SPA fallback" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Disabled" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await userEvent.click(
+      within(dialog).getByRole("combobox", { name: "Enabled" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Disabled" }),
+    );
+    await userEvent.click(
+      within(dialog).getByRole("combobox", { name: "SPA fallback" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Disabled" }),
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
 
     await waitFor(() => {
       expect(updateSite).toHaveBeenCalledWith(
@@ -213,11 +326,15 @@ describe("SitesPage", () => {
 
     renderWithApp(<SitesPage />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Delete" }),
+    );
 
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText("Delete site?")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    );
 
     await waitFor(() => {
       expect(deleteSite).toHaveBeenCalledWith(

@@ -22,7 +22,7 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "@/api/objects";
-import { createSite } from "@/api/sites";
+import { createSite, uploadAndPublishSite } from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -54,6 +54,10 @@ import {
   UploadFolderDialog,
   type UploadFolderDialogValue,
 } from "@/features/explorer/UploadFolderDialog";
+import {
+  UploadAndPublishSiteDialog,
+  type UploadAndPublishSiteValue,
+} from "@/features/sites/UploadAndPublishSiteDialog";
 import {
   UploadObjectDialog,
   type UploadDialogValue,
@@ -94,6 +98,11 @@ export function BucketObjectsPage() {
     settings.apiBaseUrl,
     settings.bearerToken,
     bucket,
+  ] as const;
+  const sitesQueryKey = [
+    "sites",
+    settings.apiBaseUrl,
+    settings.bearerToken,
   ] as const;
   const entriesQueryKey = [
     ...entriesBaseQueryKey,
@@ -182,6 +191,35 @@ export function BucketObjectsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.createFolder");
+      pushToast("error", message);
+    },
+  });
+
+  const uploadAndPublishSiteMutation = useMutation({
+    mutationFn: (value: UploadAndPublishSiteValue) =>
+      uploadAndPublishSite(settings, {
+        bucket: value.bucket,
+        parentPrefix: value.parentPrefix,
+        files: value.files,
+        domains: value.domains,
+        enabled: value.enabled,
+        indexDocument: value.indexDocument,
+        errorDocument: value.errorDocument,
+        spaFallback: value.spaFallback,
+        onProgress: setUploadProgress,
+      }),
+    onSuccess: async () => {
+      setUploadProgress(0);
+      pushToast("success", t("toast.sitePublished"));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
+        queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
+      ]);
+    },
+    onError: (error) => {
+      setUploadProgress(0);
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
       pushToast("error", message);
     },
   });
@@ -307,7 +345,9 @@ export function BucketObjectsPage() {
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
   const entries = entriesQuery.data?.items ?? [];
   const uploadPending =
-    uploadMutation.isPending || uploadFolderMutation.isPending;
+    uploadMutation.isPending ||
+    uploadFolderMutation.isPending ||
+    uploadAndPublishSiteMutation.isPending;
 
   if (!bucket) {
     return (
@@ -357,6 +397,10 @@ export function BucketObjectsPage() {
     await createFolderMutation.mutateAsync(name);
   }
 
+  async function handleUploadAndPublishSite(value: UploadAndPublishSiteValue) {
+    await uploadAndPublishSiteMutation.mutateAsync(value);
+  }
+
   async function handleDeleteFile(objectKey: string) {
     await deleteFileMutation.mutateAsync(objectKey);
   }
@@ -369,7 +413,10 @@ export function BucketObjectsPage() {
     await downloadFolderMutation.mutateAsync(folderPath);
   }
 
-  async function handlePublishSite(folderPath: string, value: PublishSiteValue) {
+  async function handlePublishSite(
+    folderPath: string,
+    value: PublishSiteValue,
+  ) {
     await publishSiteMutation.mutateAsync({ folderPath, value });
   }
 
@@ -506,6 +553,15 @@ export function BucketObjectsPage() {
                     currentPrefix={prefix}
                     onSubmit={handleUploadFolder}
                     pending={uploadPending}
+                    progress={uploadProgress}
+                  />
+
+                  <UploadAndPublishSiteDialog
+                    bucket={bucket}
+                    lockedFields={{ bucket: true, parentPrefix: true }}
+                    onSubmit={handleUploadAndPublishSite}
+                    parentPrefix={prefix}
+                    pending={uploadAndPublishSiteMutation.isPending}
                     progress={uploadProgress}
                   />
 

@@ -65,25 +65,55 @@ func (h *apiHandler) uploadObjectBatch(c *gin.Context) {
 	prefix := strings.TrimSpace(formValues["prefix"])
 	visibility := strings.TrimSpace(formValues["visibility"])
 
+	items, err := buildUploadBatchItemsFromManifest(fileParts, manifest)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	result, err := h.objectService.UploadBatch(c.Request.Context(), service.UploadObjectBatchInput{
+		BucketName: c.Param("bucket"),
+		Prefix:     prefix,
+		Visibility: visibility,
+		Items:      items,
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	objects := make([]objectResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		objects = append(objects, objectToResponse(item))
+	}
+
+	response.JSON(c, http.StatusCreated, uploadBatchResponse{
+		UploadedCount: result.UploadedCount,
+		Items:         objects,
+	})
+}
+
+func buildUploadBatchItemsFromManifest(
+	fileParts map[string]*streamedUploadBatchFile,
+	manifest []uploadBatchManifestItemRequest,
+) ([]service.UploadObjectBatchItemInput, error) {
 	seenFileFields := make(map[string]struct{}, len(manifest))
 	items := make([]service.UploadObjectBatchItemInput, 0, len(manifest))
+
 	for _, entry := range manifest {
 		fileField := strings.TrimSpace(entry.FileField)
 		relativePath := strings.TrimSpace(entry.RelativePath)
 		if fileField == "" || relativePath == "" {
-			response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_batch_manifest", "manifest entry is invalid"))
-			return
+			return nil, apperrors.New(http.StatusBadRequest, "invalid_batch_manifest", "manifest entry is invalid")
 		}
 		if _, exists := seenFileFields[fileField]; exists {
-			response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_batch_manifest", "manifest contains duplicate file fields"))
-			return
+			return nil, apperrors.New(http.StatusBadRequest, "invalid_batch_manifest", "manifest contains duplicate file fields")
 		}
 		seenFileFields[fileField] = struct{}{}
 
 		filePart, err := getSingleStreamedMultipartFile(fileParts, fileField)
 		if err != nil {
-			response.Error(c, err)
-			return
+			return nil, err
 		}
 
 		currentFilePart := filePart
@@ -107,26 +137,7 @@ func (h *apiHandler) uploadObjectBatch(c *gin.Context) {
 		})
 	}
 
-	result, err := h.objectService.UploadBatch(c.Request.Context(), service.UploadObjectBatchInput{
-		BucketName: c.Param("bucket"),
-		Prefix:     prefix,
-		Visibility: visibility,
-		Items:      items,
-	})
-	if err != nil {
-		response.Error(c, err)
-		return
-	}
-
-	objects := make([]objectResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		objects = append(objects, objectToResponse(item))
-	}
-
-	response.JSON(c, http.StatusCreated, uploadBatchResponse{
-		UploadedCount: result.UploadedCount,
-		Items:         objects,
-	})
+	return items, nil
 }
 
 func readBatchMultipartRequest(

@@ -24,27 +24,29 @@ import (
 )
 
 type Dependencies struct {
-	Config        config.Config
-	Logger        *zap.Logger
-	DB            *sql.DB
-	GormDB        *gorm.DB
-	AuthValidator *middleware.TokenValidator
-	BucketService *service.BucketService
-	ObjectService *service.ObjectService
-	SiteService   *service.SiteService
-	SignService   *service.SignService
+	Config             config.Config
+	Logger             *zap.Logger
+	DB                 *sql.DB
+	GormDB             *gorm.DB
+	AuthValidator      *middleware.TokenValidator
+	BucketService      *service.BucketService
+	ObjectService      *service.ObjectService
+	SiteService        *service.SiteService
+	SitePublishService *service.SitePublishService
+	SignService        *service.SignService
 }
 
 type apiHandler struct {
-	cfg           config.Config
-	logger        *zap.Logger
-	db            *sql.DB
-	gormDB        *gorm.DB
-	authValidator *middleware.TokenValidator
-	bucketService *service.BucketService
-	objectService *service.ObjectService
-	siteService   *service.SiteService
-	signService   *service.SignService
+	cfg                config.Config
+	logger             *zap.Logger
+	db                 *sql.DB
+	gormDB             *gorm.DB
+	authValidator      *middleware.TokenValidator
+	bucketService      *service.BucketService
+	objectService      *service.ObjectService
+	siteService        *service.SiteService
+	sitePublishService *service.SitePublishService
+	signService        *service.SignService
 }
 
 type createBucketRequest struct {
@@ -129,20 +131,26 @@ type siteResponse struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type sitePublishResponse struct {
+	UploadedCount int          `json:"uploaded_count"`
+	Site          siteResponse `json:"site"`
+}
+
 func NewRouter(deps Dependencies) *gin.Engine {
 	router := gin.New()
 	router.MaxMultipartMemory = deps.Config.MaxMultipartMemoryBytes
 
 	handler := &apiHandler{
-		cfg:           deps.Config,
-		logger:        deps.Logger,
-		db:            deps.DB,
-		gormDB:        deps.GormDB,
-		authValidator: deps.AuthValidator,
-		bucketService: deps.BucketService,
-		objectService: deps.ObjectService,
-		siteService:   deps.SiteService,
-		signService:   deps.SignService,
+		cfg:                deps.Config,
+		logger:             deps.Logger,
+		db:                 deps.DB,
+		gormDB:             deps.GormDB,
+		authValidator:      deps.AuthValidator,
+		bucketService:      deps.BucketService,
+		objectService:      deps.ObjectService,
+		siteService:        deps.SiteService,
+		sitePublishService: deps.SitePublishService,
+		signService:        deps.SignService,
 	}
 
 	rateLimiter := middleware.NewRateLimiter(deps.Config.RateLimitRPS, deps.Config.RateLimitBurst)
@@ -187,6 +195,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/buckets/:bucket/objects", handler.listObjects)
 	protected.DELETE("/buckets/:bucket/objects/*key", handler.deleteObject)
 	protected.POST("/sites", handler.createSite)
+	protected.POST("/sites/publish", middleware.MaxBodySize(deps.Config.MaxUploadSizeBytes), handler.publishSite)
 	protected.GET("/sites", handler.listSites)
 	protected.GET("/sites/:siteID", handler.getSite)
 	protected.PUT("/sites/:siteID", handler.updateSite)

@@ -61,11 +61,13 @@ const enUS = {
   "sites.description":
     "Manage bucket-backed websites, bind domains, and update routing behavior from one place.",
   "sites.actions.create": "Create site",
+  "sites.actions.uploadAndPublish": "Upload and publish",
   "sites.list.title": "Site list",
   "sites.list.description":
     "Review configured websites and adjust their bucket, prefix, and domain settings.",
   "sites.list.total": "{count} total",
-  "sites.list.empty": "Create a site to start serving bucket prefixes as websites.",
+  "sites.list.empty":
+    "Create a site to start serving bucket prefixes as websites.",
   "sites.table.domains": "Domains",
   "sites.table.bucket": "Bucket",
   "sites.table.rootPrefix": "Root prefix",
@@ -91,6 +93,19 @@ const enUS = {
   "sites.form.spaFallback": "SPA fallback",
   "sites.form.submitCreate": "Create site",
   "sites.form.submitUpdate": "Save changes",
+  "sites.uploadPublish.title": "Upload folder and publish",
+  "sites.uploadPublish.description":
+    "Upload one folder, keep its top-level name, and create a website from the uploaded files in one request.",
+  "sites.uploadPublish.parentPrefix": "Parent prefix",
+  "sites.uploadPublish.parentPrefixDescription":
+    "Optional upload parent folder. The selected folder name is appended automatically.",
+  "sites.uploadPublish.folderLabel": "Folder",
+  "sites.uploadPublish.folderDescription":
+    "Choose one folder per request. Empty folders are not uploaded.",
+  "sites.uploadPublish.rootPreview": "Final root prefix",
+  "sites.uploadPublish.rootPreviewPlaceholder":
+    "Choose a folder to preview the final site root.",
+  "sites.uploadPublish.submit": "Upload and publish",
   "sites.delete.title": "Delete site?",
   "sites.delete.description":
     "This removes the website bound to {domain}. This action cannot be undone.",
@@ -361,7 +376,8 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "common.ready": "就绪",
   "common.notAvailable": "不可用",
   "dashboard.title": "仪表盘",
-  "dashboard.description": "在一个页面中监控 bucket 活动、连接状态，并管理存储资源。",
+  "dashboard.description":
+    "在一个页面中监控 bucket 活动、连接状态，并管理存储资源。",
   "buckets.title": "bucket",
   "buckets.description": "查看当前可用的 bucket，并进入对应 bucket 管理文件。",
   "buckets.overview.totalBuckets": "bucket 总数",
@@ -467,11 +483,13 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.actions.viewDetails": "查看详情",
   "explorer.actions.deleteFolder": "删除文件夹",
   "sites.publish.title": "发布站点",
-  "sites.publish.description": "将当前文件夹前缀绑定到域名并作为网站提供公开对象。",
+  "sites.publish.description":
+    "将当前文件夹前缀绑定到域名并作为网站提供公开对象。",
   "sites.publish.bucket": "Bucket",
   "sites.publish.rootPrefix": "根前缀",
   "sites.publish.domains": "域名",
-  "sites.publish.domainsDescription": "只支持单层 *.underhear.cn 域名，多个值请用逗号分隔。",
+  "sites.publish.domainsDescription":
+    "只支持单层 *.underhear.cn 域名，多个值请用逗号分隔。",
   "sites.publish.indexDocument": "首页文档",
   "sites.publish.errorDocument": "错误页文档",
   "sites.publish.spaFallback": "SPA 回退",
@@ -563,8 +581,10 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "sites.title": "站点管理",
   "sites.description": "统一管理 bucket 网站、域名绑定和路由回退配置。",
   "sites.actions.create": "创建站点",
+  "sites.actions.uploadAndPublish": "上传并发布",
   "sites.list.title": "站点列表",
-  "sites.list.description": "查看已配置的网站，并调整它们的 bucket、前缀和域名设置。",
+  "sites.list.description":
+    "查看已配置的网站，并调整它们的 bucket、前缀和域名设置。",
   "sites.list.total": "共 {count} 个",
   "sites.list.empty": "先创建一个站点，把 bucket 前缀发布为网站。",
   "sites.table.domains": "域名",
@@ -577,20 +597,36 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "sites.table.actions": "操作",
   "sites.form.createTitle": "创建站点",
   "sites.form.editTitle": "编辑站点",
-  "sites.form.createDescription": "将 bucket 前缀绑定到一个或多个域名，并配置网站路由行为。",
+  "sites.form.createDescription":
+    "将 bucket 前缀绑定到一个或多个域名，并配置网站路由行为。",
   "sites.form.editDescription": "更新当前站点的 bucket、前缀、域名和回退规则。",
   "sites.form.bucket": "Bucket",
   "sites.form.rootPrefix": "根前缀",
   "sites.form.domains": "域名",
-  "sites.form.domainsDescription": "只支持单层 *.underhear.cn 域名，多个值请用逗号分隔。",
+  "sites.form.domainsDescription":
+    "只支持单层 *.underhear.cn 域名，多个值请用逗号分隔。",
   "sites.form.enabled": "启用状态",
   "sites.form.indexDocument": "首页文档",
   "sites.form.errorDocument": "错误页文档",
   "sites.form.spaFallback": "SPA 回退",
   "sites.form.submitCreate": "创建站点",
   "sites.form.submitUpdate": "保存修改",
+  "sites.uploadPublish.title": "上传文件夹并发布",
+  "sites.uploadPublish.description":
+    "一次上传一个文件夹，保留最外层目录名，并直接根据上传结果创建站点。",
+  "sites.uploadPublish.parentPrefix": "父级前缀",
+  "sites.uploadPublish.parentPrefixDescription":
+    "可选的上传父目录。选中的文件夹名称会自动追加到最终站点根前缀中。",
+  "sites.uploadPublish.folderLabel": "文件夹",
+  "sites.uploadPublish.folderDescription":
+    "每次请求只能选择一个文件夹，空文件夹不会被上传。",
+  "sites.uploadPublish.rootPreview": "最终根前缀",
+  "sites.uploadPublish.rootPreviewPlaceholder":
+    "选择文件夹后会在这里预览最终站点根前缀。",
+  "sites.uploadPublish.submit": "上传并发布",
   "sites.delete.title": "删除站点？",
-  "sites.delete.description": "这会删除绑定到 {domain} 的网站配置，且无法撤销。",
+  "sites.delete.description":
+    "这会删除绑定到 {domain} 的网站配置，且无法撤销。",
   "toast.siteCreated": "站点创建成功",
   "toast.siteUpdated": "站点更新成功",
   "toast.siteDeleted": "站点已删除",

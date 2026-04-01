@@ -1316,6 +1316,103 @@
         }
       }
     },
+    "/api/v1/sites/publish": {
+      "post": {
+        "tags": [
+          "站点"
+        ],
+        "operationId": "publishSiteUpload",
+        "summary": "上传文件夹并发布站点",
+        "description": "接收浏览器文件夹上传，保留所选的最外层目录名，将所有对象强制保存为 public，并在一次请求中创建站点绑定。",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSiteForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "文件夹上传并发布成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishSiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "multipart 表单、manifest、domains、bucket、prefix 或站点配置无效。错误代码：invalid_multipart_request、invalid_request、invalid_batch_manifest、invalid_bucket_name、invalid_prefix、invalid_website_config、invalid_domain、batch_file_missing。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "未找到存储桶。错误代码：bucket_not_found。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "其中一个域名已绑定到另一个站点。错误代码：domain_conflict。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "请求体超过配置的上传大小限制。错误代码：payload_too_large。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "站点发布失败。错误代码：bucket_lookup_failed、batch_file_buffer_failed、batch_file_open_failed、object_store_failed、object_metadata_failed、site_create_failed。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sites/{siteID}": {
       "parameters": [
         {
@@ -2327,6 +2424,69 @@
           }
         }
       },
+      "PublishSiteForm": {
+        "type": "object",
+        "required": [
+          "bucket",
+          "domains",
+          "manifest"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63
+          },
+          "parent_prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "",
+            "description": "可选的父级目录前缀。前导斜杠会被移除，非空值会被标准化为以“/”结尾。"
+          },
+          "domains": {
+            "type": "string",
+            "description": "站点域名的 JSON 字符串数组，至少需要一个域名。",
+            "example": "[\"demo.underhear.cn\"]"
+          },
+          "enabled": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "index_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "index.html"
+          },
+          "error_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": ""
+          },
+          "spa_fallback": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "manifest": {
+            "type": "string",
+            "description": "UploadBatchManifestItem 对象的 JSON 字符串数组。所有 relative_path 必须共享同一个最外层目录名。",
+            "example": "[{\"file_field\":\"file_0\",\"relative_path\":\"dist/index.html\"},{\"file_field\":\"file_1\",\"relative_path\":\"dist/assets/app.js\"}]"
+          }
+        },
+        "additionalProperties": {
+          "type": "string",
+          "format": "binary",
+          "description": "由 manifest[].file_field 引用的其他 multipart 文件分段。"
+        }
+      },
       "Site": {
         "type": "object",
         "required": [
@@ -2392,6 +2552,23 @@
             "items": {
               "$ref": "#/components/schemas/Site"
             }
+          }
+        }
+      },
+      "PublishSiteResult": {
+        "type": "object",
+        "required": [
+          "uploaded_count",
+          "site"
+        ],
+        "properties": {
+          "uploaded_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "site": {
+            "$ref": "#/components/schemas/Site"
           }
         }
       },
@@ -2610,6 +2787,28 @@
               },
               "data": {
                 "$ref": "#/components/schemas/SiteList"
+              }
+            }
+          }
+        ]
+      },
+      "PublishSiteEnvelope": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessEnvelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "request_id",
+              "data"
+            ],
+            "properties": {
+              "request_id": {
+                "type": "string"
+              },
+              "data": {
+                "$ref": "#/components/schemas/PublishSiteResult"
               }
             }
           }

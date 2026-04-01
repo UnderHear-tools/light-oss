@@ -20,6 +20,7 @@ vi.mock("../api/objects", () => ({
 
 vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
+  uploadAndPublishSite: vi.fn(),
 }));
 
 import {
@@ -32,7 +33,7 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "../api/objects";
-import { createSite } from "../api/sites";
+import { createSite, uploadAndPublishSite } from "../api/sites";
 
 describe("BucketObjectsPage", () => {
   beforeEach(() => {
@@ -170,7 +171,9 @@ describe("BucketObjectsPage", () => {
       { route: "/buckets/demo" },
     );
 
-    const buttons = await screen.findAllByRole("button", { name: "Download ZIP" });
+    const buttons = await screen.findAllByRole("button", {
+      name: "Download ZIP",
+    });
     await userEvent.click(buttons[0]);
 
     await waitFor(() => {
@@ -189,7 +192,9 @@ describe("BucketObjectsPage", () => {
 
     resolveDownload?.();
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: "Download ZIP" })).toHaveLength(2);
+      expect(
+        screen.getAllByRole("button", { name: "Download ZIP" }),
+      ).toHaveLength(2);
     });
   });
 
@@ -390,6 +395,103 @@ describe("BucketObjectsPage", () => {
     });
 
     expect(await screen.findByText("readme.txt")).toBeInTheDocument();
+  });
+
+  it("uploads a folder and publishes a site from the toolbar", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({ items: [], next_cursor: "" })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "directory",
+            path: "docs/dist/",
+            name: "dist",
+            is_empty: false,
+            object_key: null,
+            original_filename: null,
+            size: null,
+            content_type: null,
+            etag: null,
+            visibility: null,
+            updated_at: null,
+          },
+        ],
+        next_cursor: "",
+      });
+    vi.mocked(uploadAndPublishSite).mockResolvedValue({
+      uploaded_count: 2,
+      site: {
+        id: 8,
+        bucket: "demo",
+        root_prefix: "docs/dist/",
+        enabled: true,
+        index_document: "index.html",
+        error_document: "",
+        spa_fallback: true,
+        domains: ["demo.underhear.cn"],
+        created_at: "2026-03-30T00:00:00Z",
+        updated_at: "2026-03-30T00:00:00Z",
+      },
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload and publish" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const indexFile = new File(["<html>home</html>"], "index.html", {
+      type: "text/html",
+    });
+    const appFile = new File(["console.log('demo')"], "app.js", {
+      type: "application/javascript",
+    });
+    Object.defineProperty(indexFile, "webkitRelativePath", {
+      configurable: true,
+      value: "dist/index.html",
+    });
+    Object.defineProperty(appFile, "webkitRelativePath", {
+      configurable: true,
+      value: "dist/assets/app.js",
+    });
+
+    await userEvent.upload(within(dialog).getByLabelText("Folder"), [
+      indexFile,
+      appFile,
+    ]);
+    expect(within(dialog).getByText("docs/dist/")).toBeInTheDocument();
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Upload and publish" }),
+    );
+
+    await waitFor(() => {
+      expect(uploadAndPublishSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "demo",
+          parentPrefix: "docs/",
+          files: [indexFile, appFile],
+          domains: ["demo.underhear.cn"],
+          enabled: true,
+          indexDocument: "index.html",
+          errorDocument: "",
+          spaFallback: true,
+          onProgress: expect.any(Function),
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
   });
 
   it("shows an error toast when folder upload fails", async () => {

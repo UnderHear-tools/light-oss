@@ -90,18 +90,20 @@ func main() {
 	bucketService := service.NewBucketService(bucketRepo)
 	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
+	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, siteService)
 	signService := service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds)
 
 	router := handler.NewRouter(handler.Dependencies{
-		Config:        cfg,
-		Logger:        logger,
-		DB:            runtimeDB,
-		GormDB:        gormDB,
-		AuthValidator: tokenValidator,
-		BucketService: bucketService,
-		ObjectService: objectService,
-		SiteService:   siteService,
-		SignService:   signService,
+		Config:             cfg,
+		Logger:             logger,
+		DB:                 runtimeDB,
+		GormDB:             gormDB,
+		AuthValidator:      tokenValidator,
+		BucketService:      bucketService,
+		ObjectService:      objectService,
+		SiteService:        siteService,
+		SitePublishService: sitePublishService,
+		SignService:        signService,
 	})
 
 	server := &http.Server{
