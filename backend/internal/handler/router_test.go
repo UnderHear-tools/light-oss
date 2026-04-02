@@ -542,6 +542,202 @@ func TestPublishSiteUploadSuccess(t *testing.T) {
 	}
 }
 
+func TestPublishSiteFileSuccess(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+
+	req := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/sites/publish/file",
+		map[string]string{
+			"bucket":        "websites",
+			"parent_prefix": "deployments/",
+			"domains": mustMarshalJSON(t, []string{
+				"demo.underhear.cn",
+			}),
+		},
+		map[string]multipartUploadFile{
+			"file": {Filename: "index.html", Content: "<html>home</html>", ContentType: "text/html"},
+		},
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.RootPrefix != "deployments/" {
+		t.Fatalf("expected root prefix deployments/, got %q", body.Data.RootPrefix)
+	}
+	if body.Data.IndexDocument != "index.html" {
+		t.Fatalf("expected index document index.html, got %q", body.Data.IndexDocument)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/websites/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 object, got %d", len(listBody.Data.Items))
+	}
+	if listBody.Data.Items[0].ObjectKey != "deployments/index.html" {
+		t.Fatalf("unexpected object key %q", listBody.Data.Items[0].ObjectKey)
+	}
+	if listBody.Data.Items[0].Visibility != "public" {
+		t.Fatalf("expected public visibility, got %q", listBody.Data.Items[0].Visibility)
+	}
+
+	indexReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sites/%d", body.Data.ID), nil)
+	indexRec := httptest.NewRecorder()
+	router.ServeHTTP(indexRec, indexReq)
+	if indexRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", indexRec.Code, indexRec.Body.String())
+	}
+	if indexRec.Body.String() != "<html>home</html>" {
+		t.Fatalf("unexpected index body %q", indexRec.Body.String())
+	}
+}
+
+func TestPublishSiteFileSupportsBucketRoot(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+
+	req := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/sites/publish/file",
+		map[string]string{
+			"bucket": "websites",
+			"domains": mustMarshalJSON(t, []string{
+				"root.underhear.cn",
+			}),
+		},
+		map[string]multipartUploadFile{
+			"file": {Filename: "landing.txt", Content: "hello root", ContentType: "text/plain"},
+		},
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.RootPrefix != "" {
+		t.Fatalf("expected empty root prefix, got %q", body.Data.RootPrefix)
+	}
+	if body.Data.IndexDocument != "landing.txt" {
+		t.Fatalf("expected index document landing.txt, got %q", body.Data.IndexDocument)
+	}
+
+	indexReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sites/%d", body.Data.ID), nil)
+	indexRec := httptest.NewRecorder()
+	router.ServeHTTP(indexRec, indexReq)
+	if indexRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", indexRec.Code, indexRec.Body.String())
+	}
+	if indexRec.Body.String() != "hello root" {
+		t.Fatalf("unexpected index body %q", indexRec.Body.String())
+	}
+}
+
+func TestPublishSiteFileRequiresFile(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+
+	req := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/sites/publish/file",
+		map[string]string{
+			"bucket": "websites",
+			"domains": mustMarshalJSON(t, []string{
+				"demo.underhear.cn",
+			}),
+		},
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Error == nil || body.Error.Code != "invalid_request" {
+		t.Fatalf("expected invalid_request, got %+v", body.Error)
+	}
+}
+
+func TestPublishSiteFileRollsBackStorageOnDomainConflict(t *testing.T) {
+	router, storageRoot := newTestRouterWithStorageRoot(t, 8*1024)
+
+	createBucket(t, router, "websites")
+	createBucket(t, router, "other-sites")
+	createSite(t, router, `{
+		"bucket":"other-sites",
+		"root_prefix":"existing/",
+		"domains":["demo.underhear.cn"]
+	}`)
+
+	req := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/sites/publish/file",
+		map[string]string{
+			"bucket": "websites",
+			"domains": mustMarshalJSON(t, []string{
+				"demo.underhear.cn",
+			}),
+		},
+		map[string]multipartUploadFile{
+			"file": {Filename: "index.html", Content: "<html>home</html>", ContentType: "text/html"},
+		},
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Error == nil || body.Error.Code != "domain_conflict" {
+		t.Fatalf("expected domain_conflict, got %+v", body.Error)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/websites/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 0 {
+		t.Fatalf("expected no persisted objects after conflict, got %+v", listBody.Data.Items)
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 0 {
+		t.Fatalf("expected no stored files after conflict, got %d", files)
+	}
+}
+
 func TestPublishSiteUploadRejectsMixedTopLevelFolders(t *testing.T) {
 	router, storageRoot := newTestRouterWithStorageRoot(t, 8*1024)
 

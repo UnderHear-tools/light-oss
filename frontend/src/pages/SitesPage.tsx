@@ -17,6 +17,7 @@ import {
   deleteSite,
   listSites,
   updateSite,
+  uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
@@ -119,17 +120,28 @@ export function SitesPage() {
 
   const uploadAndPublishSiteMutation = useMutation({
     mutationFn: (value: UploadAndPublishSiteValue) =>
-      uploadAndPublishSite(settings, {
-        bucket: value.bucket,
-        parentPrefix: value.parentPrefix,
-        files: value.files,
-        domains: value.domains,
-        enabled: value.enabled,
-        indexDocument: value.indexDocument,
-        errorDocument: value.errorDocument,
-        spaFallback: value.spaFallback,
-        onProgress: setUploadProgress,
-      }),
+      value.mode === "folder"
+        ? uploadAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            files: value.files,
+            domains: value.domains,
+            enabled: value.enabled,
+            indexDocument: value.indexDocument,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          })
+        : uploadFileAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            file: value.file,
+            domains: value.domains,
+            enabled: value.enabled,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          }),
     onSuccess: async () => {
       setUploadProgress(0);
       pushToast("success", t("toast.sitePublished"));

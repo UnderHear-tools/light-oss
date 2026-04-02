@@ -1413,6 +1413,103 @@
         }
       }
     },
+    "/api/v1/sites/publish/file": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "publishSiteFile",
+        "summary": "Upload a file and publish a site",
+        "description": "Accepts one uploaded file, stores it as a public object, and creates a site whose index document is the uploaded file name.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSiteFileForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File uploaded and site published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Multipart form, domains, bucket, parent prefix, file name, or site configuration is invalid. Error codes: invalid_request, invalid_bucket_name, invalid_prefix, invalid_website_config, invalid_domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "One of the domains is already bound to another site. Error code: domain_conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Site publish failed. Error codes: batch_file_open_failed, object_store_failed, object_metadata_failed, site_create_failed, bucket_lookup_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sites/{siteID}": {
       "parameters": [
         {
@@ -2485,6 +2582,59 @@
           "type": "string",
           "format": "binary",
           "description": "Additional multipart file parts referenced by manifest[].file_field."
+        }
+      },
+      "PublishSiteFileForm": {
+        "type": "object",
+        "required": [
+          "bucket",
+          "domains",
+          "file"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63
+          },
+          "parent_prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "",
+            "description": "Optional parent folder prefix. Leading slash is stripped. Non-empty values are normalized to end with '/'."
+          },
+          "domains": {
+            "type": "string",
+            "description": "JSON string array of site domains. At least one domain is required.",
+            "example": "[\"demo.underhear.cn\"]"
+          },
+          "enabled": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "error_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": ""
+          },
+          "spa_fallback": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "The single file to upload and publish as the site index document."
+          }
         }
       },
       "Site": {

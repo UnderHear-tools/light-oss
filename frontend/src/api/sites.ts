@@ -22,6 +22,17 @@ export interface UploadAndPublishSiteParams {
   onProgress?: (value: number) => void;
 }
 
+export interface UploadFileAndPublishSiteParams {
+  bucket: string;
+  parentPrefix: string;
+  file: File;
+  domains: string[];
+  enabled: boolean;
+  errorDocument: string;
+  spaFallback: boolean;
+  onProgress?: (value: number) => void;
+}
+
 export interface PublishObjectSiteParams {
   bucket: string;
   objectKey: string;
@@ -108,6 +119,47 @@ export async function uploadAndPublishSite(
     });
 
     return response.data.data as PublishSiteResult;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Site publish failed");
+  }
+}
+
+export async function uploadFileAndPublishSite(
+  settings: AppSettings,
+  params: UploadFileAndPublishSiteParams,
+) {
+  const formData = new FormData();
+  formData.append("bucket", params.bucket);
+  if (params.parentPrefix.trim() !== "") {
+    formData.append("parent_prefix", params.parentPrefix);
+  }
+  formData.append("domains", JSON.stringify(params.domains));
+  formData.append("enabled", String(params.enabled));
+  formData.append("error_document", params.errorDocument);
+  formData.append("spa_fallback", String(params.spaFallback));
+  formData.append("file", params.file, params.file.name);
+
+  try {
+    const response = await createApiClient(settings).request({
+      method: "POST",
+      url: "/api/v1/sites/publish/file",
+      timeout: 0,
+      data: formData,
+      onUploadProgress: (event: AxiosProgressEvent) => {
+        if (!params.onProgress || !event.total) {
+          return;
+        }
+        params.onProgress(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+
+    return response.data.data as Site;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;

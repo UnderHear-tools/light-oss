@@ -93,18 +93,25 @@ const enUS = {
   "sites.form.spaFallback": "SPA fallback",
   "sites.form.submitCreate": "Create site",
   "sites.form.submitUpdate": "Save changes",
-  "sites.uploadPublish.title": "Upload folder and publish",
+  "sites.uploadPublish.title": "Upload and publish",
   "sites.uploadPublish.description":
-    "Upload one folder, keep its top-level name, and create a website from the uploaded files in one request.",
+    "Upload one folder or one file and publish it as a site in one request.",
+  "sites.uploadPublish.folderTab": "Upload folder and publish",
+  "sites.uploadPublish.fileTab": "Upload file and publish",
   "sites.uploadPublish.parentPrefix": "Parent prefix",
   "sites.uploadPublish.parentPrefixDescription":
     "Optional upload parent folder. The selected folder name is appended automatically.",
   "sites.uploadPublish.folderLabel": "Folder",
   "sites.uploadPublish.folderDescription":
     "Choose one folder per request. Empty folders are not uploaded.",
+  "sites.uploadPublish.fileLabel": "File",
+  "sites.uploadPublish.fileDescription":
+    "Choose one file to upload and publish as the site homepage.",
   "sites.uploadPublish.rootPreview": "Final root prefix",
   "sites.uploadPublish.rootPreviewPlaceholder":
     "Choose a folder to preview the final site root.",
+  "sites.uploadPublish.indexDocumentPreviewPlaceholder":
+    "Choose a file to preview the site index document.",
   "sites.uploadPublish.submit": "Upload and publish",
   "sites.delete.title": "Delete site?",
   "sites.delete.description":
@@ -617,18 +624,25 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "sites.form.spaFallback": "SPA 回退",
   "sites.form.submitCreate": "创建站点",
   "sites.form.submitUpdate": "保存修改",
-  "sites.uploadPublish.title": "上传文件夹并发布",
+  "sites.uploadPublish.title": "上传并发布",
   "sites.uploadPublish.description":
-    "一次上传一个文件夹，保留最外层目录名，并直接根据上传结果创建站点。",
+    "一次上传一个文件夹或一个文件，并直接根据上传结果创建站点。",
+  "sites.uploadPublish.folderTab": "上传文件夹并发布",
+  "sites.uploadPublish.fileTab": "上传文件并发布",
   "sites.uploadPublish.parentPrefix": "父级前缀",
   "sites.uploadPublish.parentPrefixDescription":
     "可选的上传父目录。选中的文件夹名称会自动追加到最终站点根前缀中。",
   "sites.uploadPublish.folderLabel": "文件夹",
   "sites.uploadPublish.folderDescription":
     "每次请求只能选择一个文件夹，空文件夹不会被上传。",
+  "sites.uploadPublish.fileLabel": "文件",
+  "sites.uploadPublish.fileDescription":
+    "选择一个文件上传，并将它作为站点首页发布。",
   "sites.uploadPublish.rootPreview": "最终根前缀",
   "sites.uploadPublish.rootPreviewPlaceholder":
     "选择文件夹后会在这里预览最终站点根前缀。",
+  "sites.uploadPublish.indexDocumentPreviewPlaceholder":
+    "选择文件后会在这里预览站点首页文件名。",
   "sites.uploadPublish.submit": "上传并发布",
   "sites.delete.title": "删除站点？",
   "sites.delete.description":

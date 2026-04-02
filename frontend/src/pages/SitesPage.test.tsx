@@ -9,6 +9,7 @@ vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
   updateSite: vi.fn(),
   deleteSite: vi.fn(),
+  uploadFileAndPublishSite: vi.fn(),
   uploadAndPublishSite: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ import {
   deleteSite,
   listSites,
   updateSite,
+  uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "../api/sites";
 
@@ -229,6 +231,61 @@ describe("SitesPage", () => {
           domains: ["demo.underhear.cn"],
           enabled: true,
           indexDocument: "index.html",
+          errorDocument: "",
+          spaFallback: true,
+          onProgress: expect.any(Function),
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
+  }, 15000);
+
+  it("uploads a file and publishes a site from the page header", async () => {
+    vi.mocked(listSites)
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [existingSite] });
+    vi.mocked(listBuckets).mockResolvedValue(defaultBuckets);
+    vi.mocked(uploadFileAndPublishSite).mockResolvedValue(existingSite);
+
+    renderWithApp(<SitesPage />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload and publish" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(dialog).getByRole("tab", { name: "Upload file and publish" }),
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText("Parent prefix"),
+      "deployments/",
+    );
+
+    const landingFile = new File(["<html>home</html>"], "landing.html", {
+      type: "text/html",
+    });
+    await userEvent.upload(within(dialog).getByLabelText("File"), landingFile);
+    expect(within(dialog).getByText("deployments/")).toBeInTheDocument();
+    expect(within(dialog).getByText("landing.html")).toBeInTheDocument();
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Upload and publish" }),
+    );
+
+    await waitFor(() => {
+      expect(uploadFileAndPublishSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "websites",
+          parentPrefix: "deployments/",
+          file: landingFile,
+          domains: ["demo.underhear.cn"],
+          enabled: true,
           errorDocument: "",
           spaFallback: true,
           onProgress: expect.any(Function),

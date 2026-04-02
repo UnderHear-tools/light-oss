@@ -25,6 +25,7 @@ import {
 import {
   createSite,
   publishObjectSite,
+  uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
@@ -58,9 +59,7 @@ import {
   UploadFolderDialog,
   type UploadFolderDialogValue,
 } from "@/features/explorer/UploadFolderDialog";
-import {
-  PublishObjectSiteValue,
-} from "@/features/explorer/PublishObjectSiteDialog";
+import { PublishObjectSiteValue } from "@/features/explorer/PublishObjectSiteDialog";
 import {
   UploadAndPublishSiteDialog,
   type UploadAndPublishSiteValue,
@@ -204,17 +203,28 @@ export function BucketObjectsPage() {
 
   const uploadAndPublishSiteMutation = useMutation({
     mutationFn: (value: UploadAndPublishSiteValue) =>
-      uploadAndPublishSite(settings, {
-        bucket: value.bucket,
-        parentPrefix: value.parentPrefix,
-        files: value.files,
-        domains: value.domains,
-        enabled: value.enabled,
-        indexDocument: value.indexDocument,
-        errorDocument: value.errorDocument,
-        spaFallback: value.spaFallback,
-        onProgress: setUploadProgress,
-      }),
+      value.mode === "folder"
+        ? uploadAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            files: value.files,
+            domains: value.domains,
+            enabled: value.enabled,
+            indexDocument: value.indexDocument,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          })
+        : uploadFileAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            file: value.file,
+            domains: value.domains,
+            enabled: value.enabled,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          }),
     onSuccess: async () => {
       setUploadProgress(0);
       pushToast("success", t("toast.sitePublished"));

@@ -1413,6 +1413,103 @@
         }
       }
     },
+    "/api/v1/sites/publish/file": {
+      "post": {
+        "tags": [
+          "站点"
+        ],
+        "operationId": "publishSiteFile",
+        "summary": "上传文件并发布站点",
+        "description": "接收一个上传文件，将其强制保存为 public 对象，并创建一个以该文件名作为首页文档的站点。",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSiteFileForm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "文件上传并发布成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "multipart 表单、domains、bucket、父级前缀、文件名或站点配置无效。错误代码：invalid_request、invalid_bucket_name、invalid_prefix、invalid_website_config、invalid_domain。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer Token 缺失或无效。错误代码：unauthorized。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "未找到存储桶。错误代码：bucket_not_found。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "其中一个域名已绑定到另一个站点。错误代码：domain_conflict。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "请求体超过配置的上传大小限制。错误代码：payload_too_large。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "站点发布失败。错误代码：batch_file_open_failed、object_store_failed、object_metadata_failed、site_create_failed、bucket_lookup_failed。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sites/{siteID}": {
       "parameters": [
         {
@@ -2485,6 +2582,59 @@
           "type": "string",
           "format": "binary",
           "description": "由 manifest[].file_field 引用的其他 multipart 文件分段。"
+        }
+      },
+      "PublishSiteFileForm": {
+        "type": "object",
+        "required": [
+          "bucket",
+          "domains",
+          "file"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+            "minLength": 3,
+            "maxLength": 63
+          },
+          "parent_prefix": {
+            "type": "string",
+            "maxLength": 512,
+            "default": "",
+            "description": "可选的父级目录前缀。前导斜杠会被移除，非空值会被标准化为以“/”结尾。"
+          },
+          "domains": {
+            "type": "string",
+            "description": "站点域名的 JSON 字符串数组，至少需要一个域名。",
+            "example": "[\"demo.underhear.cn\"]"
+          },
+          "enabled": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "error_document": {
+            "type": "string",
+            "maxLength": 512,
+            "default": ""
+          },
+          "spa_fallback": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "default": "true"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "需要上传并作为站点首页文档发布的单个文件。"
+          }
         }
       },
       "Site": {

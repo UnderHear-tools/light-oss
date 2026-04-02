@@ -21,6 +21,7 @@ vi.mock("../api/objects", () => ({
 vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
   publishObjectSite: vi.fn(),
+  uploadFileAndPublishSite: vi.fn(),
   uploadAndPublishSite: vi.fn(),
 }));
 
@@ -37,6 +38,7 @@ import {
 import {
   createSite,
   publishObjectSite,
+  uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "../api/sites";
 
@@ -489,6 +491,89 @@ describe("BucketObjectsPage", () => {
           domains: ["demo.underhear.cn"],
           enabled: true,
           indexDocument: "index.html",
+          errorDocument: "",
+          spaFallback: true,
+          onProgress: expect.any(Function),
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
+  });
+
+  it("uploads a file and publishes a site from the toolbar", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({ items: [], next_cursor: "" })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "docs/landing.html",
+            name: "landing.html",
+            is_empty: null,
+            object_key: "docs/landing.html",
+            original_filename: "landing.html",
+            size: 18,
+            content_type: "text/html",
+            etag: "feedface12345678",
+            visibility: "public",
+            updated_at: "2026-03-25T00:02:00Z",
+          },
+        ],
+        next_cursor: "",
+      });
+    vi.mocked(uploadFileAndPublishSite).mockResolvedValue({
+      id: 9,
+      bucket: "demo",
+      root_prefix: "docs/",
+      enabled: true,
+      index_document: "landing.html",
+      error_document: "",
+      spa_fallback: true,
+      domains: ["demo.underhear.cn"],
+      created_at: "2026-03-30T00:00:00Z",
+      updated_at: "2026-03-30T00:00:00Z",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload and publish" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(dialog).getByRole("tab", { name: "Upload file and publish" }),
+    );
+
+    const landingFile = new File(["<html>home</html>"], "landing.html", {
+      type: "text/html",
+    });
+    await userEvent.upload(within(dialog).getByLabelText("File"), landingFile);
+    expect(within(dialog).getAllByText("docs/")).toHaveLength(2);
+    expect(within(dialog).getByText("landing.html")).toBeInTheDocument();
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Upload and publish" }),
+    );
+
+    await waitFor(() => {
+      expect(uploadFileAndPublishSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "demo",
+          parentPrefix: "docs/",
+          file: landingFile,
+          domains: ["demo.underhear.cn"],
+          enabled: true,
           errorDocument: "",
           spaFallback: true,
           onProgress: expect.any(Function),

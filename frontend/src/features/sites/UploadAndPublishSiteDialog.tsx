@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getFolderUploadTopLevelName,
   normalizeFolderUploadParentPrefix,
@@ -39,16 +40,25 @@ const folderInputAttributes: Record<string, string> = {
 
 const emptyBuckets: Bucket[] = [];
 
-export interface UploadAndPublishSiteValue {
+interface UploadAndPublishSiteCommonValue {
   bucket: string;
   parentPrefix: string;
-  files: File[];
   domains: string[];
   enabled: boolean;
-  indexDocument: string;
   errorDocument: string;
   spaFallback: boolean;
 }
+
+export type UploadAndPublishSiteValue =
+  | (UploadAndPublishSiteCommonValue & {
+      mode: "folder";
+      files: File[];
+      indexDocument: string;
+    })
+  | (UploadAndPublishSiteCommonValue & {
+      mode: "file";
+      file: File;
+    });
 
 export function UploadAndPublishSiteDialog({
   buckets,
@@ -74,8 +84,11 @@ export function UploadAndPublishSiteDialog({
 }) {
   const resolvedBuckets = buckets ?? emptyBuckets;
   const [open, setOpen] = useState(false);
+  const [selectedMode, setSelectedMode] =
+    useState<UploadAndPublishSiteValue["mode"]>("folder");
   const [selectedBucket, setSelectedBucket] = useState(bucket ?? "");
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFolderFiles, setSelectedFolderFiles] = useState<File[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parentPrefixValue, setParentPrefixValue] = useState(
     parentPrefix ?? "",
   );
@@ -97,8 +110,10 @@ export function UploadAndPublishSiteDialog({
       bucket?.trim() ||
       (resolvedBuckets.length > 0 ? resolvedBuckets[0].name : "");
 
+    setSelectedMode("folder");
     setSelectedBucket(nextBucket);
-    setSelectedFiles([]);
+    setSelectedFolderFiles([]);
+    setSelectedFile(null);
     setParentPrefixValue(parentPrefix ?? "");
     setDomainsInput("");
     setEnabled(true);
@@ -113,15 +128,18 @@ export function UploadAndPublishSiteDialog({
     .filter(Boolean);
   const normalizedParentPrefix =
     normalizeFolderUploadParentPrefix(parentPrefixValue);
-  const topLevelFolderName = getFolderUploadTopLevelName(selectedFiles);
-  const rootPrefixPreview = topLevelFolderName
+  const topLevelFolderName =
+    getSafeFolderUploadTopLevelName(selectedFolderFiles);
+  const folderRootPrefixPreview = topLevelFolderName
     ? `${normalizedParentPrefix}${topLevelFolderName}/`
     : "";
+  const selectedFileName = getUploadFileName(selectedFile);
   const canSubmit =
     selectedBucket.trim() !== "" &&
-    selectedFiles.length > 0 &&
     parsedDomains.length > 0 &&
-    topLevelFolderName !== "";
+    (selectedMode === "folder"
+      ? selectedFolderFiles.length > 0 && topLevelFolderName !== ""
+      : selectedFile !== null && selectedFileName !== "");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,16 +148,30 @@ export function UploadAndPublishSiteDialog({
     }
 
     try {
-      await onSubmit({
-        bucket: selectedBucket.trim(),
-        parentPrefix: normalizedParentPrefix,
-        files: selectedFiles,
-        domains: parsedDomains,
-        enabled,
-        indexDocument: indexDocument.trim() || "index.html",
-        errorDocument: errorDocument.trim(),
-        spaFallback,
-      });
+      if (selectedMode === "folder") {
+        await onSubmit({
+          mode: "folder",
+          bucket: selectedBucket.trim(),
+          parentPrefix: normalizedParentPrefix,
+          files: selectedFolderFiles,
+          domains: parsedDomains,
+          enabled,
+          indexDocument: indexDocument.trim() || "index.html",
+          errorDocument: errorDocument.trim(),
+          spaFallback,
+        });
+      } else if (selectedFile) {
+        await onSubmit({
+          mode: "file",
+          bucket: selectedBucket.trim(),
+          parentPrefix: normalizedParentPrefix,
+          file: selectedFile,
+          domains: parsedDomains,
+          enabled,
+          errorDocument: errorDocument.trim(),
+          spaFallback,
+        });
+      }
 
       setOpen(false);
     } catch {
@@ -223,35 +255,113 @@ export function UploadAndPublishSiteDialog({
                 {t("sites.uploadPublish.parentPrefixDescription")}
               </FieldDescription>
             </Field>
+          </FieldGroup>
 
-            <Field data-disabled={pending || undefined}>
-              <FieldLabel htmlFor="upload-publish-folder">
-                {t("sites.uploadPublish.folderLabel")}
-              </FieldLabel>
-              <Input
-                {...folderInputAttributes}
-                disabled={pending}
-                id="upload-publish-folder"
-                multiple
-                name="upload-publish-folder"
-                onChange={(event) =>
-                  setSelectedFiles(Array.from(event.target.files ?? []))
-                }
-                type="file"
-              />
-              <FieldDescription>
-                {t("sites.uploadPublish.folderDescription")}
-              </FieldDescription>
-            </Field>
+          <Tabs
+            className="gap-5"
+            onValueChange={(value) =>
+              setSelectedMode(value as UploadAndPublishSiteValue["mode"])
+            }
+            value={selectedMode}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger disabled={pending} value="folder">
+                {t("sites.uploadPublish.folderTab")}
+              </TabsTrigger>
+              <TabsTrigger disabled={pending} value="file">
+                {t("sites.uploadPublish.fileTab")}
+              </TabsTrigger>
+            </TabsList>
 
-            <Field>
-              <FieldLabel>{t("sites.uploadPublish.rootPreview")}</FieldLabel>
-              <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
-                {rootPrefixPreview ||
-                  t("sites.uploadPublish.rootPreviewPlaceholder")}
-              </div>
-            </Field>
+            <TabsContent value="folder">
+              <FieldGroup>
+                <Field data-disabled={pending || undefined}>
+                  <FieldLabel htmlFor="upload-publish-folder">
+                    {t("sites.uploadPublish.folderLabel")}
+                  </FieldLabel>
+                  <Input
+                    {...folderInputAttributes}
+                    disabled={pending}
+                    id="upload-publish-folder"
+                    multiple
+                    name="upload-publish-folder"
+                    onChange={(event) =>
+                      setSelectedFolderFiles(
+                        Array.from(event.target.files ?? []),
+                      )
+                    }
+                    type="file"
+                  />
+                  <FieldDescription>
+                    {t("sites.uploadPublish.folderDescription")}
+                  </FieldDescription>
+                </Field>
 
+                <Field>
+                  <FieldLabel>
+                    {t("sites.uploadPublish.rootPreview")}
+                  </FieldLabel>
+                  <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {folderRootPrefixPreview ||
+                      t("sites.uploadPublish.rootPreviewPlaceholder")}
+                  </div>
+                </Field>
+
+                <Field data-disabled={pending || undefined}>
+                  <FieldLabel htmlFor="upload-publish-index-document">
+                    {t("sites.form.indexDocument")}
+                  </FieldLabel>
+                  <Input
+                    disabled={pending}
+                    id="upload-publish-index-document"
+                    onChange={(event) => setIndexDocument(event.target.value)}
+                    value={indexDocument}
+                  />
+                </Field>
+              </FieldGroup>
+            </TabsContent>
+
+            <TabsContent value="file">
+              <FieldGroup>
+                <Field data-disabled={pending || undefined}>
+                  <FieldLabel htmlFor="upload-publish-file">
+                    {t("sites.uploadPublish.fileLabel")}
+                  </FieldLabel>
+                  <Input
+                    disabled={pending}
+                    id="upload-publish-file"
+                    name="upload-publish-file"
+                    onChange={(event) =>
+                      setSelectedFile(event.target.files?.[0] ?? null)
+                    }
+                    type="file"
+                  />
+                  <FieldDescription>
+                    {t("sites.uploadPublish.fileDescription")}
+                  </FieldDescription>
+                </Field>
+
+                <Field>
+                  <FieldLabel>
+                    {t("sites.uploadPublish.rootPreview")}
+                  </FieldLabel>
+                  <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {normalizedParentPrefix || t("explorer.rootFolder")}
+                  </div>
+                </Field>
+
+                <Field>
+                  <FieldLabel>{t("sites.form.indexDocument")}</FieldLabel>
+                  <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    {selectedFileName ||
+                      t("sites.uploadPublish.indexDocumentPreviewPlaceholder")}
+                  </div>
+                </Field>
+              </FieldGroup>
+            </TabsContent>
+          </Tabs>
+
+          <FieldGroup>
             <Field data-disabled={pending || undefined}>
               <FieldLabel htmlFor="upload-publish-domains">
                 {t("sites.form.domains")}
@@ -289,18 +399,6 @@ export function UploadAndPublishSiteDialog({
                   <SelectItem value="false">{t("common.disabled")}</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
-
-            <Field data-disabled={pending || undefined}>
-              <FieldLabel htmlFor="upload-publish-index-document">
-                {t("sites.form.indexDocument")}
-              </FieldLabel>
-              <Input
-                disabled={pending}
-                id="upload-publish-index-document"
-                onChange={(event) => setIndexDocument(event.target.value)}
-                value={indexDocument}
-              />
             </Field>
 
             <Field data-disabled={pending || undefined}>
@@ -369,4 +467,21 @@ export function UploadAndPublishSiteDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function getSafeFolderUploadTopLevelName(files: File[]) {
+  try {
+    return getFolderUploadTopLevelName(files);
+  } catch {
+    return "";
+  }
+}
+
+function getUploadFileName(file: File | null) {
+  if (!file) {
+    return "";
+  }
+
+  const segments = file.name.replace(/\\/g, "/").split("/");
+  return segments[segments.length - 1]?.trim() ?? "";
 }
