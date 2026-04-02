@@ -22,7 +22,12 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "@/api/objects";
-import { createSite } from "@/api/sites";
+import {
+  createSite,
+  publishObjectSite,
+  uploadFileAndPublishSite,
+  uploadAndPublishSite,
+} from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -55,6 +60,11 @@ import {
   UploadFolderDialog,
   type UploadFolderDialogValue,
 } from "@/features/explorer/UploadFolderDialog";
+import { PublishObjectSiteValue } from "@/features/explorer/PublishObjectSiteDialog";
+import {
+  UploadAndPublishSiteDialog,
+  type UploadAndPublishSiteValue,
+} from "@/features/sites/UploadAndPublishSiteDialog";
 import {
   UploadObjectDialog,
   type UploadDialogValue,
@@ -95,6 +105,11 @@ export function BucketObjectsPage() {
     settings.apiBaseUrl,
     settings.bearerToken,
     bucket,
+  ] as const;
+  const sitesQueryKey = [
+    "sites",
+    settings.apiBaseUrl,
+    settings.bearerToken,
   ] as const;
   const entriesQueryKey = [
     ...entriesBaseQueryKey,
@@ -183,6 +198,46 @@ export function BucketObjectsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.createFolder");
+      pushToast("error", message);
+    },
+  });
+
+  const uploadAndPublishSiteMutation = useMutation({
+    mutationFn: (value: UploadAndPublishSiteValue) =>
+      value.mode === "folder"
+        ? uploadAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            files: value.files,
+            domains: value.domains,
+            enabled: value.enabled,
+            indexDocument: value.indexDocument,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          })
+        : uploadFileAndPublishSite(settings, {
+            bucket: value.bucket,
+            parentPrefix: value.parentPrefix,
+            file: value.file,
+            domains: value.domains,
+            enabled: value.enabled,
+            errorDocument: value.errorDocument,
+            spaFallback: value.spaFallback,
+            onProgress: setUploadProgress,
+          }),
+    onSuccess: async () => {
+      setUploadProgress(0);
+      pushToast("success", t("toast.sitePublished"));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
+        queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
+      ]);
+    },
+    onError: (error) => {
+      setUploadProgress(0);
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
       pushToast("error", message);
     },
   });
@@ -305,10 +360,44 @@ export function BucketObjectsPage() {
     },
   });
 
+  const publishObjectSiteMutation = useMutation({
+    mutationFn: async (input: {
+      objectKey: string;
+      value: PublishObjectSiteValue;
+    }) => {
+      setPublishingPath(input.objectKey);
+      return publishObjectSite(settings, {
+        bucket,
+        objectKey: input.objectKey,
+        domains: input.value.domains,
+        enabled: input.value.enabled,
+        errorDocument: input.value.errorDocument,
+        spaFallback: input.value.spaFallback,
+      });
+    },
+    onSuccess: async () => {
+      pushToast("success", t("toast.sitePublished"));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
+        queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
+      ]);
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
+      pushToast("error", message);
+    },
+    onSettled: () => {
+      setPublishingPath("");
+    },
+  });
+
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
   const entries = entriesQuery.data?.items ?? [];
   const uploadPending =
-    uploadMutation.isPending || uploadFolderMutation.isPending;
+    uploadMutation.isPending ||
+    uploadFolderMutation.isPending ||
+    uploadAndPublishSiteMutation.isPending;
 
   if (!bucket) {
     return (
@@ -358,6 +447,10 @@ export function BucketObjectsPage() {
     await createFolderMutation.mutateAsync(name);
   }
 
+  async function handleUploadAndPublishSite(value: UploadAndPublishSiteValue) {
+    await uploadAndPublishSiteMutation.mutateAsync(value);
+  }
+
   async function handleDeleteFile(objectKey: string) {
     await deleteFileMutation.mutateAsync(objectKey);
   }
@@ -370,8 +463,18 @@ export function BucketObjectsPage() {
     await downloadFolderMutation.mutateAsync(folderPath);
   }
 
-  async function handlePublishSite(folderPath: string, value: PublishSiteValue) {
+  async function handlePublishSite(
+    folderPath: string,
+    value: PublishSiteValue,
+  ) {
     await publishSiteMutation.mutateAsync({ folderPath, value });
+  }
+
+  async function handlePublishObjectSite(
+    objectKey: string,
+    value: PublishObjectSiteValue,
+  ) {
+    await publishObjectSiteMutation.mutateAsync({ objectKey, value });
   }
 
   async function handleSignDownload(objectKey: string) {
@@ -511,6 +614,15 @@ export function BucketObjectsPage() {
                   />
 
                   <Separator className="hidden h-5 sm:block" orientation="vertical" />
+                  
+                  <UploadAndPublishSiteDialog
+                    bucket={bucket}
+                    lockedFields={{ bucket: true, parentPrefix: true }}
+                    onSubmit={handleUploadAndPublishSite}
+                    parentPrefix={prefix}
+                    pending={uploadAndPublishSiteMutation.isPending}
+                    progress={uploadProgress}
+                  />
 
                   <CreateFolderDialog
                     currentPrefix={prefix}
@@ -614,6 +726,7 @@ export function BucketObjectsPage() {
                     onDeleteFolder={handleDeleteFolder}
                     onDownloadFolder={handleDownloadFolder}
                     onOpenDirectory={handleNavigatePrefix}
+                    onPublishObjectSite={handlePublishObjectSite}
                     onPublishSite={handlePublishSite}
                     onSignDownload={handleSignDownload}
                     onUpdateVisibility={handleUpdateVisibility}

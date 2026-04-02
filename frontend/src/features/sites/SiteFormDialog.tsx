@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { GlobeIcon, LoaderCircleIcon } from "lucide-react";
 import type { Bucket, Site } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -78,6 +83,7 @@ export function SiteFormDialog({
   lockedFields?: {
     bucket?: boolean;
     rootPrefix?: boolean;
+    indexDocument?: boolean;
   };
   mode: "create" | "edit";
   pending: boolean;
@@ -95,33 +101,27 @@ export function SiteFormDialog({
   const { t } = useI18n();
   const bucketLocked = lockedFields?.bucket ?? false;
   const rootPrefixLocked = lockedFields?.rootPrefix ?? false;
-  const initialDomainsKey = initialValue?.domains?.join("\0") ?? "";
-  const bucketNamesKey = resolvedBuckets.map((bucket) => bucket.name).join("\0");
+  const indexDocumentLocked = lockedFields?.indexDocument ?? false;
+  const initialValueSnapshot = JSON.stringify(buildSiteFormValue(initialValue));
+  const initialDialogValue = useMemo(
+    () => JSON.parse(initialValueSnapshot) as SiteFormValue,
+    [initialValueSnapshot],
+  );
+  const defaultBucketName = resolvedBuckets[0]?.name ?? "";
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const nextValue = buildSiteFormValue(initialValue);
-    if (!bucketLocked && nextValue.bucket === "" && resolvedBuckets.length > 0) {
-      nextValue.bucket = resolvedBuckets[0].name;
+    const nextValue = buildSiteFormValue(initialDialogValue);
+    if (!bucketLocked && nextValue.bucket === "" && defaultBucketName !== "") {
+      nextValue.bucket = defaultBucketName;
     }
 
     setFormValue(nextValue);
     setDomainsInput(nextValue.domains.join(", "));
-  }, [
-    bucketLocked,
-    bucketNamesKey,
-    initialDomainsKey,
-    initialValue?.bucket,
-    initialValue?.enabled,
-    initialValue?.errorDocument,
-    initialValue?.indexDocument,
-    initialValue?.rootPrefix,
-    initialValue?.spaFallback,
-    open,
-  ]);
+  }, [bucketLocked, defaultBucketName, initialDialogValue, open]);
 
   const parsedDomains = domainsInput
     .split(",")
@@ -284,17 +284,23 @@ export function SiteFormDialog({
               <FieldLabel htmlFor="site-form-index-document">
                 {t("sites.form.indexDocument")}
               </FieldLabel>
-              <Input
-                disabled={pending}
-                id="site-form-index-document"
-                onChange={(event) =>
-                  setFormValue((current) => ({
-                    ...current,
-                    indexDocument: event.target.value,
-                  }))
-                }
-                value={formValue.indexDocument}
-              />
+              {indexDocumentLocked ? (
+                <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  {formValue.indexDocument}
+                </div>
+              ) : (
+                <Input
+                  disabled={pending}
+                  id="site-form-index-document"
+                  onChange={(event) =>
+                    setFormValue((current) => ({
+                      ...current,
+                      indexDocument: event.target.value,
+                    }))
+                  }
+                  value={formValue.indexDocument}
+                />
+              )}
             </Field>
 
             <Field data-disabled={pending || undefined}>
@@ -347,7 +353,10 @@ export function SiteFormDialog({
           <DialogFooter>
             <Button disabled={pending || !canSubmit} type="submit">
               {pending ? (
-                <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                <LoaderCircleIcon
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
               ) : (
                 <GlobeIcon data-icon="inline-start" />
               )}

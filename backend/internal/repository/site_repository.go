@@ -13,6 +13,22 @@ type SiteRepository struct {
 	db *gorm.DB
 }
 
+type siteCreateRecord struct {
+	ID            uint64    `gorm:"primaryKey"`
+	BucketName    string    `gorm:"column:bucket_name"`
+	RootPrefix    string    `gorm:"column:root_prefix"`
+	Enabled       bool      `gorm:"column:enabled"`
+	IndexDocument string    `gorm:"column:index_document"`
+	ErrorDocument string    `gorm:"column:error_document"`
+	SPAFallback   bool      `gorm:"column:spa_fallback"`
+	CreatedAt     time.Time `gorm:"column:created_at"`
+	UpdatedAt     time.Time `gorm:"column:updated_at"`
+}
+
+func (siteCreateRecord) TableName() string {
+	return "sites"
+}
+
 func NewSiteRepository(db *gorm.DB) *SiteRepository {
 	return &SiteRepository{db: db}
 }
@@ -36,9 +52,20 @@ func (r *SiteRepository) Create(ctx context.Context, site *model.Site, domains [
 	site.CreatedAt = now
 	site.UpdatedAt = now
 
-	if err := r.db.WithContext(ctx).Omit("Domains").Create(site).Error; err != nil {
+	record := siteCreateRecord{
+		BucketName:    site.BucketName,
+		RootPrefix:    site.RootPrefix,
+		Enabled:       site.Enabled,
+		IndexDocument: site.IndexDocument,
+		ErrorDocument: site.ErrorDocument,
+		SPAFallback:   site.SPAFallback,
+		CreatedAt:     site.CreatedAt,
+		UpdatedAt:     site.UpdatedAt,
+	}
+	if err := r.db.WithContext(ctx).Create(&record).Error; err != nil {
 		return nil, err
 	}
+	site.ID = record.ID
 
 	if err := r.replaceDomains(ctx, site.ID, domains, now); err != nil {
 		return nil, err
