@@ -83,6 +83,7 @@ export function SiteFormDialog({
   lockedFields?: {
     bucket?: boolean;
     rootPrefix?: boolean;
+    indexDocument?: boolean;
   };
   mode: "create" | "edit";
   pending: boolean;
@@ -100,6 +101,7 @@ export function SiteFormDialog({
   const { t } = useI18n();
   const bucketLocked = lockedFields?.bucket ?? false;
   const rootPrefixLocked = lockedFields?.rootPrefix ?? false;
+  const indexDocumentLocked = lockedFields?.indexDocument ?? false;
   const initialValueSnapshot = JSON.stringify(buildSiteFormValue(initialValue));
   const initialDialogValue = useMemo(
     () => JSON.parse(initialValueSnapshot) as SiteFormValue,
@@ -282,17 +284,23 @@ export function SiteFormDialog({
               <FieldLabel htmlFor="site-form-index-document">
                 {t("sites.form.indexDocument")}
               </FieldLabel>
-              <Input
-                disabled={pending}
-                id="site-form-index-document"
-                onChange={(event) =>
-                  setFormValue((current) => ({
-                    ...current,
-                    indexDocument: event.target.value,
-                  }))
-                }
-                value={formValue.indexDocument}
-              />
+              {indexDocumentLocked ? (
+                <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  {formValue.indexDocument}
+                </div>
+              ) : (
+                <Input
+                  disabled={pending}
+                  id="site-form-index-document"
+                  onChange={(event) =>
+                    setFormValue((current) => ({
+                      ...current,
+                      indexDocument: event.target.value,
+                    }))
+                  }
+                  value={formValue.indexDocument}
+                />
+              )}
             </Field>
 
             <Field data-disabled={pending || undefined}>

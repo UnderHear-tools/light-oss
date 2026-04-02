@@ -22,6 +22,15 @@ export interface UploadAndPublishSiteParams {
   onProgress?: (value: number) => void;
 }
 
+export interface PublishObjectSiteParams {
+  bucket: string;
+  objectKey: string;
+  domains: string[];
+  enabled: boolean;
+  errorDocument: string;
+  spaFallback: boolean;
+}
+
 export function listSites(settings: AppSettings) {
   return apiRequest<SiteListResult>(settings, {
     method: "GET",
@@ -108,4 +117,22 @@ export async function uploadAndPublishSite(
     }
     throw new Error("Site publish failed");
   }
+}
+
+export function publishObjectSite(
+  settings: AppSettings,
+  params: PublishObjectSiteParams,
+) {
+  return apiRequest<Site>(settings, {
+    method: "POST",
+    url: "/api/v1/sites/publish/object",
+    data: {
+      bucket: params.bucket,
+      object_key: params.objectKey,
+      domains: params.domains,
+      enabled: params.enabled,
+      error_document: params.errorDocument,
+      spa_fallback: params.spaFallback,
+    },
+  });
 }

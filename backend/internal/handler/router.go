@@ -195,6 +195,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/buckets/:bucket/objects", handler.listObjects)
 	protected.DELETE("/buckets/:bucket/objects/*key", handler.deleteObject)
 	protected.POST("/sites", handler.createSite)
+	protected.POST("/sites/publish/object", handler.publishObjectSite)
 	protected.POST("/sites/publish", middleware.MaxBodySize(deps.Config.MaxUploadSizeBytes), handler.publishSite)
 	protected.GET("/sites", handler.listSites)
 	protected.GET("/sites/:siteID", handler.getSite)

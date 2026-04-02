@@ -20,6 +20,7 @@ vi.mock("../api/objects", () => ({
 
 vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
+  publishObjectSite: vi.fn(),
   uploadAndPublishSite: vi.fn(),
 }));
 
@@ -33,7 +34,11 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "../api/objects";
-import { createSite, uploadAndPublishSite } from "../api/sites";
+import {
+  createSite,
+  publishObjectSite,
+  uploadAndPublishSite,
+} from "../api/sites";
 
 describe("BucketObjectsPage", () => {
   beforeEach(() => {
@@ -668,7 +673,7 @@ describe("BucketObjectsPage", () => {
     });
   });
 
-  it("shows publish site only for directory rows", async () => {
+  it("shows publish site for both directory and file rows", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [
         {
@@ -709,8 +714,8 @@ describe("BucketObjectsPage", () => {
     );
 
     expect(
-      await screen.findByRole("button", { name: "Publish site" }),
-    ).toBeInTheDocument();
+      await screen.findAllByRole("button", { name: "Publish site" }),
+    ).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
   });
 
@@ -780,6 +785,98 @@ describe("BucketObjectsPage", () => {
           error_document: "",
           spa_fallback: true,
           domains: ["demo.underhear.cn", "www.underhear.cn"],
+        },
+      );
+    });
+
+    expect(await screen.findByText("Site published")).toBeInTheDocument();
+  });
+
+  it("publishes a file as a site from the explorer table", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "docs/readme.txt",
+            name: "readme.txt",
+            is_empty: null,
+            object_key: "docs/readme.txt",
+            original_filename: "readme.txt",
+            size: 12,
+            content_type: "text/plain",
+            etag: "abcdef1234567890",
+            visibility: "private",
+            updated_at: "2026-03-25T00:00:00Z",
+          },
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "docs/readme.txt",
+            name: "readme.txt",
+            is_empty: null,
+            object_key: "docs/readme.txt",
+            original_filename: "readme.txt",
+            size: 12,
+            content_type: "text/plain",
+            etag: "abcdef1234567890",
+            visibility: "public",
+            updated_at: "2026-03-25T00:00:00Z",
+          },
+        ],
+        next_cursor: "",
+      });
+    vi.mocked(publishObjectSite).mockResolvedValue({
+      id: 9,
+      bucket: "demo",
+      root_prefix: "docs/",
+      enabled: true,
+      index_document: "readme.txt",
+      error_document: "",
+      spa_fallback: true,
+      domains: ["demo.underhear.cn"],
+      created_at: "2026-03-30T00:00:00Z",
+      updated_at: "2026-03-30T00:00:00Z",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Publish site" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("demo")).toBeInTheDocument();
+    expect(within(dialog).getByText("docs/")).toBeInTheDocument();
+    expect(within(dialog).getByText("readme.txt")).toBeInTheDocument();
+
+    await userEvent.type(
+      within(dialog).getByLabelText("Domains"),
+      "demo.underhear.cn",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Publish site" }),
+    );
+
+    await waitFor(() => {
+      expect(publishObjectSite).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "demo",
+          objectKey: "docs/readme.txt",
+          domains: ["demo.underhear.cn"],
+          enabled: true,
+          errorDocument: "",
+          spaFallback: true,
         },
       );
     });

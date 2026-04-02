@@ -224,6 +224,9 @@ const enUS = {
   "sites.publish.title": "Publish folder as a site",
   "sites.publish.description":
     "Bind one or more domains to this folder prefix and serve its public objects as a website.",
+  "sites.publishObject.title": "Publish file as a site",
+  "sites.publishObject.description":
+    "Bind one or more domains to this file and serve it as the site root document.",
   "sites.publish.bucket": "Bucket",
   "sites.publish.rootPrefix": "Root prefix",
   "sites.publish.domains": "Domains",
@@ -485,6 +488,9 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "sites.publish.title": "发布站点",
   "sites.publish.description":
     "将当前文件夹前缀绑定到域名并作为网站提供公开对象。",
+  "sites.publishObject.title": "发布文件为站点",
+  "sites.publishObject.description":
+    "将当前文件绑定到域名，并把该文件作为站点根路径返回的首页文档。",
   "sites.publish.bucket": "Bucket",
   "sites.publish.rootPrefix": "根前缀",
   "sites.publish.domains": "域名",

@@ -656,6 +656,224 @@ func TestPublishSiteUploadRollsBackObjectsOnDomainConflict(t *testing.T) {
 	}
 }
 
+func TestPublishObjectSiteSuccessFromPrivateFile(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+	uploadObjectWithContentType(
+		t,
+		router,
+		"/api/v1/buckets/websites/objects/docs/landing.txt",
+		"hello from object site",
+		"private",
+		"text/plain",
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/sites/publish/object",
+		bytes.NewBufferString(`{
+			"bucket":"websites",
+			"object_key":"docs/landing.txt",
+			"domains":["demo.underhear.cn"]
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.RootPrefix != "docs/" {
+		t.Fatalf("expected root prefix docs/, got %q", body.Data.RootPrefix)
+	}
+	if body.Data.IndexDocument != "landing.txt" {
+		t.Fatalf("expected index document landing.txt, got %q", body.Data.IndexDocument)
+	}
+	if !body.Data.Enabled {
+		t.Fatalf("expected site enabled by default")
+	}
+	if !body.Data.SPAFallback {
+		t.Fatalf("expected spa fallback enabled by default")
+	}
+
+	siteReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sites/%d", body.Data.ID), nil)
+	siteRec := httptest.NewRecorder()
+	router.ServeHTTP(siteRec, siteReq)
+	if siteRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", siteRec.Code, siteRec.Body.String())
+	}
+	if siteRec.Body.String() != "hello from object site" {
+		t.Fatalf("unexpected site body %q", siteRec.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/websites/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 object, got %+v", listBody.Data.Items)
+	}
+	if listBody.Data.Items[0].Visibility != "public" {
+		t.Fatalf("expected object visibility public, got %q", listBody.Data.Items[0].Visibility)
+	}
+}
+
+func TestPublishObjectSiteSuccessFromRootFile(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+	uploadObjectWithContentType(
+		t,
+		router,
+		"/api/v1/buckets/websites/objects/home.txt",
+		"root file site",
+		"public",
+		"text/plain",
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/sites/publish/object",
+		bytes.NewBufferString(`{
+			"bucket":"websites",
+			"object_key":"home.txt",
+			"domains":["root.underhear.cn"],
+			"enabled":false,
+			"spa_fallback":false,
+			"error_document":"404.txt"
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.RootPrefix != "" {
+		t.Fatalf("expected empty root prefix, got %q", body.Data.RootPrefix)
+	}
+	if body.Data.IndexDocument != "home.txt" {
+		t.Fatalf("expected index document home.txt, got %q", body.Data.IndexDocument)
+	}
+	if body.Data.Enabled {
+		t.Fatalf("expected site disabled")
+	}
+	if body.Data.SPAFallback {
+		t.Fatalf("expected spa fallback disabled")
+	}
+	if body.Data.ErrorDocument != "404.txt" {
+		t.Fatalf("expected error document 404.txt, got %q", body.Data.ErrorDocument)
+	}
+}
+
+func TestPublishObjectSiteRollsBackVisibilityOnDomainConflict(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+	createBucket(t, router, "other-sites")
+	uploadObjectWithContentType(
+		t,
+		router,
+		"/api/v1/buckets/websites/objects/docs/landing.txt",
+		"hello from object site",
+		"private",
+		"text/plain",
+	)
+	createSite(t, router, `{
+		"bucket":"other-sites",
+		"root_prefix":"existing/",
+		"domains":["demo.underhear.cn"]
+	}`)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/sites/publish/object",
+		bytes.NewBufferString(`{
+			"bucket":"websites",
+			"object_key":"docs/landing.txt",
+			"domains":["demo.underhear.cn"]
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Error == nil || body.Error.Code != "domain_conflict" {
+		t.Fatalf("expected domain_conflict, got %+v", body.Error)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/websites/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 object, got %+v", listBody.Data.Items)
+	}
+	if listBody.Data.Items[0].Visibility != "private" {
+		t.Fatalf("expected object visibility private after rollback, got %q", listBody.Data.Items[0].Visibility)
+	}
+}
+
+func TestPublishObjectSiteReturnsObjectNotFound(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/sites/publish/object",
+		bytes.NewBufferString(`{
+			"bucket":"websites",
+			"object_key":"docs/missing.txt",
+			"domains":["demo.underhear.cn"]
+		}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[siteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Error == nil || body.Error.Code != "object_not_found" {
+		t.Fatalf("expected object_not_found, got %+v", body.Error)
+	}
+}
+
 func TestUploadObjectBatchRejectsInvalidFinalObjectKeyFromPrefix(t *testing.T) {
 	router, storageRoot := newTestRouterWithStorageRoot(t, 8*1024)
 

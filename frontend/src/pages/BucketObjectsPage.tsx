@@ -22,7 +22,11 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "@/api/objects";
-import { createSite, uploadAndPublishSite } from "@/api/sites";
+import {
+  createSite,
+  publishObjectSite,
+  uploadAndPublishSite,
+} from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -54,6 +58,9 @@ import {
   UploadFolderDialog,
   type UploadFolderDialogValue,
 } from "@/features/explorer/UploadFolderDialog";
+import {
+  PublishObjectSiteValue,
+} from "@/features/explorer/PublishObjectSiteDialog";
 import {
   UploadAndPublishSiteDialog,
   type UploadAndPublishSiteValue,
@@ -342,6 +349,38 @@ export function BucketObjectsPage() {
     },
   });
 
+  const publishObjectSiteMutation = useMutation({
+    mutationFn: async (input: {
+      objectKey: string;
+      value: PublishObjectSiteValue;
+    }) => {
+      setPublishingPath(input.objectKey);
+      return publishObjectSite(settings, {
+        bucket,
+        objectKey: input.objectKey,
+        domains: input.value.domains,
+        enabled: input.value.enabled,
+        errorDocument: input.value.errorDocument,
+        spaFallback: input.value.spaFallback,
+      });
+    },
+    onSuccess: async () => {
+      pushToast("success", t("toast.sitePublished"));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
+        queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
+      ]);
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
+      pushToast("error", message);
+    },
+    onSettled: () => {
+      setPublishingPath("");
+    },
+  });
+
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
   const entries = entriesQuery.data?.items ?? [];
   const uploadPending =
@@ -418,6 +457,13 @@ export function BucketObjectsPage() {
     value: PublishSiteValue,
   ) {
     await publishSiteMutation.mutateAsync({ folderPath, value });
+  }
+
+  async function handlePublishObjectSite(
+    objectKey: string,
+    value: PublishObjectSiteValue,
+  ) {
+    await publishObjectSiteMutation.mutateAsync({ objectKey, value });
   }
 
   async function handleSignDownload(objectKey: string) {
@@ -658,6 +704,7 @@ export function BucketObjectsPage() {
                     onDeleteFolder={handleDeleteFolder}
                     onDownloadFolder={handleDownloadFolder}
                     onOpenDirectory={handleNavigatePrefix}
+                    onPublishObjectSite={handlePublishObjectSite}
                     onPublishSite={handlePublishSite}
                     onSignDownload={handleSignDownload}
                     onUpdateVisibility={handleUpdateVisibility}
