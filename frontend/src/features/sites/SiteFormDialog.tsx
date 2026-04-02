@@ -197,7 +197,7 @@ export function SiteFormDialog({
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" side="bottom">
                     {resolvedBuckets.map((bucket) => (
                       <SelectItem key={bucket.name} value={bucket.name}>
                         {bucket.name}
@@ -273,7 +273,7 @@ export function SiteFormDialog({
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" side="bottom">
                   <SelectItem value="true">{t("common.enabled")}</SelectItem>
                   <SelectItem value="false">{t("common.disabled")}</SelectItem>
                 </SelectContent>
@@ -342,7 +342,7 @@ export function SiteFormDialog({
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" side="bottom">
                   <SelectItem value="true">{t("common.enabled")}</SelectItem>
                   <SelectItem value="false">{t("common.disabled")}</SelectItem>
                 </SelectContent>

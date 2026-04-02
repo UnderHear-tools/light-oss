@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ToastProvider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
 import { type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
@@ -612,6 +613,8 @@ export function BucketObjectsPage() {
                     progress={uploadProgress}
                   />
 
+                  <Separator className="hidden h-5 sm:block" orientation="vertical" />
+                  
                   <UploadAndPublishSiteDialog
                     bucket={bucket}
                     lockedFields={{ bucket: true, parentPrefix: true }}
@@ -627,18 +630,27 @@ export function BucketObjectsPage() {
                     pending={createFolderMutation.isPending}
                   />
 
-                  <Button
-                    onClick={() => {
-                      void queryClient.invalidateQueries({
-                        queryKey: entriesBaseQueryKey,
-                      });
-                    }}
-                    type="button"
-                    variant="outline"
-                  >
-                    <RefreshCcwIcon data-icon="inline-start" />
-                    {t("explorer.toolbar.refresh")}
-                  </Button>
+                  <Separator className="hidden h-5 sm:block" orientation="vertical" />
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={() => {
+                          void queryClient.invalidateQueries({
+                            queryKey: entriesBaseQueryKey,
+                          });
+                        }}
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                      >
+                        <RefreshCcwIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
+                      {t("explorer.toolbar.refresh")}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 <div className="flex w-full min-w-0 flex-col gap-3 lg:ml-auto lg:max-w-md">
@@ -667,7 +679,7 @@ export function BucketObjectsPage() {
                     </FieldGroup>
                     <Button
                       className="shrink-0"
-                      size="icon-sm"
+                      size="icon"
                       type="submit"
                       variant="outline"
                     >

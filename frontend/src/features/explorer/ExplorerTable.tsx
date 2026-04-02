@@ -254,7 +254,7 @@ function ExplorerEntryName({
 
   if (entry.type === "file") {
     return (
-      <div className="flex w-full min-w-0 items-center gap-2 px-0 pl-3">
+      <div className="flex w-full min-w-0 items-center gap-2 px-0 pl-2">
         <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
           <FileTextIcon data-icon="inline-start" />
         </span>
@@ -430,7 +430,7 @@ function FileDetailsButton({
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" side="bottom">
                       <SelectItem value="private">{t("objects.visibility.private")}</SelectItem>
                       <SelectItem value="public">{t("objects.visibility.public")}</SelectItem>
                     </SelectContent>
