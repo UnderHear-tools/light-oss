@@ -28,6 +28,7 @@ import {
   uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "@/api/sites";
+import type { PublishSiteResult } from "@/api/types";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -203,29 +204,39 @@ export function BucketObjectsPage() {
   });
 
   const uploadAndPublishSiteMutation = useMutation({
-    mutationFn: (value: UploadAndPublishSiteValue) =>
-      value.mode === "folder"
-        ? uploadAndPublishSite(settings, {
-            bucket: value.bucket,
-            parentPrefix: value.parentPrefix,
-            files: value.files,
-            domains: value.domains,
-            enabled: value.enabled,
-            indexDocument: value.indexDocument,
-            errorDocument: value.errorDocument,
-            spaFallback: value.spaFallback,
-            onProgress: setUploadProgress,
-          })
-        : uploadFileAndPublishSite(settings, {
-            bucket: value.bucket,
-            parentPrefix: value.parentPrefix,
-            file: value.file,
-            domains: value.domains,
-            enabled: value.enabled,
-            errorDocument: value.errorDocument,
-            spaFallback: value.spaFallback,
-            onProgress: setUploadProgress,
-          }),
+    mutationFn: async (
+      value: UploadAndPublishSiteValue,
+    ): Promise<PublishSiteResult> => {
+      if (value.mode === "folder") {
+        return uploadAndPublishSite(settings, {
+          bucket: value.bucket,
+          parentPrefix: value.parentPrefix,
+          files: value.files,
+          domains: value.domains,
+          enabled: value.enabled,
+          indexDocument: value.indexDocument,
+          errorDocument: value.errorDocument,
+          spaFallback: value.spaFallback,
+          onProgress: setUploadProgress,
+        });
+      }
+
+      const site = await uploadFileAndPublishSite(settings, {
+        bucket: value.bucket,
+        parentPrefix: value.parentPrefix,
+        file: value.file,
+        domains: value.domains,
+        enabled: value.enabled,
+        errorDocument: value.errorDocument,
+        spaFallback: value.spaFallback,
+        onProgress: setUploadProgress,
+      });
+
+      return {
+        uploaded_count: 1,
+        site,
+      };
+    },
     onSuccess: async () => {
       setUploadProgress(0);
       pushToast("success", t("toast.sitePublished"));

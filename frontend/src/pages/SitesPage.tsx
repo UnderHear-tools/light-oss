@@ -10,7 +10,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
-import type { CreateSiteRequest, Site } from "@/api/types";
+import type { CreateSiteRequest, PublishSiteResult, Site } from "@/api/types";
 import { listBuckets } from "@/api/buckets";
 import {
   createSite,
@@ -119,29 +119,39 @@ export function SitesPage() {
   });
 
   const uploadAndPublishSiteMutation = useMutation({
-    mutationFn: (value: UploadAndPublishSiteValue) =>
-      value.mode === "folder"
-        ? uploadAndPublishSite(settings, {
-            bucket: value.bucket,
-            parentPrefix: value.parentPrefix,
-            files: value.files,
-            domains: value.domains,
-            enabled: value.enabled,
-            indexDocument: value.indexDocument,
-            errorDocument: value.errorDocument,
-            spaFallback: value.spaFallback,
-            onProgress: setUploadProgress,
-          })
-        : uploadFileAndPublishSite(settings, {
-            bucket: value.bucket,
-            parentPrefix: value.parentPrefix,
-            file: value.file,
-            domains: value.domains,
-            enabled: value.enabled,
-            errorDocument: value.errorDocument,
-            spaFallback: value.spaFallback,
-            onProgress: setUploadProgress,
-          }),
+    mutationFn: async (
+      value: UploadAndPublishSiteValue,
+    ): Promise<PublishSiteResult> => {
+      if (value.mode === "folder") {
+        return uploadAndPublishSite(settings, {
+          bucket: value.bucket,
+          parentPrefix: value.parentPrefix,
+          files: value.files,
+          domains: value.domains,
+          enabled: value.enabled,
+          indexDocument: value.indexDocument,
+          errorDocument: value.errorDocument,
+          spaFallback: value.spaFallback,
+          onProgress: setUploadProgress,
+        });
+      }
+
+      const site = await uploadFileAndPublishSite(settings, {
+        bucket: value.bucket,
+        parentPrefix: value.parentPrefix,
+        file: value.file,
+        domains: value.domains,
+        enabled: value.enabled,
+        errorDocument: value.errorDocument,
+        spaFallback: value.spaFallback,
+        onProgress: setUploadProgress,
+      });
+
+      return {
+        uploaded_count: 1,
+        site,
+      };
+    },
     onSuccess: async () => {
       setUploadProgress(0);
       pushToast("success", t("toast.sitePublished"));
