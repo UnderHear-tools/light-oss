@@ -79,7 +79,7 @@ func (s *SitePublishService) PublishFile(
 		OriginalFilename: SanitizeOriginalFilename(input.Filename),
 		StoragePath:      stored.RelativePath,
 		Size:             stored.Size,
-		ContentType:      normalizeContentType(input.ContentType),
+		ContentType:      NormalizeContentType(input.ContentType),
 		ETag:             stored.ETag,
 		Visibility:       model.VisibilityPublic,
 		IsDeleted:        false,

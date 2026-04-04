@@ -134,7 +134,7 @@ func (s *SitePublishService) Publish(
 				OriginalFilename: SanitizeOriginalFilename(item.OriginalFilename),
 				StoragePath:      stored.RelativePath,
 				Size:             stored.Size,
-				ContentType:      normalizeContentType(item.ContentType),
+				ContentType:      NormalizeContentType(item.ContentType),
 				ETag:             stored.ETag,
 				Visibility:       model.VisibilityPublic,
 				IsDeleted:        false,
