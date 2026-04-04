@@ -49,6 +49,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import {
+  PublishObjectSiteDialog,
+  type PublishObjectSiteValue,
+} from "@/features/explorer/PublishObjectSiteDialog";
 import { PublishSiteDialog, type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
 import { downloadFile } from "@/lib/utils";
 
@@ -62,6 +66,7 @@ export function ExplorerTable({
   onDeleteFolder,
   onDownloadFolder,
   onOpenDirectory,
+  onPublishObjectSite,
   onPublishSite,
   onSignDownload,
   onUpdateVisibility,
@@ -77,6 +82,7 @@ export function ExplorerTable({
   onDeleteFolder: (folderPath: string) => Promise<void>;
   onDownloadFolder: (folderPath: string) => Promise<void>;
   onOpenDirectory: (folderPath: string) => void;
+  onPublishObjectSite: (objectKey: string, value: PublishObjectSiteValue) => Promise<void>;
   onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
   onSignDownload: (objectKey: string) => Promise<void>;
   onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
@@ -199,6 +205,13 @@ export function ExplorerTable({
                       </ExplorerIconButton>
                     )}
 
+                    <PublishObjectSiteButton
+                      bucket={bucket}
+                      entry={entry}
+                      onPublishObjectSite={onPublishObjectSite}
+                      publishingPath={publishingPath}
+                    />
+
                     <DeleteFileButton
                       bucket={bucket}
                       deletingPath={deletingPath}
@@ -241,7 +254,7 @@ function ExplorerEntryName({
 
   if (entry.type === "file") {
     return (
-      <div className="flex w-full min-w-0 items-center gap-2 px-0 pl-3">
+      <div className="flex w-full min-w-0 items-center gap-2 px-0 pl-2">
         <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
           <FileTextIcon data-icon="inline-start" />
         </span>
@@ -417,7 +430,7 @@ function FileDetailsButton({
                     >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" side="bottom">
                       <SelectItem value="private">{t("objects.visibility.private")}</SelectItem>
                       <SelectItem value="public">{t("objects.visibility.public")}</SelectItem>
                     </SelectContent>
@@ -654,6 +667,45 @@ function PublishFolderSiteButton({
       onSubmit={(value) => onPublishSite(entry.path, value)}
       pending={pending}
       prefix={entry.path}
+      trigger={
+        <span className="inline-flex">
+          <ExplorerIconButton
+            disabled={pending}
+            label={t("explorer.actions.publishSite")}
+            onClick={() => undefined}
+          >
+            {pending ? (
+              <LoaderCircleIcon className="animate-spin text-emerald-500" />
+            ) : (
+              <GlobeIcon className="text-emerald-500" />
+            )}
+          </ExplorerIconButton>
+        </span>
+      }
+    />
+  );
+}
+
+function PublishObjectSiteButton({
+  bucket,
+  entry,
+  onPublishObjectSite,
+  publishingPath,
+}: {
+  bucket: string;
+  entry: ExplorerFileEntry;
+  onPublishObjectSite: (objectKey: string, value: PublishObjectSiteValue) => Promise<void>;
+  publishingPath: string;
+}) {
+  const { t } = useI18n();
+  const pending = publishingPath === entry.path;
+
+  return (
+    <PublishObjectSiteDialog
+      bucket={bucket}
+      objectKey={entry.object_key}
+      onSubmit={(value) => onPublishObjectSite(entry.object_key, value)}
+      pending={pending}
       trigger={
         <span className="inline-flex">
           <ExplorerIconButton

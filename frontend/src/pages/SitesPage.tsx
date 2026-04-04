@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   CircleAlertIcon,
   GlobeIcon,
@@ -7,10 +8,18 @@ import {
   PlusIcon,
   ShieldAlertIcon,
   Trash2Icon,
+  UploadIcon,
 } from "lucide-react";
-import type { CreateSiteRequest, Site } from "@/api/types";
+import type { CreateSiteRequest, PublishSiteResult, Site } from "@/api/types";
 import { listBuckets } from "@/api/buckets";
-import { createSite, deleteSite, listSites, updateSite } from "@/api/sites";
+import {
+  createSite,
+  deleteSite,
+  listSites,
+  updateSite,
+  uploadFileAndPublishSite,
+  uploadAndPublishSite,
+} from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/ToastProvider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -49,6 +58,10 @@ import {
   siteToSiteFormValue,
   type SiteFormValue,
 } from "@/features/sites/SiteFormDialog";
+import {
+  UploadAndPublishSiteDialog,
+  type UploadAndPublishSiteValue,
+} from "@/features/sites/UploadAndPublishSiteDialog";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
@@ -58,7 +71,12 @@ export function SitesPage() {
   const { locale, t } = useI18n();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
-  const sitesQueryKey = ["sites", settings.apiBaseUrl, settings.bearerToken] as const;
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const sitesQueryKey = [
+    "sites",
+    settings.apiBaseUrl,
+    settings.bearerToken,
+  ] as const;
 
   const sitesQuery = useQuery({
     queryKey: sitesQueryKey,
@@ -100,6 +118,53 @@ export function SitesPage() {
     },
   });
 
+  const uploadAndPublishSiteMutation = useMutation({
+    mutationFn: async (
+      value: UploadAndPublishSiteValue,
+    ): Promise<PublishSiteResult> => {
+      if (value.mode === "folder") {
+        return uploadAndPublishSite(settings, {
+          bucket: value.bucket,
+          parentPrefix: value.parentPrefix,
+          files: value.files,
+          domains: value.domains,
+          enabled: value.enabled,
+          indexDocument: value.indexDocument,
+          errorDocument: value.errorDocument,
+          spaFallback: value.spaFallback,
+          onProgress: setUploadProgress,
+        });
+      }
+
+      const site = await uploadFileAndPublishSite(settings, {
+        bucket: value.bucket,
+        parentPrefix: value.parentPrefix,
+        file: value.file,
+        domains: value.domains,
+        enabled: value.enabled,
+        errorDocument: value.errorDocument,
+        spaFallback: value.spaFallback,
+        onProgress: setUploadProgress,
+      });
+
+      return {
+        uploaded_count: 1,
+        site,
+      };
+    },
+    onSuccess: async () => {
+      setUploadProgress(0);
+      pushToast("success", t("toast.sitePublished"));
+      await queryClient.invalidateQueries({ queryKey: sitesQueryKey });
+    },
+    onError: (error) => {
+      setUploadProgress(0);
+      const message =
+        error instanceof Error ? error.message : t("errors.publishSite");
+      pushToast("error", message);
+    },
+  });
+
   const deleteSiteMutation = useMutation({
     mutationFn: (siteId: number) => deleteSite(settings, siteId),
     onSuccess: async () => {
@@ -129,6 +194,10 @@ export function SitesPage() {
     await deleteSiteMutation.mutateAsync(siteId);
   }
 
+  async function handleUploadAndPublishSite(value: UploadAndPublishSiteValue) {
+    await uploadAndPublishSiteMutation.mutateAsync(value);
+  }
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -141,23 +210,42 @@ export function SitesPage() {
           </p>
         </div>
 
-        <SiteFormDialog
-          buckets={buckets}
-          description={t("sites.form.createDescription")}
-          mode="create"
-          onSubmit={handleCreateSite}
-          pending={createSiteMutation.isPending}
-          title={t("sites.form.createTitle")}
-          trigger={
-            <Button
-              disabled={bucketsQuery.isLoading || buckets.length === 0}
-              type="button"
-            >
-              <PlusIcon data-icon="inline-start" />
-              {t("sites.actions.create")}
-            </Button>
-          }
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <UploadAndPublishSiteDialog
+            buckets={buckets}
+            onSubmit={handleUploadAndPublishSite}
+            pending={uploadAndPublishSiteMutation.isPending}
+            progress={uploadProgress}
+            trigger={
+              <Button
+                disabled={bucketsQuery.isLoading || buckets.length === 0}
+                type="button"
+                variant="outline"
+              >
+                <UploadIcon data-icon="inline-start" />
+                {t("sites.actions.uploadAndPublish")}
+              </Button>
+            }
+          />
+
+          <SiteFormDialog
+            buckets={buckets}
+            description={t("sites.form.createDescription")}
+            mode="create"
+            onSubmit={handleCreateSite}
+            pending={createSiteMutation.isPending}
+            title={t("sites.form.createTitle")}
+            trigger={
+              <Button
+                disabled={bucketsQuery.isLoading || buckets.length === 0}
+                type="button"
+              >
+                <PlusIcon data-icon="inline-start" />
+                {t("sites.actions.create")}
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {sitesQuery.isError ? (
@@ -179,11 +267,11 @@ export function SitesPage() {
       <Card className="border-border/70 bg-card py-0">
         <CardHeader className="border-b border-border/70 py-4">
           <CardTitle>{t("sites.list.title")}</CardTitle>
-          <CardDescription>
-            {t("sites.list.description")}
-          </CardDescription>
+          <CardDescription>{t("sites.list.description")}</CardDescription>
           <CardAction>
-            <Badge variant="outline">{t("sites.list.total", { count: sites.length })}</Badge>
+            <Badge variant="outline">
+              {t("sites.list.total", { count: sites.length })}
+            </Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="p-0">
@@ -241,12 +329,16 @@ export function SitesPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={site.enabled ? "secondary" : "outline"}>
-                        {site.enabled ? t("common.enabled") : t("common.disabled")}
+                        {site.enabled
+                          ? t("common.enabled")
+                          : t("common.disabled")}
                       </Badge>
                     </TableCell>
                     <TableCell>{site.index_document}</TableCell>
                     <TableCell>
-                      <Badge variant={site.spa_fallback ? "secondary" : "outline"}>
+                      <Badge
+                        variant={site.spa_fallback ? "secondary" : "outline"}
+                      >
                         {site.spa_fallback
                           ? t("common.enabled")
                           : t("common.disabled")}
@@ -326,7 +418,10 @@ function DeleteSiteButton({
             variant="destructive"
           >
             {pending ? (
-              <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+              <LoaderCircleIcon
+                className="animate-spin"
+                data-icon="inline-start"
+              />
             ) : null}
             {t("common.delete")}
           </AlertDialogAction>

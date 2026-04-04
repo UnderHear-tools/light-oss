@@ -107,7 +107,12 @@ export interface CreateSiteRequest {
   domains: string[];
 }
 
-export interface UpdateSiteRequest extends CreateSiteRequest {}
+export type UpdateSiteRequest = CreateSiteRequest;
+
+export interface PublishSiteResult {
+  uploaded_count: number;
+  site: Site;
+}
 
 export interface SignedDownloadResult {
   url: string;

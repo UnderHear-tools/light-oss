@@ -10,6 +10,7 @@ import type {
   ObjectVisibility,
   SignedDownloadResult,
 } from "./types";
+import { buildFolderUploadManifest } from "../lib/folder-upload";
 
 export interface ListObjectsParams {
   bucket: string;
@@ -56,11 +57,6 @@ export interface UpdateObjectVisibilityParams {
   bucket: string;
   objectKey: string;
   visibility: ObjectVisibility;
-}
-
-interface UploadFolderManifestItem {
-  file_field: string;
-  relative_path: string;
 }
 
 export function listObjects(settings: AppSettings, params: ListObjectsParams) {
@@ -172,14 +168,13 @@ export async function uploadFolder(
   }
   formData.append("visibility", params.visibility);
 
-  const manifest: UploadFolderManifestItem[] = [];
-  params.files.forEach((file, index) => {
-    const fileField = `file_${index}`;
-    manifest.push({
-      file_field: fileField,
-      relative_path: getFolderRelativePath(file),
-    });
-    formData.append(fileField, file, file.name);
+  const manifest = buildFolderUploadManifest(params.files);
+  manifest.forEach((item, index) => {
+    formData.append(
+      item.file_field,
+      params.files[index],
+      params.files[index].name,
+    );
   });
   formData.append("manifest", JSON.stringify(manifest));
 
@@ -287,10 +282,7 @@ export async function downloadFolderZip(
       URL.revokeObjectURL(blobUrl);
     }
   } catch (error) {
-    throw await normalizeBlobDownloadError(
-      error,
-      "Folder ZIP download failed",
-    );
+    throw await normalizeBlobDownloadError(error, "Folder ZIP download failed");
   }
 }
 
@@ -320,23 +312,6 @@ function buildFolderArchiveFallbackName(folderPath: string) {
   return `${leaf}.zip`;
 }
 
-function getFolderRelativePath(file: File) {
-  const relativePath =
-    "webkitRelativePath" in file && typeof file.webkitRelativePath === "string"
-      ? file.webkitRelativePath
-      : "";
-  const normalizedPath = relativePath
-    .replace(/\\/g, "/")
-    .replace(/^\/+/, "")
-    .trim();
-
-  if (!normalizedPath) {
-    throw new Error("Folder upload requires relative paths");
-  }
-
-  return normalizedPath;
-}
-
 function encodeObjectKeySegment(segment: string) {
   // Keep dots percent-encoded so upstream proxies do not treat object keys as file extensions.
   return encodeURIComponent(segment).replace(/\./g, "%2E");
@@ -350,7 +325,9 @@ function getDownloadFilename(
     return fallbackFilename;
   }
 
-  const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  const utf8Match = contentDisposition.match(
+    /filename\*\s*=\s*UTF-8''([^;]+)/i,
+  );
   if (utf8Match?.[1]) {
     try {
       return decodeURIComponent(utf8Match[1]);
@@ -372,7 +349,10 @@ function getDownloadFilename(
   return fallbackFilename;
 }
 
-async function normalizeBlobDownloadError(error: unknown, fallbackMessage: string) {
+async function normalizeBlobDownloadError(
+  error: unknown,
+  fallbackMessage: string,
+) {
   if (axios.isAxiosError(error)) {
     const status = error.response?.status ?? 500;
     const payload = error.response?.data;
