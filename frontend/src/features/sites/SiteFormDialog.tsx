@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -198,11 +199,13 @@ export function SiteFormDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper" side="bottom">
-                    {resolvedBuckets.map((bucket) => (
-                      <SelectItem key={bucket.name} value={bucket.name}>
-                        {bucket.name}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {resolvedBuckets.map((bucket) => (
+                        <SelectItem key={bucket.name} value={bucket.name}>
+                          {bucket.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               ) : (
@@ -274,8 +277,10 @@ export function SiteFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom">
-                  <SelectItem value="true">{t("common.enabled")}</SelectItem>
-                  <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="true">{t("common.enabled")}</SelectItem>
+                    <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
@@ -285,7 +290,7 @@ export function SiteFormDialog({
                 {t("sites.form.indexDocument")}
               </FieldLabel>
               {indexDocumentLocked ? (
-                <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border/70 bg-muted px-3 py-2 text-sm text-muted-foreground overflow-x-hidden text-ellipsis whitespace-nowrap">
                   {formValue.indexDocument}
                 </div>
               ) : (
@@ -343,8 +348,10 @@ export function SiteFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper" side="bottom">
-                  <SelectItem value="true">{t("common.enabled")}</SelectItem>
-                  <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="true">{t("common.enabled")}</SelectItem>
+                    <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>

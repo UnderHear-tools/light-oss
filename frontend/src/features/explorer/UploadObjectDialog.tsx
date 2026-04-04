@@ -147,7 +147,7 @@ export function UploadObjectDialog({
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" side="bottom">
                   <SelectGroup>
                     <SelectItem value="private">
                       {t("objects.visibility.private")}

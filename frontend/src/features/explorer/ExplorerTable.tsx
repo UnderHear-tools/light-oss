@@ -10,7 +10,7 @@ import {
   ShieldAlertIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import type {
   ExplorerDirectoryEntry,
   ExplorerEntry,
@@ -37,10 +37,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -119,7 +121,7 @@ export function ExplorerTable({
         {entries.map((entry) => (
           <TableRow key={entry.path}>
             <TableCell className="w-[360px] max-w-[360px]">
-              <ExplorerEntryName entry={entry} onOpenDirectory={onOpenDirectory} />
+              <ExplorerEntryName entry={entry} buildPublicUrl={buildPublicUrl} onOpenDirectory={onOpenDirectory} onUpdateVisibility={onUpdateVisibility} />
             </TableCell>
             <TableCell className="max-w-[280px]">
               <ExplorerEntryUrlCell
@@ -135,7 +137,7 @@ export function ExplorerTable({
               {entry.type === "directory" ? (
                 "-"
               ) : (
-                <Badge variant={entry.visibility === "public" ? "secondary" : "outline"}>
+                <Badge variant={entry.visibility === "public" ? "default" : "secondary"}>
                   {entry.visibility === "public"
                     ? t("objects.visibility.public")
                     : t("objects.visibility.private")}
@@ -182,7 +184,13 @@ export function ExplorerTable({
                       buildPublicUrl={buildPublicUrl}
                       entry={entry}
                       onUpdateVisibility={onUpdateVisibility}
-                    />
+                    >
+                      <ExplorerIconButton
+                        label={t("explorer.actions.viewDetails")}
+                      >
+                        <EyeIcon className="text-muted-foreground" />
+                      </ExplorerIconButton>
+                    </FileDetailsButton>
 
                     {entry.visibility === "public" ? (
                       <ExplorerIconLink
@@ -231,15 +239,19 @@ export function ExplorerTable({
 
 function ExplorerEntryName({
   entry,
+  buildPublicUrl,
   onOpenDirectory,
+  onUpdateVisibility,
 }: {
   entry: ExplorerEntry;
+  buildPublicUrl: (objectKey: string) => string;
   onOpenDirectory: (folderPath: string) => void;
+  onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
 }) {
   if (entry.type === "directory") {
     return (
       <Button
-        className="w-full max-w-full min-w-0 cursor-pointer justify-start gap-2 px-0 font-normal hover:bg-transparent"
+        className="w-full max-w-full min-w-0 cursor-pointer justify-start items-center gap-2 px-0 font-normal hover:bg-transparent"
         onClick={() => onOpenDirectory(entry.path)}
         type="button"
         variant="ghost"
@@ -254,12 +266,22 @@ function ExplorerEntryName({
 
   if (entry.type === "file") {
     return (
-      <div className="flex w-full min-w-0 items-center gap-2 px-0 pl-2">
-        <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
-          <FileTextIcon data-icon="inline-start" />
-        </span>
-        <span className="min-w-0 truncate">{entry.name}</span>
-      </div>
+      <FileDetailsButton
+        buildPublicUrl={buildPublicUrl}
+        entry={entry}
+        onUpdateVisibility={onUpdateVisibility}
+      >
+        <Button
+          className="flex w-full min-w-0 cursor-pointer justify-start items-center gap-2 px-0 font-normal hover:bg-transparent"
+          type="button"
+          variant="ghost"
+        >
+          <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
+            <FileTextIcon data-icon="inline-start" />
+          </span>
+          <span className="min-w-0 truncate">{entry.name}</span>
+        </Button>
+      </FileDetailsButton>
     );
   }
 
@@ -322,10 +344,12 @@ function ExplorerEntryUrlCell({
 }
 
 function FileDetailsButton({
+  children,
   buildPublicUrl,
   entry,
   onUpdateVisibility,
 }: {
+  children: React.ReactNode,
   buildPublicUrl: (objectKey: string) => string;
   entry: ExplorerFileEntry;
   onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
@@ -365,12 +389,9 @@ function FileDetailsButton({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <ExplorerIconButton
-        label={t("explorer.actions.viewDetails")}
-        onClick={() => setOpen(true)}
-      >
-        <EyeIcon className="text-muted-foreground" />
-      </ExplorerIconButton>
+      <DialogTrigger asChild>
+        {children}
+      </DialogTrigger>
 
       <DialogContent
         aria-describedby={undefined}
@@ -431,8 +452,10 @@ function FileDetailsButton({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper" side="bottom">
-                      <SelectItem value="private">{t("objects.visibility.private")}</SelectItem>
-                      <SelectItem value="public">{t("objects.visibility.public")}</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="private">{t("objects.visibility.private")}</SelectItem>
+                        <SelectItem value="public">{t("objects.visibility.public")}</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <Button
@@ -782,40 +805,43 @@ function DeleteFileButton({
   );
 }
 
-function ExplorerIconButton({
-  children,
-  disabled,
-  label,
-  onClick,
-}: {
+const ExplorerIconButton = forwardRef<HTMLButtonElement, {
   children: React.ReactNode;
   disabled?: boolean;
   label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex">
-          <Button
-            className="[&_svg]:size-4"
-            disabled={disabled}
-            onClick={onClick}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            {children}
-            <span className="sr-only">{label}</span>
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+  onClick?: () => void;
+}>(
+  function ExplorerIconButton({
+    children,
+    disabled,
+    label,
+    onClick,
+  }, ref) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button
+              ref={ref}
+              className="[&_svg]:size-4"
+              disabled={disabled}
+              onClick={onClick}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              {children}
+              <span className="sr-only">{label}</span>
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+);
 
 function ExplorerIconLink({
   children,
