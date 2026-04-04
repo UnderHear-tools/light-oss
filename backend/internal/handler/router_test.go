@@ -326,6 +326,63 @@ func TestUploadDecodesEncodedOriginalFilenameHeader(t *testing.T) {
 	}
 }
 
+func TestDownloadObjectEncodesFilenameHeadersAndAddsUTF8Charset(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "download-bucket")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/buckets/download-bucket/objects/docs/report.txt", strings.NewReader("我是 UnderHear"))
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("X-Object-Visibility", "public")
+	req.Header.Set("X-Original-Filename", url.PathEscape("中文报告.txt"))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/download-bucket/objects/docs/report.txt", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", getRec.Code)
+	}
+	if body := getRec.Body.String(); body != "我是 UnderHear" {
+		t.Fatalf("unexpected body %q", body)
+	}
+	if got := getRec.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("unexpected content type %q", got)
+	}
+	if got := getRec.Header().Get("X-Original-Filename"); got != url.PathEscape("中文报告.txt") {
+		t.Fatalf("unexpected encoded filename header %q", got)
+	}
+	contentDisposition := strings.ToLower(getRec.Header().Get("Content-Disposition"))
+	if !strings.Contains(contentDisposition, "inline") {
+		t.Fatalf("expected inline content disposition, got %q", contentDisposition)
+	}
+	if !strings.Contains(contentDisposition, "filename*=") || !strings.Contains(contentDisposition, "%e4%b8%ad%e6%96%87%e6%8a%a5%e5%91%8a.txt") {
+		t.Fatalf("unexpected content disposition %q", contentDisposition)
+	}
+}
+
+func TestDownloadObjectPreservesExplicitCharset(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "charset-bucket")
+	uploadObjectWithContentType(t, router, "/api/v1/buckets/charset-bucket/objects/docs/legacy.txt", "legacy", "public", "text/plain; charset=gbk")
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/charset-bucket/objects/docs/legacy.txt", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", getRec.Code)
+	}
+	if got := getRec.Header().Get("Content-Type"); got != "text/plain; charset=gbk" {
+		t.Fatalf("unexpected content type %q", got)
+	}
+}
+
 func TestUploadObjectBatchSuccess(t *testing.T) {
 	router := newTestRouter(t, 8*1024)
 
