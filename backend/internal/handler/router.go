@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -155,7 +156,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		AllowOrigins:     deps.Config.CORSAllowedOrigins,
 		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Object-Visibility", "X-Original-Filename", "X-Request-ID"},
-		ExposeHeaders:    []string{"Content-Length", "Content-Type", "ETag", "X-Request-ID", "X-Object-Visibility", "X-Original-Filename"},
+		ExposeHeaders:    []string{"Content-Disposition", "Content-Length", "Content-Type", "ETag", "X-Request-ID", "X-Object-Visibility", "X-Original-Filename"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -769,11 +770,16 @@ func siteInputFromRequest(req siteRequest) service.SiteInput {
 }
 
 func setObjectHeaders(c *gin.Context, object *model.Object) {
-	c.Header("Content-Type", object.ContentType)
+	c.Header("Content-Type", service.NormalizeContentType(object.ContentType))
 	c.Header("Content-Length", strconv.FormatInt(object.Size, 10))
 	c.Header("ETag", object.ETag)
 	c.Header("X-Object-Visibility", string(object.Visibility))
-	c.Header("X-Original-Filename", object.OriginalFilename)
+	c.Header("X-Original-Filename", url.PathEscape(object.OriginalFilename))
+	if contentDisposition := mime.FormatMediaType("inline", map[string]string{
+		"filename": object.OriginalFilename,
+	}); contentDisposition != "" {
+		c.Header("Content-Disposition", contentDisposition)
+	}
 }
 
 func setFolderArchiveHeaders(c *gin.Context, filename string) {

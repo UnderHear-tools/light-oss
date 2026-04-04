@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,7 +91,7 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 		OriginalFilename: SanitizeOriginalFilename(input.OriginalFilename),
 		StoragePath:      stored.RelativePath,
 		Size:             stored.Size,
-		ContentType:      normalizeContentType(input.ContentType),
+		ContentType:      NormalizeContentType(input.ContentType),
 		ETag:             stored.ETag,
 		Visibility:       visibility,
 		IsDeleted:        false,
@@ -267,9 +268,42 @@ func decodeCursor(value string) (*repository.Cursor, error) {
 	}, nil
 }
 
-func normalizeContentType(contentType string) string {
-	if strings.TrimSpace(contentType) == "" {
+func NormalizeContentType(contentType string) string {
+	trimmed := strings.TrimSpace(contentType)
+	if trimmed == "" {
 		return "application/octet-stream"
 	}
-	return strings.TrimSpace(contentType)
+
+	mediaType, params, err := mime.ParseMediaType(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	if _, hasCharset := params["charset"]; hasCharset || !shouldAttachUTF8Charset(mediaType) {
+		return trimmed
+	}
+
+	params["charset"] = "utf-8"
+	normalized := mime.FormatMediaType(mediaType, params)
+	if normalized == "" {
+		return mediaType + "; charset=utf-8"
+	}
+
+	return normalized
+}
+
+func shouldAttachUTF8Charset(mediaType string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(mediaType))
+	if strings.HasPrefix(normalized, "text/") {
+		return true
+	}
+	if strings.HasSuffix(normalized, "+json") || strings.HasSuffix(normalized, "+xml") {
+		return true
+	}
+
+	switch normalized {
+	case "application/json", "application/ld+json", "application/xml", "application/xhtml+xml", "image/svg+xml":
+		return true
+	default:
+		return false
+	}
 }
