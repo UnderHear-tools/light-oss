@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -219,12 +220,14 @@ export function UploadAndPublishSiteDialog({
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    {resolvedBuckets.map((item) => (
-                      <SelectItem key={item.name} value={item.name}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
+                  <SelectContent position="popper" side="bottom">
+                    <SelectGroup>
+                      {resolvedBuckets.map((item) => (
+                        <SelectItem key={item.name} value={item.name}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               ) : (
@@ -394,9 +397,11 @@ export function UploadAndPublishSiteDialog({
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">{t("common.enabled")}</SelectItem>
-                  <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                <SelectContent position="popper" side="bottom">
+                  <SelectGroup>
+                    <SelectItem value="true">{t("common.enabled")}</SelectItem>
+                    <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
@@ -430,9 +435,11 @@ export function UploadAndPublishSiteDialog({
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">{t("common.enabled")}</SelectItem>
-                  <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                <SelectContent position="popper" side="bottom">
+                  <SelectGroup>
+                    <SelectItem value="true">{t("common.enabled")}</SelectItem>
+                    <SelectItem value="false">{t("common.disabled")}</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
