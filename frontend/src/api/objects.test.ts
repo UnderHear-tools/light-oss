@@ -66,6 +66,25 @@ describe("objects api helpers", () => {
     );
   });
 
+  it("falls back to text/markdown for markdown files without a browser mime type", async () => {
+    const file = new File(["# hello"], "test.md");
+
+    await uploadObject(settings, {
+      bucket: "demo",
+      objectKey: "docs/test.md",
+      file,
+      visibility: "private",
+    });
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Content-Type": "text/markdown",
+        }),
+      }),
+    );
+  });
+
   it("encodes dots when building a public object URL", () => {
     expect(
       buildPublicObjectURL(

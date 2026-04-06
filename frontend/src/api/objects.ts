@@ -130,7 +130,7 @@ export async function uploadObject(
       timeout: 0,
       data: params.file,
       headers: {
-        "Content-Type": params.file.type || "application/octet-stream",
+        "Content-Type": resolveUploadContentType(params.file),
         "X-Object-Visibility": params.visibility,
         "X-Original-Filename": encodeHeaderFilename(params.file.name),
       },
@@ -303,6 +303,19 @@ function encodeObjectKey(objectKey: string) {
 
 function encodeHeaderFilename(filename: string) {
   return encodeURIComponent(filename);
+}
+
+function resolveUploadContentType(file: File) {
+  const detectedType = file.type.trim();
+  if (detectedType) {
+    return detectedType;
+  }
+
+  if (file.name.toLowerCase().endsWith(".md")) {
+    return "text/markdown";
+  }
+
+  return "application/octet-stream";
 }
 
 function buildFolderArchiveFallbackName(folderPath: string) {

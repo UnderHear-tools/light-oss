@@ -11,6 +11,8 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { forwardRef, useEffect, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   ExplorerDirectoryEntry,
   ExplorerEntry,
@@ -505,7 +507,55 @@ function DetailField({
   );
 }
 
-type PreviewType = "image" | "video" | "audio" | "pdf" | "text" | null;
+type PreviewType = "image" | "video" | "audio" | "pdf" | "markdown" | "text" | null;
+
+const markdownComponents: Components = {
+  h1: ({ children }) => <h1 className="mt-0 text-xl font-semibold text-foreground">{children}</h1>,
+  h2: ({ children }) => <h2 className="mt-6 text-lg font-semibold text-foreground">{children}</h2>,
+  h3: ({ children }) => <h3 className="mt-5 text-base font-semibold text-foreground">{children}</h3>,
+  p: ({ children }) => <p className="leading-7 text-foreground">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc space-y-2 pl-5">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal space-y-2 pl-5">{children}</ol>,
+  li: ({ children }) => <li className="leading-7">{children}</li>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-2 border-border/70 pl-4 italic text-muted-foreground">
+      {children}
+    </blockquote>
+  ),
+  hr: () => <hr className="border-border/70" />,
+  a: ({ children, ...props }) => (
+    <a
+      {...props}
+      className="font-medium text-sky-600 underline underline-offset-4 hover:text-sky-500"
+      rel="noreferrer"
+      target="_blank"
+    >
+      {children}
+    </a>
+  ),
+  table: ({ children }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border border-border/70 bg-muted/40 px-3 py-2 text-left font-medium">{children}</th>
+  ),
+  td: ({ children }) => <td className="border border-border/70 px-3 py-2 align-top">{children}</td>,
+  pre: ({ children }) => (
+    <pre className="overflow-x-auto rounded-md border border-border/70 bg-muted/60 p-3">{children}</pre>
+  ),
+  code: ({ children, className }) => {
+    const content = String(children).replace(/\n$/, "");
+    const isInline = !className && !content.includes("\n");
+
+    if (isInline) {
+      return <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">{content}</code>;
+    }
+
+    return <code className={`font-mono text-sm ${className ?? ""}`.trim()}>{content}</code>;
+  },
+};
 
 function FilePreview({
   previewType,
@@ -540,12 +590,95 @@ function FilePreview({
     return <audio className="w-full" controls src={publicUrl} />;
   }
 
+  if (previewType === "markdown") {
+    return <RemoteTextPreview mode="markdown" publicUrl={publicUrl} />;
+  }
+
+  if (previewType === "text") {
+    return <RemoteTextPreview mode="text" publicUrl={publicUrl} />;
+  }
+
   return (
     <iframe
       className="h-80 w-full rounded-md border border-border/70 bg-background"
       src={publicUrl}
       title="file preview"
     />
+  );
+}
+
+function RemoteTextPreview({
+  mode,
+  publicUrl,
+}: {
+  mode: "markdown" | "text";
+  publicUrl: string;
+}) {
+  const { t } = useI18n();
+  const [previewText, setPreviewText] = useState("");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    setPreviewText("");
+    setStatus("loading");
+
+    void fetch(publicUrl, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`preview_request_failed_${response.status}`);
+        }
+
+        return response.text();
+      })
+      .then((text) => {
+        setPreviewText(text);
+        setStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string } | null)?.name === "AbortError") {
+          return;
+        }
+
+        setStatus("error");
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [publicUrl]);
+
+  if (status === "loading") {
+    return <span className="text-muted-foreground">{t("common.loading")}</span>;
+  }
+
+  if (status === "error") {
+    return <span className="text-muted-foreground">{t("common.notAvailable")}</span>;
+  }
+
+  if (mode === "markdown") {
+    return (
+      <div className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-4">
+        <div className="space-y-4 text-sm">
+          <ReactMarkdown
+            components={markdownComponents}
+            remarkPlugins={[remarkGfm]}
+            skipHtml
+          >
+            {previewText}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap break-words">
+      {previewText}
+    </pre>
   );
 }
 
@@ -566,12 +699,18 @@ function getPreviewType(entry: ExplorerFileEntry): PreviewType {
     return "pdf";
   }
   if (
+    contentType.includes("markdown") ||
+    name.endsWith(".md") ||
+    name.endsWith(".markdown")
+  ) {
+    return "markdown";
+  }
+  if (
     contentType.startsWith("text/") ||
     contentType.includes("json") ||
     contentType.includes("xml") ||
     contentType.includes("javascript") ||
     contentType.includes("sql") ||
-    name.endsWith(".md") ||
     name.endsWith(".log")
   ) {
     return "text";
