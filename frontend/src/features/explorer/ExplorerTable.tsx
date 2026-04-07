@@ -1,6 +1,7 @@
 import {
   CopyIcon,
   DownloadIcon,
+  ExpandIcon,
   EyeIcon,
   FileTextIcon,
   FolderIcon,
@@ -58,7 +59,7 @@ import {
   type PublishObjectSiteValue,
 } from "@/features/explorer/PublishObjectSiteDialog";
 import { PublishSiteDialog, type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
-import { downloadFile } from "@/lib/utils";
+import { cn, downloadFile } from "@/lib/utils";
 
 export function ExplorerTable({
   bucket,
@@ -397,19 +398,30 @@ function FileDetailsButton({
 
       <DialogContent
         aria-describedby={undefined}
-        className="max-h-[85vh] sm:max-w-xl"
+        className="max-h-[85vh] min-w-0 sm:max-w-xl"
       >
         <DialogHeader>
           <DialogTitle>{t("explorer.details.title")}</DialogTitle>
         </DialogHeader>
 
-        <div className="-mr-1 overflow-y-auto pr-1">
+        <div className="-mr-1 min-w-0 overflow-y-auto pr-1">
           <dl className="grid gap-3">
             <DetailField label={t("explorer.details.preview")}>
-              <FilePreview
-                previewType={previewType}
-                publicUrl={publicUrl}
-              />
+              <div className="flex min-w-0 max-w-full flex-col gap-2">
+                {publicUrl && previewType ? (
+                  <div className="flex justify-end">
+                    <PreviewFullscreenButton
+                      fileName={entry.original_filename}
+                      previewType={previewType}
+                      publicUrl={publicUrl}
+                    />
+                  </div>
+                ) : null}
+                <FilePreview
+                  previewType={previewType}
+                  publicUrl={publicUrl}
+                />
+              </div>
             </DetailField>
             <DetailField label={t("explorer.table.url")} monospace>
               {publicUrl ? (
@@ -436,7 +448,7 @@ function FileDetailsButton({
             </DetailField>
             <DetailField label={t("objects.table.visibility")}>
               <div className="flex flex-col gap-2">
-                <Badge variant={currentVisibility === "public" ? "secondary" : "outline"}>
+                <Badge variant={currentVisibility === "public" ? "default" : "secondary"}>
                   {currentVisibility === "public"
                     ? t("objects.visibility.public")
                     : t("objects.visibility.private")}
@@ -496,11 +508,11 @@ function DetailField({
   monospace?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+    <div className="min-w-0 rounded-lg border border-border/70 bg-muted/30 p-3">
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className={monospace ? "mt-1 break-all font-mono text-sm" : "mt-1 text-sm"}>
+      <dd className={monospace ? "mt-1 min-w-0 break-all text-sm" : "mt-1 min-w-0 text-sm"}>
         {children}
       </dd>
     </div>
@@ -508,6 +520,7 @@ function DetailField({
 }
 
 type PreviewType = "image" | "video" | "audio" | "pdf" | "markdown" | "text" | null;
+type PreviewDisplayMode = "inline" | "fullscreen";
 
 const openXmlOfficeExtensions = new Set([
   ".docx",
@@ -532,8 +545,8 @@ const markdownComponents: Components = {
   h2: ({ children }) => <h2 className="mt-6 text-lg font-semibold text-foreground">{children}</h2>,
   h3: ({ children }) => <h3 className="mt-5 text-base font-semibold text-foreground">{children}</h3>,
   p: ({ children }) => <p className="leading-7 text-foreground">{children}</p>,
-  ul: ({ children }) => <ul className="list-disc space-y-2 pl-5">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal space-y-2 pl-5">{children}</ol>,
+  ul: ({ children }) => <ul className="flex list-disc flex-col gap-2 pl-5">{children}</ul>,
+  ol: ({ children }) => <ol className="flex list-decimal flex-col gap-2 pl-5">{children}</ol>,
   li: ({ children }) => <li className="leading-7">{children}</li>,
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-border/70 pl-4 italic text-muted-foreground">
@@ -575,14 +588,55 @@ const markdownComponents: Components = {
   },
 };
 
-function FilePreview({
+function PreviewFullscreenButton({
+  fileName,
   previewType,
   publicUrl,
 }: {
+  fileName: string;
   previewType: PreviewType;
   publicUrl: string;
 }) {
   const { t } = useI18n();
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" type="button" variant="outline">
+          <ExpandIcon data-icon="inline-start" />
+          {t("explorer.actions.fullscreenPreview")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        aria-describedby={undefined}
+        className="flex h-[96vh] w-[96vw] max-w-none flex-col gap-3 p-5"
+      >
+        <DialogHeader className="pr-10">
+          <DialogTitle>{fileName}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 min-w-0 flex-1">
+          <FilePreview
+            displayMode="fullscreen"
+            previewType={previewType}
+            publicUrl={publicUrl}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FilePreview({
+  displayMode = "inline",
+  previewType,
+  publicUrl,
+}: {
+  displayMode?: PreviewDisplayMode;
+  previewType: PreviewType;
+  publicUrl: string;
+}) {
+  const { t } = useI18n();
+  const isFullscreen = displayMode === "fullscreen";
 
   if (!publicUrl || !previewType) {
     return <span className="text-muted-foreground">{t("common.notAvailable")}</span>;
@@ -592,7 +646,10 @@ function FilePreview({
     return (
       <img
         alt="file preview"
-        className="max-h-80 w-full rounded-md border border-border/70 object-contain"
+        className={cn(
+          "w-full min-w-0 max-w-full rounded-md border border-border/70 object-contain",
+          isFullscreen ? "h-full max-h-full bg-background" : "max-h-80",
+        )}
         src={publicUrl}
       />
     );
@@ -600,35 +657,60 @@ function FilePreview({
 
   if (previewType === "video") {
     return (
-      <video className="max-h-80 w-full rounded-md border border-border/70" controls src={publicUrl} />
+      <video
+        className={cn(
+          "w-full min-w-0 max-w-full rounded-md border border-border/70",
+          isFullscreen ? "h-full max-h-full bg-background" : "max-h-80",
+        )}
+        controls
+        src={publicUrl}
+      />
     );
   }
 
   if (previewType === "audio") {
-    return <audio className="w-full" controls src={publicUrl} />;
+    return <audio className="w-full min-w-0 max-w-full" controls src={publicUrl} />;
   }
 
   if (previewType === "markdown") {
-    return <RemoteTextPreview mode="markdown" publicUrl={publicUrl} />;
+    return <RemoteTextPreview displayMode={displayMode} mode="markdown" publicUrl={publicUrl} />;
   }
 
   if (previewType === "text") {
-    return <RemoteTextPreview mode="text" publicUrl={publicUrl} />;
+    return <RemoteTextPreview displayMode={displayMode} mode="text" publicUrl={publicUrl} />;
   }
+
+  const previewUrl = previewType === "pdf"
+    ? buildPdfPreviewUrl(publicUrl, displayMode)
+    : publicUrl;
 
   return (
     <iframe
-      className="h-80 w-full rounded-md border border-border/70 bg-background"
-      src={publicUrl}
+      className={cn(
+        "w-full min-w-0 max-w-full rounded-md border border-border/70 bg-background",
+        isFullscreen ? "h-full min-h-0" : "h-80",
+      )}
+      src={previewUrl}
       title="file preview"
     />
   );
 }
 
+function buildPdfPreviewUrl(publicUrl: string, displayMode: PreviewDisplayMode) {
+  const params = displayMode === "fullscreen"
+    ? "toolbar=0&navpanes=0&pagemode=none&zoom=page-width"
+    : "toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit";
+  const separator = publicUrl.includes("#") ? "&" : "#";
+
+  return `${publicUrl}${separator}${params}`;
+}
+
 function RemoteTextPreview({
+  displayMode,
   mode,
   publicUrl,
 }: {
+  displayMode: PreviewDisplayMode;
   mode: "markdown" | "text";
   publicUrl: string;
 }) {
@@ -679,8 +761,13 @@ function RemoteTextPreview({
 
   if (mode === "markdown") {
     return (
-      <div className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-4">
-        <div className="space-y-4 text-sm">
+      <div
+        className={cn(
+          "min-w-0 max-w-full rounded-md border border-border/70 bg-background p-4",
+          displayMode === "fullscreen" ? "h-full min-h-0 overflow-auto" : "max-h-80 overflow-auto",
+        )}
+      >
+        <div className="flex min-w-0 flex-col gap-4 text-sm">
           <ReactMarkdown
             components={markdownComponents}
             remarkPlugins={[remarkGfm]}
@@ -694,7 +781,12 @@ function RemoteTextPreview({
   }
 
   return (
-    <pre className="max-h-80 overflow-auto rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap break-words">
+    <pre
+      className={cn(
+        "w-full min-w-0 max-w-full rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap wrap-break-word",
+        displayMode === "fullscreen" ? "h-full min-h-0 overflow-auto" : "max-h-80 overflow-auto",
+      )}
+    >
       {previewText}
     </pre>
   );

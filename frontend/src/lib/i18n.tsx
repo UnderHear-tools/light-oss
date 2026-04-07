@@ -227,6 +227,7 @@ const enUS = {
   "explorer.actions.signedDownload": "Signed download",
   "explorer.actions.copyUrl": "Copy URL",
   "explorer.actions.viewDetails": "View details",
+  "explorer.actions.fullscreenPreview": "Fullscreen preview",
   "explorer.actions.deleteFolder": "Delete folder",
   "sites.publish.title": "Publish folder as a site",
   "sites.publish.description":
@@ -491,6 +492,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.actions.signedDownload": "签名下载",
   "explorer.actions.copyUrl": "复制 URL",
   "explorer.actions.viewDetails": "查看详情",
+  "explorer.actions.fullscreenPreview": "全屏预览",
   "explorer.actions.deleteFolder": "删除文件夹",
   "sites.publish.title": "发布站点",
   "sites.publish.description":

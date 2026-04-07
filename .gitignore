@@ -12,3 +12,8 @@ frontend/.vite/
 *.log
 Thumbs.db
 .DS_Store
+
+/.agents/
+/.codex/
+/.trae/
+skills-lock.json

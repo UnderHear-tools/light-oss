@@ -111,6 +111,50 @@ describe("ExplorerTable", () => {
     expect(within(dialog).queryByText("item", { selector: "li" })).not.toBeInTheDocument();
   });
 
+  it("opens image previews in a fullscreen dialog", async () => {
+    renderExplorerTable(createFileEntry({
+      content_type: "image/png",
+      name: "avatar.png",
+      object_key: "images/avatar.png",
+      original_filename: "avatar.png",
+      path: "images/avatar.png",
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "avatar.png" }));
+
+    const detailsDialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      within(detailsDialog).getByRole("button", { name: "Fullscreen preview" }),
+    );
+
+    const fullscreenDialog = await screen.findByRole("dialog", { name: "avatar.png" });
+
+    expect(within(fullscreenDialog).getByText("avatar.png")).toBeInTheDocument();
+    expect(within(fullscreenDialog).getByAltText("file preview")).toHaveAttribute(
+      "src",
+      "https://oss.underhear.cn/api/v1/buckets/demo/objects/images/avatar.png",
+    );
+  });
+
+  it("uses embedded PDF preview parameters to avoid native viewer overflow", async () => {
+    renderExplorerTable(createFileEntry({
+      content_type: "application/pdf",
+      name: "test.pdf",
+      object_key: "docs/test.pdf",
+      original_filename: "test.pdf",
+      path: "docs/test.pdf",
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "test.pdf" }));
+
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByTitle("file preview")).toHaveAttribute(
+      "src",
+      "https://oss.underhear.cn/api/v1/buckets/demo/objects/docs/test.pdf#toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit",
+    );
+  });
+
   it.each([
     {
       contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
