@@ -509,6 +509,24 @@ function DetailField({
 
 type PreviewType = "image" | "video" | "audio" | "pdf" | "markdown" | "text" | null;
 
+const openXmlOfficeExtensions = new Set([
+  ".docx",
+  ".dotx",
+  ".docm",
+  ".dotm",
+  ".xlsx",
+  ".xltx",
+  ".xlsm",
+  ".xltm",
+  ".pptx",
+  ".potx",
+  ".ppsx",
+  ".pptm",
+  ".potm",
+  ".ppsm",
+  ".ppam",
+]);
+
 const markdownComponents: Components = {
   h1: ({ children }) => <h1 className="mt-0 text-xl font-semibold text-foreground">{children}</h1>,
   h2: ({ children }) => <h2 className="mt-6 text-lg font-semibold text-foreground">{children}</h2>,
@@ -684,39 +702,51 @@ function RemoteTextPreview({
 
 function getPreviewType(entry: ExplorerFileEntry): PreviewType {
   const contentType = entry.content_type.toLowerCase();
+  const mimeType = contentType.split(";")[0]?.trim() ?? "";
   const name = entry.original_filename.toLowerCase();
 
-  if (contentType.startsWith("image/")) {
+  if (mimeType.startsWith("image/")) {
     return "image";
   }
-  if (contentType.startsWith("video/")) {
+  if (mimeType.startsWith("video/")) {
     return "video";
   }
-  if (contentType.startsWith("audio/")) {
+  if (mimeType.startsWith("audio/")) {
     return "audio";
   }
-  if (contentType === "application/pdf" || name.endsWith(".pdf")) {
+  if (mimeType === "application/pdf" || name.endsWith(".pdf")) {
     return "pdf";
   }
   if (
-    contentType.includes("markdown") ||
+    mimeType.includes("markdown") ||
     name.endsWith(".md") ||
     name.endsWith(".markdown")
   ) {
     return "markdown";
   }
   if (
-    contentType.startsWith("text/") ||
-    contentType.includes("json") ||
-    contentType.includes("xml") ||
-    contentType.includes("javascript") ||
-    contentType.includes("sql") ||
+    mimeType.startsWith("application/vnd.openxmlformats-officedocument.") ||
+    isOpenXmlOfficeExtension(name)
+  ) {
+    return null;
+  }
+  if (
+    mimeType.startsWith("text/") ||
+    mimeType.includes("json") ||
+    mimeType === "application/xml" ||
+    mimeType.endsWith("+xml") ||
+    mimeType.includes("javascript") ||
+    mimeType.includes("sql") ||
     name.endsWith(".log")
   ) {
     return "text";
   }
 
   return null;
+}
+
+function isOpenXmlOfficeExtension(name: string) {
+  return Array.from(openXmlOfficeExtensions).some((extension) => name.endsWith(extension));
 }
 
 function DeleteFolderButton({

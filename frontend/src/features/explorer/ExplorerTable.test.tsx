@@ -110,6 +110,81 @@ describe("ExplorerTable", () => {
     expect(pre).toBeInTheDocument();
     expect(within(dialog).queryByText("item", { selector: "li" })).not.toBeInTheDocument();
   });
+
+  it.each([
+    {
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      name: "report.docx",
+    },
+    {
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      name: "budget.xlsx",
+    },
+    {
+      contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      name: "deck.pptx",
+    },
+  ])("does not preview OpenXML office files: $name", async ({ contentType, name }) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderExplorerTable(createFileEntry({
+      content_type: contentType,
+      name,
+      object_key: `docs/${name}`,
+      original_filename: name,
+      path: `docs/${name}`,
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name }));
+
+    const dialog = await screen.findByRole("dialog");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(within(dialog).getByText("Not available")).toBeInTheDocument();
+    expect(dialog.querySelector('iframe[title="file preview"]')).toBeNull();
+    expect(dialog.querySelector("pre")).toBeNull();
+  });
+
+  it.each([
+    {
+      contentType: "application/xml",
+      name: "feed.xml",
+    },
+    {
+      contentType: "application/atom+xml",
+      name: "atom.xml",
+    },
+  ])("keeps real XML content previewable as text: $contentType", async ({ contentType, name }) => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: vi.fn().mockResolvedValue("<root><item>value</item></root>"),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderExplorerTable(createFileEntry({
+      content_type: contentType,
+      name,
+      object_key: `docs/${name}`,
+      original_filename: name,
+      path: `docs/${name}`,
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name }));
+
+    const dialog = await screen.findByRole("dialog");
+    const pre = within(dialog).getByText((_, element) => {
+      return element?.tagName === "PRE" && element.textContent === "<root><item>value</item></root>";
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://oss.underhear.cn/api/v1/buckets/demo/objects/docs/${name}`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(pre).toBeInTheDocument();
+  });
 });
 
 function createFileEntry(overrides: Partial<ExplorerFileEntry>): ExplorerFileEntry {
