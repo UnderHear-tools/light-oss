@@ -512,7 +512,7 @@ function DetailField({
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className={monospace ? "mt-1 min-w-0 break-all font-mono text-sm" : "mt-1 min-w-0 text-sm"}>
+      <dd className={monospace ? "mt-1 min-w-0 break-all text-sm" : "mt-1 min-w-0 text-sm"}>
         {children}
       </dd>
     </div>
