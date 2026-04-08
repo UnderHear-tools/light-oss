@@ -1,4 +1,7 @@
 import {
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
   CopyIcon,
   DownloadIcon,
   ExpandIcon,
@@ -45,6 +48,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -52,15 +63,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatBytes, formatDate } from "@/lib/format";
+import type { ExplorerSortBy, ExplorerSortOrder } from "@/lib/explorer";
 import { useI18n } from "@/lib/i18n";
 import {
   PublishObjectSiteDialog,
   type PublishObjectSiteValue,
 } from "@/features/explorer/PublishObjectSiteDialog";
-import { PublishSiteDialog, type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
+import {
+  PublishSiteDialog,
+  type PublishSiteValue,
+} from "@/features/explorer/PublishSiteDialog";
 import { cn, downloadFile } from "@/lib/utils";
 
 export function ExplorerTable({
@@ -76,8 +103,12 @@ export function ExplorerTable({
   onPublishObjectSite,
   onPublishSite,
   onSignDownload,
+  onSortApply,
+  onSortClear,
   onUpdateVisibility,
   publishingPath,
+  sortBy,
+  sortOrder,
   signingPath,
 }: {
   bucket: string;
@@ -89,33 +120,71 @@ export function ExplorerTable({
   onDeleteFolder: (folderPath: string) => Promise<void>;
   onDownloadFolder: (folderPath: string) => Promise<void>;
   onOpenDirectory: (folderPath: string) => void;
-  onPublishObjectSite: (objectKey: string, value: PublishObjectSiteValue) => Promise<void>;
+  onPublishObjectSite: (
+    objectKey: string,
+    value: PublishObjectSiteValue,
+  ) => Promise<void>;
   onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
   onSignDownload: (objectKey: string) => Promise<void>;
-  onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
+  onSortApply: (sortBy: ExplorerSortBy, sortOrder: ExplorerSortOrder) => void;
+  onSortClear: () => void;
+  onUpdateVisibility: (
+    objectKey: string,
+    visibility: ObjectVisibility,
+  ) => Promise<void>;
   publishingPath: string;
+  sortBy: ExplorerSortBy | null;
+  sortOrder: ExplorerSortOrder | null;
   signingPath: string;
 }) {
   const { locale, t } = useI18n();
+  const [openSortBy, setOpenSortBy] = useState<ExplorerSortBy | null>(null);
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[360px] max-w-[360px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.name")}
+            <ExplorerSortHeader
+              activeSortBy={sortBy}
+              label={t("explorer.table.name")}
+              onApply={onSortApply}
+              onClear={onSortClear}
+              open={openSortBy === "name"}
+              onOpenChange={(open) => setOpenSortBy(open ? "name" : null)}
+              sortBy="name"
+              sortOrder={sortOrder}
+            />
           </TableHead>
           <TableHead className="w-[280px] text-base font-semibold text-muted-foreground">
             {t("explorer.table.url")}
           </TableHead>
           <TableHead className="w-[120px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.size")}
+            <ExplorerSortHeader
+              activeSortBy={sortBy}
+              label={t("explorer.table.size")}
+              onApply={onSortApply}
+              onClear={onSortClear}
+              open={openSortBy === "size"}
+              onOpenChange={(open) => setOpenSortBy(open ? "size" : null)}
+              sortBy="size"
+              sortOrder={sortOrder}
+            />
           </TableHead>
           <TableHead className="w-[160px] text-base font-semibold text-muted-foreground">
             {t("objects.form.visibility.label")}
           </TableHead>
           <TableHead className="w-[220px] text-base font-semibold text-muted-foreground">
-            {t("objects.table.createdAt")}
+            <ExplorerSortHeader
+              activeSortBy={sortBy}
+              label={t("objects.table.createdAt")}
+              onApply={onSortApply}
+              onClear={onSortClear}
+              open={openSortBy === "created_at"}
+              onOpenChange={(open) => setOpenSortBy(open ? "created_at" : null)}
+              sortBy="created_at"
+              sortOrder={sortOrder}
+            />
           </TableHead>
           <TableHead className="w-[180px] text-base font-semibold text-muted-foreground">
             {t("explorer.table.actions")}
@@ -126,7 +195,12 @@ export function ExplorerTable({
         {entries.map((entry) => (
           <TableRow key={entry.path}>
             <TableCell className="w-[360px] max-w-[360px]">
-              <ExplorerEntryName entry={entry} buildPublicUrl={buildPublicUrl} onOpenDirectory={onOpenDirectory} onUpdateVisibility={onUpdateVisibility} />
+              <ExplorerEntryName
+                entry={entry}
+                buildPublicUrl={buildPublicUrl}
+                onOpenDirectory={onOpenDirectory}
+                onUpdateVisibility={onUpdateVisibility}
+              />
             </TableCell>
             <TableCell className="max-w-[280px]">
               <ExplorerEntryUrlCell
@@ -135,15 +209,25 @@ export function ExplorerTable({
                 entry={entry}
               />
             </TableCell>
-            <TableCell className={entry.type === "directory" ? "text-muted-foreground" : undefined}>
+            <TableCell
+              className={
+                entry.type === "directory" ? "text-muted-foreground" : undefined
+              }
+            >
               {entry.type === "directory" ? "-" : formatBytes(entry.size)}
             </TableCell>
-            <TableCell className={entry.type === "directory" ? "text-muted-foreground" : undefined}>
+            <TableCell
+              className={
+                entry.type === "directory" ? "text-muted-foreground" : undefined
+              }
+            >
               {entry.type === "directory" ? (
                 "-"
               ) : (
                 <Badge
-                  variant={entry.visibility === "public" ? "outline" : "secondary"}
+                  variant={
+                    entry.visibility === "public" ? "outline" : "secondary"
+                  }
                   className="flex items-center"
                 >
                   {entry.visibility === "public" ? (
@@ -160,8 +244,14 @@ export function ExplorerTable({
                 </Badge>
               )}
             </TableCell>
-            <TableCell className={entry.type === "directory" ? "text-muted-foreground" : undefined}>
-              {entry.type === "directory" ? "-" : formatDate(entry.created_at ?? entry.updated_at, locale)}
+            <TableCell
+              className={
+                entry.type === "directory" ? "text-muted-foreground" : undefined
+              }
+            >
+              {entry.type === "directory"
+                ? "-"
+                : formatDate(entry.created_at ?? entry.updated_at, locale)}
             </TableCell>
             <TableCell>
               <div className="flex items-center justify-start gap-1">
@@ -262,7 +352,10 @@ function ExplorerEntryName({
   entry: ExplorerEntry;
   buildPublicUrl: (objectKey: string) => string;
   onOpenDirectory: (folderPath: string) => void;
-  onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
+  onUpdateVisibility: (
+    objectKey: string,
+    visibility: ObjectVisibility,
+  ) => Promise<void>;
 }) {
   if (entry.type === "directory") {
     return (
@@ -303,6 +396,149 @@ function ExplorerEntryName({
 
   const exhaustiveEntry: never = entry;
   return exhaustiveEntry;
+}
+
+function ExplorerSortHeader({
+  activeSortBy,
+  label,
+  onApply,
+  onClear,
+  onOpenChange,
+  open,
+  sortBy,
+  sortOrder,
+}: {
+  activeSortBy: ExplorerSortBy | null;
+  label: string;
+  onApply: (sortBy: ExplorerSortBy, sortOrder: ExplorerSortOrder) => void;
+  onClear: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  sortBy: ExplorerSortBy;
+  sortOrder: ExplorerSortOrder | null;
+}) {
+  const { t } = useI18n();
+  const active = activeSortBy === sortBy;
+  const appliedSortOrder = active ? (sortOrder ?? "asc") : "asc";
+  const [draftSortOrder, setDraftSortOrder] =
+    useState<ExplorerSortOrder>(appliedSortOrder);
+  const triggerState = active
+    ? appliedSortOrder === "asc"
+      ? t("explorer.sort.state.asc")
+      : t("explorer.sort.state.desc")
+    : t("explorer.sort.state.none");
+  const popoverTitle = t("explorer.sort.popover.title", { label });
+  const hasActiveSort = activeSortBy !== null;
+  const clearDisabled = !hasActiveSort;
+  const Icon = !active
+    ? ArrowUpDownIcon
+    : appliedSortOrder === "asc"
+      ? ArrowUpIcon
+      : ArrowDownIcon;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setDraftSortOrder(appliedSortOrder);
+  }, [appliedSortOrder, open]);
+
+  function handleConfirm() {
+    onApply(sortBy, draftSortOrder);
+    onOpenChange(false);
+  }
+
+  function handleCancel() {
+    onOpenChange(false);
+  }
+
+  function handleClear() {
+    if (clearDisabled) {
+      onOpenChange(false);
+      return;
+    }
+
+    onClear();
+    onOpenChange(false);
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <span>{label}</span>
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <Button
+            aria-label={t("explorer.sort.trigger", {
+              label,
+              state: triggerState,
+            })}
+            aria-pressed={active}
+            className={cn(
+              "size-6 text-muted-foreground hover:text-foreground",
+              active && "text-foreground",
+            )}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <Icon className="size-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          aria-label={popoverTitle}
+          className="w-64 gap-4"
+          sideOffset={8}
+        >
+          <PopoverHeader>
+            <PopoverTitle>{popoverTitle}</PopoverTitle>
+            <PopoverDescription>
+              {t("explorer.sort.popover.description")}
+            </PopoverDescription>
+          </PopoverHeader>
+          <div className="flex flex-col gap-3">
+            <ToggleGroup
+              aria-label={popoverTitle}
+              className="w-full"
+              onValueChange={(value) => {
+                if (value === "asc" || value === "desc") {
+                  setDraftSortOrder(value);
+                }
+              }}
+              type="single"
+              value={draftSortOrder}
+              variant="outline"
+            >
+              <ToggleGroupItem className="flex-1" value="asc">
+                {t("explorer.sort.option.asc")}
+              </ToggleGroupItem>
+              <ToggleGroupItem className="flex-1" value="desc">
+                {t("explorer.sort.option.desc")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                disabled={clearDisabled}
+                onClick={handleClear}
+                type="button"
+                variant="ghost"
+              >
+                {t("explorer.sort.clear")}
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleCancel} type="button" variant="outline">
+                  {t("explorer.sort.cancel")}
+                </Button>
+                <Button onClick={handleConfirm} type="button">
+                  {t("explorer.sort.confirm")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 function ExplorerEntryUrlCell({
@@ -364,14 +600,20 @@ function FileDetailsButton({
   entry,
   onUpdateVisibility,
 }: {
-  children: React.ReactNode,
+  children: React.ReactNode;
   buildPublicUrl: (objectKey: string) => string;
   entry: ExplorerFileEntry;
-  onUpdateVisibility: (objectKey: string, visibility: ObjectVisibility) => Promise<void>;
+  onUpdateVisibility: (
+    objectKey: string,
+    visibility: ObjectVisibility,
+  ) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedVisibility, setSelectedVisibility] = useState<ObjectVisibility>(entry.visibility);
-  const [currentVisibility, setCurrentVisibility] = useState<ObjectVisibility>(entry.visibility);
+  const [selectedVisibility, setSelectedVisibility] =
+    useState<ObjectVisibility>(entry.visibility);
+  const [currentVisibility, setCurrentVisibility] = useState<ObjectVisibility>(
+    entry.visibility,
+  );
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const { locale, t } = useI18n();
   const publicUrl =
@@ -394,7 +636,10 @@ function FileDetailsButton({
       setCurrentVisibility(selectedVisibility);
       toast.success(t("toast.objectVisibilityUpdated"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.updateObjectVisibility");
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("errors.updateObjectVisibility");
       toast.error(message);
     } finally {
       setIsSavingVisibility(false);
@@ -403,9 +648,7 @@ function FileDetailsButton({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      <DialogTrigger asChild>{children}</DialogTrigger>
 
       <DialogContent
         aria-describedby={undefined}
@@ -441,7 +684,10 @@ function FileDetailsButton({
                 t("common.notAvailable")
               )}
             </DetailField>
-            <DetailField label={t("explorer.details.originalFilename")} monospace>
+            <DetailField
+              label={t("explorer.details.originalFilename")}
+              monospace
+            >
               {entry.original_filename}
             </DetailField>
             <DetailField label={t("explorer.details.contentType")} monospace>
@@ -454,7 +700,9 @@ function FileDetailsButton({
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select
-                    onValueChange={(value) => setSelectedVisibility(value as ObjectVisibility)}
+                    onValueChange={(value) =>
+                      setSelectedVisibility(value as ObjectVisibility)
+                    }
                     value={selectedVisibility}
                   >
                     <SelectTrigger
@@ -466,13 +714,20 @@ function FileDetailsButton({
                     </SelectTrigger>
                     <SelectContent position="popper" side="bottom">
                       <SelectGroup>
-                        <SelectItem value="private">{t("objects.visibility.private")}</SelectItem>
-                        <SelectItem value="public">{t("objects.visibility.public")}</SelectItem>
+                        <SelectItem value="private">
+                          {t("objects.visibility.private")}
+                        </SelectItem>
+                        <SelectItem value="public">
+                          {t("objects.visibility.public")}
+                        </SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                   <Button
-                    disabled={isSavingVisibility || selectedVisibility === currentVisibility}
+                    disabled={
+                      isSavingVisibility ||
+                      selectedVisibility === currentVisibility
+                    }
                     onClick={() => {
                       void handleSaveVisibility();
                     }}
@@ -480,7 +735,10 @@ function FileDetailsButton({
                     variant="outline"
                   >
                     {isSavingVisibility ? (
-                      <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                      <LoaderCircleIcon
+                        className="animate-spin"
+                        data-icon="inline-start"
+                      />
                     ) : null}
                     {t("common.save")}
                   </Button>
@@ -488,10 +746,16 @@ function FileDetailsButton({
               </div>
             </DetailField>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <DetailField className="flex-1" label={t("explorer.table.updatedAt")}>
+              <DetailField
+                className="flex-1"
+                label={t("explorer.table.updatedAt")}
+              >
                 {formatDate(entry.updated_at, locale)}
               </DetailField>
-              <DetailField className="flex-1" label={t("objects.table.createdAt")}>
+              <DetailField
+                className="flex-1"
+                label={t("objects.table.createdAt")}
+              >
                 {formatDate(entry.created_at ?? entry.updated_at, locale)}
               </DetailField>
             </div>
@@ -514,18 +778,34 @@ function DetailField({
   monospace?: boolean;
 }) {
   return (
-    <div className={cn("min-w-0 rounded-lg border border-border/70 bg-muted/30 p-3", className)}>
+    <div
+      className={cn(
+        "min-w-0 rounded-lg border border-border/70 bg-muted/30 p-3",
+        className,
+      )}
+    >
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className={monospace ? "mt-1 min-w-0 break-all text-sm" : "mt-1 min-w-0 text-sm"}>
+      <dd
+        className={
+          monospace ? "mt-1 min-w-0 break-all text-sm" : "mt-1 min-w-0 text-sm"
+        }
+      >
         {children}
       </dd>
     </div>
   );
 }
 
-type PreviewType = "image" | "video" | "audio" | "pdf" | "markdown" | "text" | null;
+type PreviewType =
+  | "image"
+  | "video"
+  | "audio"
+  | "pdf"
+  | "markdown"
+  | "text"
+  | null;
 type PreviewDisplayMode = "inline" | "fullscreen";
 
 const openXmlOfficeExtensions = new Set([
@@ -547,12 +827,22 @@ const openXmlOfficeExtensions = new Set([
 ]);
 
 const markdownComponents: Components = {
-  h1: ({ children }) => <h1 className="mt-0 text-xl font-semibold text-foreground">{children}</h1>,
-  h2: ({ children }) => <h2 className="mt-6 text-lg font-semibold text-foreground">{children}</h2>,
-  h3: ({ children }) => <h3 className="mt-5 text-base font-semibold text-foreground">{children}</h3>,
+  h1: ({ children }) => (
+    <h1 className="mt-0 text-xl font-semibold text-foreground">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="mt-6 text-lg font-semibold text-foreground">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="mt-5 text-base font-semibold text-foreground">{children}</h3>
+  ),
   p: ({ children }) => <p className="leading-7 text-foreground">{children}</p>,
-  ul: ({ children }) => <ul className="flex list-disc flex-col gap-2 pl-5">{children}</ul>,
-  ol: ({ children }) => <ol className="flex list-decimal flex-col gap-2 pl-5">{children}</ol>,
+  ul: ({ children }) => (
+    <ul className="flex list-disc flex-col gap-2 pl-5">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="flex list-decimal flex-col gap-2 pl-5">{children}</ol>
+  ),
   li: ({ children }) => <li className="leading-7">{children}</li>,
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-border/70 pl-4 italic text-muted-foreground">
@@ -576,21 +866,35 @@ const markdownComponents: Components = {
     </div>
   ),
   th: ({ children }) => (
-    <th className="border border-border/70 bg-muted/40 px-3 py-2 text-left font-medium">{children}</th>
+    <th className="border border-border/70 bg-muted/40 px-3 py-2 text-left font-medium">
+      {children}
+    </th>
   ),
-  td: ({ children }) => <td className="border border-border/70 px-3 py-2 align-top">{children}</td>,
+  td: ({ children }) => (
+    <td className="border border-border/70 px-3 py-2 align-top">{children}</td>
+  ),
   pre: ({ children }) => (
-    <pre className="overflow-x-auto rounded-md border border-border/70 bg-muted/60 p-3">{children}</pre>
+    <pre className="overflow-x-auto rounded-md border border-border/70 bg-muted/60 p-3">
+      {children}
+    </pre>
   ),
   code: ({ children, className }) => {
     const content = String(children).replace(/\n$/, "");
     const isInline = !className && !content.includes("\n");
 
     if (isInline) {
-      return <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">{content}</code>;
+      return (
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
+          {content}
+        </code>
+      );
     }
 
-    return <code className={`font-mono text-sm ${className ?? ""}`.trim()}>{content}</code>;
+    return (
+      <code className={`font-mono text-sm ${className ?? ""}`.trim()}>
+        {content}
+      </code>
+    );
   },
 };
 
@@ -661,7 +965,9 @@ function FilePreview({
   ) : null;
 
   if (!publicUrl || !previewType) {
-    return <span className="text-muted-foreground">{t("common.notAvailable")}</span>;
+    return (
+      <span className="text-muted-foreground">{t("common.notAvailable")}</span>
+    );
   }
 
   const renderInlineSurface = (children: React.ReactNode) => (
@@ -709,7 +1015,9 @@ function FilePreview({
   }
 
   if (previewType === "audio") {
-    return <audio className="w-full min-w-0 max-w-full" controls src={publicUrl} />;
+    return (
+      <audio className="w-full min-w-0 max-w-full" controls src={publicUrl} />
+    );
   }
 
   if (previewType === "markdown") {
@@ -734,9 +1042,10 @@ function FilePreview({
     );
   }
 
-  const previewUrl = previewType === "pdf"
-    ? buildPdfPreviewUrl(publicUrl, displayMode)
-    : publicUrl;
+  const previewUrl =
+    previewType === "pdf"
+      ? buildPdfPreviewUrl(publicUrl, displayMode)
+      : publicUrl;
 
   const iframePreview = (
     <iframe
@@ -752,10 +1061,14 @@ function FilePreview({
   return isFullscreen ? iframePreview : renderInlineSurface(iframePreview);
 }
 
-function buildPdfPreviewUrl(publicUrl: string, displayMode: PreviewDisplayMode) {
-  const params = displayMode === "fullscreen"
-    ? "toolbar=0&navpanes=0&pagemode=none&zoom=page-width"
-    : "toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit";
+function buildPdfPreviewUrl(
+  publicUrl: string,
+  displayMode: PreviewDisplayMode,
+) {
+  const params =
+    displayMode === "fullscreen"
+      ? "toolbar=0&navpanes=0&pagemode=none&zoom=page-width"
+      : "toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit";
   const separator = publicUrl.includes("#") ? "&" : "#";
 
   return `${publicUrl}${separator}${params}`;
@@ -774,7 +1087,9 @@ function RemoteTextPreview({
 }) {
   const { t } = useI18n();
   const [previewText, setPreviewText] = useState("");
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -968,7 +1283,9 @@ function getPreviewType(entry: ExplorerFileEntry): PreviewType {
 }
 
 function isOpenXmlOfficeExtension(name: string) {
-  return Array.from(openXmlOfficeExtensions).some((extension) => name.endsWith(extension));
+  return Array.from(openXmlOfficeExtensions).some((extension) =>
+    name.endsWith(extension),
+  );
 }
 
 function DeleteFolderButton({
@@ -1006,7 +1323,9 @@ function DeleteFolderButton({
           <AlertDialogMedia>
             <ShieldAlertIcon />
           </AlertDialogMedia>
-          <AlertDialogTitle>{t("explorer.deleteFolder.title")}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t("explorer.deleteFolder.title")}
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {t("explorer.deleteFolder.description", {
               bucket,
@@ -1108,7 +1427,10 @@ function PublishObjectSiteButton({
 }: {
   bucket: string;
   entry: ExplorerFileEntry;
-  onPublishObjectSite: (objectKey: string, value: PublishObjectSiteValue) => Promise<void>;
+  onPublishObjectSite: (
+    objectKey: string,
+    value: PublishObjectSiteValue,
+  ) => Promise<void>;
   publishingPath: string;
 }) {
   const { t } = useI18n();
@@ -1196,43 +1518,39 @@ function DeleteFileButton({
   );
 }
 
-const ExplorerIconButton = forwardRef<HTMLButtonElement, {
-  children: React.ReactNode;
-  disabled?: boolean;
-  label: string;
-  onClick?: () => void;
-}>(
-  function ExplorerIconButton({
-    children,
-    disabled,
-    label,
-    onClick,
-  }, ref) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <Button
-              ref={ref}
-              className="[&_svg]:size-4"
-              disabled={disabled}
-              onClick={onClick}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            >
-              {children}
-              <span className="sr-only">{label}</span>
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    );
+const ExplorerIconButton = forwardRef<
+  HTMLButtonElement,
+  {
+    children: React.ReactNode;
+    disabled?: boolean;
+    label: string;
+    onClick?: () => void;
   }
-);
+>(function ExplorerIconButton({ children, disabled, label, onClick }, ref) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <Button
+            ref={ref}
+            className="[&_svg]:size-4"
+            disabled={disabled}
+            onClick={onClick}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            {children}
+            <span className="sr-only">{label}</span>
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+});
 
 function ExplorerIconLink({
   children,
@@ -1246,24 +1564,34 @@ function ExplorerIconLink({
   // 从 href 中提取文件名（最后一个 '/' 之后的部分，并解码）
   const getFileName = (url: string) => {
     const decodedUrl = decodeURIComponent(url);
-    const parts = decodedUrl.split('/');
+    const parts = decodedUrl.split("/");
     // 数组的 pop方法移除数组的 最后一个元素并返回
-    const lastPart = parts.pop() || 'download';
+    const lastPart = parts.pop() || "download";
     return lastPart;
-  }
+  };
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const filename = getFileName(href);
     downloadFile(href, filename);
-  }
+  };
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex">
-          <Button asChild className="[&_svg]:size-4" size="icon-sm" variant="ghost">
-            <a href={href} rel="noreferrer" target="_blank" onClick={handleClick}>
+          <Button
+            asChild
+            className="[&_svg]:size-4"
+            size="icon-sm"
+            variant="ghost"
+          >
+            <a
+              href={href}
+              rel="noreferrer"
+              target="_blank"
+              onClick={handleClick}
+            >
               {children}
               <span className="sr-only">{label}</span>
             </a>

@@ -428,6 +428,8 @@ func (h *apiHandler) listExplorerEntries(c *gin.Context) {
 		Search:     c.Query("search"),
 		Limit:      limit,
 		Cursor:     c.Query("cursor"),
+		SortBy:     c.Query("sort_by"),
+		SortOrder:  c.Query("sort_order"),
 	})
 	if err != nil {
 		response.Error(c, err)

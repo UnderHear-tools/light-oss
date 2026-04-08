@@ -53,7 +53,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
 import { type PublishSiteValue } from "@/features/explorer/PublishSiteDialog";
@@ -75,8 +79,12 @@ import {
   getExplorerBreadcrumbs,
   normalizeExplorerPrefix,
   normalizeExplorerSearch,
+  normalizeExplorerSortBy,
+  normalizeExplorerSortOrder,
   parseExplorerLimit,
   joinExplorerPath,
+  type ExplorerSortBy,
+  type ExplorerSortOrder,
 } from "@/lib/explorer";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
@@ -100,6 +108,10 @@ export function BucketObjectsPage() {
   const search = normalizeExplorerSearch(searchParams.get("search"));
   const cursor = searchParams.get("cursor") ?? "";
   const limit = parseExplorerLimit(searchParams.get("limit"));
+  const sortBy = normalizeExplorerSortBy(searchParams.get("sort_by"));
+  const sortOrder = sortBy
+    ? (normalizeExplorerSortOrder(searchParams.get("sort_order")) ?? "asc")
+    : null;
   const entriesBaseQueryKey = [
     "explorer-entries",
     settings.apiBaseUrl,
@@ -117,6 +129,8 @@ export function BucketObjectsPage() {
     search,
     cursor,
     limit,
+    sortBy ?? "",
+    sortOrder ?? "",
   ] as const;
 
   useEffect(() => {
@@ -125,7 +139,7 @@ export function BucketObjectsPage() {
 
   useEffect(() => {
     setCursorHistory([]);
-  }, [bucket, prefix, search, limit]);
+  }, [bucket, prefix, search, limit, sortBy, sortOrder]);
 
   const entriesQuery = useQuery({
     queryKey: entriesQueryKey,
@@ -136,6 +150,8 @@ export function BucketObjectsPage() {
         search,
         limit,
         cursor,
+        sortBy: sortBy ?? "",
+        sortOrder: sortOrder ?? "",
       }),
     enabled: bucket !== "",
   });
@@ -431,7 +447,12 @@ export function BucketObjectsPage() {
   }
 
   function updateSearchParams(
-    updates: Partial<Record<"prefix" | "search" | "cursor" | "limit", string>>,
+    updates: Partial<
+      Record<
+        "prefix" | "search" | "cursor" | "limit" | "sort_by" | "sort_order",
+        string
+      >
+    >,
   ) {
     const next = new URLSearchParams(searchParams);
 
@@ -514,6 +535,27 @@ export function BucketObjectsPage() {
     setCursorHistory([]);
     updateSearchParams({
       search: searchInput.trim(),
+      cursor: "",
+    });
+  }
+
+  function handleSortApply(
+    nextSortBy: ExplorerSortBy,
+    nextSortOrder: ExplorerSortOrder,
+  ) {
+    setCursorHistory([]);
+    updateSearchParams({
+      sort_by: nextSortBy,
+      sort_order: nextSortOrder,
+      cursor: "",
+    });
+  }
+
+  function handleSortClear() {
+    setCursorHistory([]);
+    updateSearchParams({
+      sort_by: "",
+      sort_order: "",
       cursor: "",
     });
   }
@@ -634,8 +676,11 @@ export function BucketObjectsPage() {
                     progress={uploadProgress}
                   />
 
-                  <Separator className="hidden h-5 sm:block" orientation="vertical" />
-                  
+                  <Separator
+                    className="hidden h-5 sm:block"
+                    orientation="vertical"
+                  />
+
                   <UploadAndPublishSiteDialog
                     bucket={bucket}
                     lockedFields={{ bucket: true, parentPrefix: true }}
@@ -651,7 +696,10 @@ export function BucketObjectsPage() {
                     pending={createFolderMutation.isPending}
                   />
 
-                  <Separator className="hidden h-5 sm:block" orientation="vertical" />
+                  <Separator
+                    className="hidden h-5 sm:block"
+                    orientation="vertical"
+                  />
 
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -668,7 +716,10 @@ export function BucketObjectsPage() {
                         <RefreshCcwIcon className="size-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
+                    <TooltipContent
+                      className="whitespace-nowrap leading-none"
+                      sideOffset={6}
+                    >
                       {t("explorer.toolbar.refresh")}
                     </TooltipContent>
                   </Tooltip>
@@ -750,8 +801,12 @@ export function BucketObjectsPage() {
                     onPublishObjectSite={handlePublishObjectSite}
                     onPublishSite={handlePublishSite}
                     onSignDownload={handleSignDownload}
+                    onSortApply={handleSortApply}
+                    onSortClear={handleSortClear}
                     onUpdateVisibility={handleUpdateVisibility}
                     publishingPath={publishingPath}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
                     signingPath={signingPath}
                   />
                 </div>
