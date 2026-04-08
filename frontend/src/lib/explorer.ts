@@ -1,4 +1,4 @@
-export const explorerPageSizes = [50, 100, 200] as const;
+export const explorerPageSizes = [10, 20, 50, 100, 200] as const;
 
 export function normalizeExplorerPrefix(value: string | null | undefined) {
   const trimmed = (value ?? "").trim().replace(/^\/+/, "").replace(/\/+$/, "");
@@ -15,7 +15,7 @@ export function parseExplorerLimit(value: string | null | undefined) {
     return limit as (typeof explorerPageSizes)[number];
   }
 
-  return 100;
+  return 20;
 }
 
 export function getExplorerBreadcrumbs(prefix: string) {
