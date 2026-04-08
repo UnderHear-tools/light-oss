@@ -204,8 +204,14 @@ describe("ExplorerTable", () => {
     await userEvent.click(screen.getByRole("button", { name: "avatar.png" }));
 
     const detailsDialog = await screen.findByRole("dialog");
+    const inlinePreviewSurface = within(detailsDialog).getByTestId("inline-preview-surface");
+
+    expect(
+      within(inlinePreviewSurface).getByRole("button", { name: "Fullscreen preview" }),
+    ).toBeInTheDocument();
+
     await userEvent.click(
-      within(detailsDialog).getByRole("button", { name: "Fullscreen preview" }),
+      within(inlinePreviewSurface).getByRole("button", { name: "Fullscreen preview" }),
     );
 
     const fullscreenDialog = await screen.findByRole("dialog", {

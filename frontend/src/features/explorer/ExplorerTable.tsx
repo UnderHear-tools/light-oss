@@ -661,17 +661,13 @@ function FileDetailsButton({
         <div className="-mr-1 min-w-0 overflow-y-auto pr-1">
           <dl className="grid gap-3">
             <DetailField label={t("explorer.details.preview")}>
-              <div className="flex min-w-0 max-w-full flex-col gap-2">
-                {publicUrl && previewType ? (
-                  <div className="flex justify-end">
-                    <PreviewFullscreenButton
-                      fileName={entry.original_filename}
-                      previewType={previewType}
-                      publicUrl={publicUrl}
-                    />
-                  </div>
-                ) : null}
-                <FilePreview previewType={previewType} publicUrl={publicUrl} />
+              <div className="flex min-w-0 max-w-full flex-col">
+                <FilePreview
+                  fileName={entry.original_filename}
+                  displayMode="inline"
+                  previewType={previewType}
+                  publicUrl={publicUrl}
+                />
               </div>
             </DetailField>
             <DetailField label={t("explorer.table.url")} monospace>
@@ -912,13 +908,19 @@ function PreviewFullscreenButton({
   publicUrl: string;
 }) {
   const { t } = useI18n();
+  const label = t("explorer.actions.fullscreenPreview");
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button size="sm" type="button" variant="outline">
-          <ExpandIcon data-icon="inline-start" />
-          {t("explorer.actions.fullscreenPreview")}
+        <Button
+          className="rounded-full bg-background/75 text-foreground shadow-sm backdrop-blur-sm hover:bg-background/90 hover:shadow-md focus-visible:bg-background/90"
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <ExpandIcon />
+          <span className="sr-only">{label}</span>
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -930,6 +932,7 @@ function PreviewFullscreenButton({
         </DialogHeader>
         <div className="min-h-0 min-w-0 flex-1">
           <FilePreview
+            fileName={fileName}
             displayMode="fullscreen"
             previewType={previewType}
             publicUrl={publicUrl}
@@ -941,16 +944,25 @@ function PreviewFullscreenButton({
 }
 
 function FilePreview({
+  fileName,
   displayMode = "inline",
   previewType,
   publicUrl,
 }: {
+  fileName: string;
   displayMode?: PreviewDisplayMode;
   previewType: PreviewType;
   publicUrl: string;
 }) {
   const { t } = useI18n();
   const isFullscreen = displayMode === "fullscreen";
+  const inlineAction = !isFullscreen && previewType !== "audio" ? (
+    <PreviewFullscreenButton
+      fileName={fileName}
+      previewType={previewType}
+      publicUrl={publicUrl}
+    />
+  ) : null;
 
   if (!publicUrl || !previewType) {
     return (
@@ -958,30 +970,48 @@ function FilePreview({
     );
   }
 
+  const renderInlineSurface = (children: React.ReactNode) => (
+    <div
+      className="relative min-w-0 max-w-full overflow-hidden rounded-md border border-border/70 bg-background"
+      data-testid="inline-preview-surface"
+    >
+      {inlineAction ? (
+        <div className="absolute top-3 right-5 z-10">
+          {inlineAction}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+
   if (previewType === "image") {
-    return (
+    const imagePreview = (
       <img
         alt="file preview"
         className={cn(
-          "w-full min-w-0 max-w-full rounded-md border border-border/70 object-contain",
-          isFullscreen ? "h-full max-h-full bg-background" : "max-h-80",
+          "w-full min-w-0 max-w-full object-contain",
+          isFullscreen ? "h-full max-h-full rounded-md border border-border/70 bg-background" : "max-h-80",
         )}
         src={publicUrl}
       />
     );
+
+    return isFullscreen ? imagePreview : renderInlineSurface(imagePreview);
   }
 
   if (previewType === "video") {
-    return (
+    const videoPreview = (
       <video
         className={cn(
-          "w-full min-w-0 max-w-full rounded-md border border-border/70",
-          isFullscreen ? "h-full max-h-full bg-background" : "max-h-80",
+          "w-full min-w-0 max-w-full",
+          isFullscreen ? "h-full max-h-full rounded-md border border-border/70 bg-background" : "max-h-80",
         )}
         controls
         src={publicUrl}
       />
     );
+
+    return isFullscreen ? videoPreview : renderInlineSurface(videoPreview);
   }
 
   if (previewType === "audio") {
@@ -993,6 +1023,7 @@ function FilePreview({
   if (previewType === "markdown") {
     return (
       <RemoteTextPreview
+        action={inlineAction}
         displayMode={displayMode}
         mode="markdown"
         publicUrl={publicUrl}
@@ -1003,6 +1034,7 @@ function FilePreview({
   if (previewType === "text") {
     return (
       <RemoteTextPreview
+        action={inlineAction}
         displayMode={displayMode}
         mode="text"
         publicUrl={publicUrl}
@@ -1015,16 +1047,18 @@ function FilePreview({
       ? buildPdfPreviewUrl(publicUrl, displayMode)
       : publicUrl;
 
-  return (
+  const iframePreview = (
     <iframe
       className={cn(
-        "w-full min-w-0 max-w-full rounded-md border border-border/70 bg-background",
-        isFullscreen ? "h-full min-h-0" : "h-80",
+        "w-full min-w-0 max-w-full bg-background",
+        isFullscreen ? "h-full min-h-0 rounded-md border border-border/70" : "h-80",
       )}
       src={previewUrl}
       title="file preview"
     />
   );
+
+  return isFullscreen ? iframePreview : renderInlineSurface(iframePreview);
 }
 
 function buildPdfPreviewUrl(
@@ -1041,10 +1075,12 @@ function buildPdfPreviewUrl(
 }
 
 function RemoteTextPreview({
+  action,
   displayMode,
   mode,
   publicUrl,
 }: {
+  action?: React.ReactNode;
   displayMode: PreviewDisplayMode;
   mode: "markdown" | "text";
   publicUrl: string;
@@ -1089,24 +1125,75 @@ function RemoteTextPreview({
   }, [publicUrl]);
 
   if (status === "loading") {
+    if (displayMode === "inline") {
+      return (
+        <div
+          className="relative min-w-0 max-w-full rounded-md border border-border/70 bg-background p-4 pt-12"
+          data-testid="inline-preview-surface"
+        >
+          {action ? (
+            <div className="absolute top-3 right-5 z-10">
+              {action}
+            </div>
+          ) : null}
+          <span className="text-muted-foreground">{t("common.loading")}</span>
+        </div>
+      );
+    }
+
     return <span className="text-muted-foreground">{t("common.loading")}</span>;
   }
 
   if (status === "error") {
-    return (
-      <span className="text-muted-foreground">{t("common.notAvailable")}</span>
-    );
+    if (displayMode === "inline") {
+      return (
+        <div
+          className="relative min-w-0 max-w-full rounded-md border border-border/70 bg-background p-4 pt-12"
+          data-testid="inline-preview-surface"
+        >
+          {action ? (
+            <div className="absolute top-3 right-5 z-10">
+              {action}
+            </div>
+          ) : null}
+          <span className="text-muted-foreground">{t("common.notAvailable")}</span>
+        </div>
+      );
+    }
+
+    return <span className="text-muted-foreground">{t("common.notAvailable")}</span>;
   }
 
   if (mode === "markdown") {
+    if (displayMode === "inline") {
+      return (
+        <div
+          className="relative min-w-0 max-w-full rounded-md border border-border/70 bg-background"
+          data-testid="inline-preview-surface"
+        >
+          {action ? (
+            <div className="absolute top-3 right-5 z-10">
+              {action}
+            </div>
+          ) : null}
+          <div className="max-h-80 min-w-0 max-w-full overflow-auto p-4 pt-12">
+            <div className="flex min-w-0 flex-col gap-4 text-sm">
+              <ReactMarkdown
+                components={markdownComponents}
+                remarkPlugins={[remarkGfm]}
+                skipHtml
+              >
+                {previewText}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
-        className={cn(
-          "min-w-0 max-w-full rounded-md border border-border/70 bg-background p-4",
-          displayMode === "fullscreen"
-            ? "h-full min-h-0 overflow-auto"
-            : "max-h-80 overflow-auto",
-        )}
+        className="h-full min-h-0 min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-4"
       >
         <div className="flex min-w-0 flex-col gap-4 text-sm">
           <ReactMarkdown
@@ -1121,14 +1208,29 @@ function RemoteTextPreview({
     );
   }
 
+  if (displayMode === "inline") {
+    return (
+      <div
+        className="relative min-w-0 max-w-full rounded-md border border-border/70 bg-background"
+        data-testid="inline-preview-surface"
+      >
+        {action ? (
+          <div className="absolute top-3 right-5 z-10">
+            {action}
+          </div>
+        ) : null}
+        <div className="max-h-80 min-w-0 max-w-full overflow-auto">
+          <pre className="w-full min-w-0 max-w-full p-3 pt-12 font-mono text-sm whitespace-pre-wrap wrap-break-word">
+            {previewText}
+          </pre>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <pre
-      className={cn(
-        "w-full min-w-0 max-w-full rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap wrap-break-word",
-        displayMode === "fullscreen"
-          ? "h-full min-h-0 overflow-auto"
-          : "max-h-80 overflow-auto",
-      )}
+      className="h-full min-h-0 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap wrap-break-word"
     >
       {previewText}
     </pre>
