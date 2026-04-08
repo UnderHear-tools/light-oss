@@ -409,8 +409,19 @@ export function BucketObjectsPage() {
     uploadMutation.isPending ||
     uploadFolderMutation.isPending ||
     uploadAndPublishSiteMutation.isPending;
+  const bucketMissing = isBucketNotFoundError(entriesQuery.error);
 
   if (!bucket) {
+    return (
+      <EmptyState
+        description={t("errors.bucketNotFound")}
+        icon={FolderSearchIcon}
+        title={t("explorer.title")}
+      />
+    );
+  }
+
+  if (bucketMissing) {
     return (
       <EmptyState
         description={t("errors.bucketNotFound")}
@@ -813,5 +824,14 @@ export function BucketObjectsPage() {
         </div>
       </Card>
     </section>
+  );
+}
+
+function isBucketNotFoundError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "bucket_not_found"
   );
 }

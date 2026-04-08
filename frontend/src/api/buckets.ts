@@ -16,3 +16,10 @@ export function createBucket(settings: AppSettings, name: string) {
     data: { name },
   });
 }
+
+export function deleteBucket(settings: AppSettings, bucketName: string) {
+  return apiRequest<void>(settings, {
+    method: "DELETE",
+    url: `/api/v1/buckets/${encodeURIComponent(bucketName)}`,
+  });
+}

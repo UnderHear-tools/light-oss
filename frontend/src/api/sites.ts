@@ -70,7 +70,7 @@ export function updateSite(
 }
 
 export function deleteSite(settings: AppSettings, siteId: number) {
-  return apiRequest<null>(settings, {
+  return apiRequest<void>(settings, {
     method: "DELETE",
     url: `/api/v1/sites/${siteId}`,
   });

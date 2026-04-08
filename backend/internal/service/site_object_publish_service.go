@@ -81,6 +81,9 @@ func (s *SitePublishService) PublishObject(
 		if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
 			return nil, apperrors.New(http.StatusConflict, "domain_conflict", "domain is already bound to another site")
 		}
+		if isForeignKeyError(err) {
+			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+		}
 
 		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
 			return nil, err

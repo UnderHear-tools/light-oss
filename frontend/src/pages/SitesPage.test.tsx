@@ -379,7 +379,7 @@ describe("SitesPage", () => {
       .mockResolvedValueOnce({ items: [existingSite] })
       .mockResolvedValueOnce({ items: [] });
     vi.mocked(listBuckets).mockResolvedValue(defaultBuckets);
-    vi.mocked(deleteSite).mockResolvedValue(null);
+    vi.mocked(deleteSite).mockResolvedValue(undefined);
 
     renderWithApp(<SitesPage />);
 

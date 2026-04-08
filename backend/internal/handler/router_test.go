@@ -1491,6 +1491,107 @@ func TestCreateAndDeleteFolder(t *testing.T) {
 	}
 }
 
+func TestDeleteBucketCascadesAndCleansStorage(t *testing.T) {
+	router, storageRoot := newTestRouterWithStorageRoot(t, 1024)
+
+	createBucket(t, router, "wipe-bucket")
+	uploadObject(t, router, "/api/v1/buckets/wipe-bucket/objects/docs/readme.txt", "hello", "public")
+	createFolder(t, router, "wipe-bucket", "docs/", "empty")
+	createSite(t, router, `{
+		"bucket":"wipe-bucket",
+		"root_prefix":"docs/",
+		"domains":["demo.underhear.cn"]
+	}`)
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/wipe-bucket", nil)
+	deleteReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	listBucketsReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets", nil)
+	listBucketsReq.Header.Set("Authorization", "Bearer dev-token")
+	listBucketsRec := httptest.NewRecorder()
+	router.ServeHTTP(listBucketsRec, listBucketsReq)
+	if listBucketsRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listBucketsRec.Code, listBucketsRec.Body.String())
+	}
+
+	var bucketBody apiEnvelope[bucketListResponse]
+	decodeJSON(t, listBucketsRec.Body.Bytes(), &bucketBody)
+	if len(bucketBody.Data.Items) != 0 {
+		t.Fatalf("expected no buckets after delete, got %+v", bucketBody.Data.Items)
+	}
+
+	listSitesReq := httptest.NewRequest(http.MethodGet, "/api/v1/sites", nil)
+	listSitesReq.Header.Set("Authorization", "Bearer dev-token")
+	listSitesRec := httptest.NewRecorder()
+	router.ServeHTTP(listSitesRec, listSitesReq)
+	if listSitesRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listSitesRec.Code, listSitesRec.Body.String())
+	}
+
+	var siteBody apiEnvelope[siteListResponse]
+	decodeJSON(t, listSitesRec.Body.Bytes(), &siteBody)
+	if len(siteBody.Data.Items) != 0 {
+		t.Fatalf("expected no sites after bucket delete, got %+v", siteBody.Data.Items)
+	}
+
+	if files := countFilesUnderRoot(t, storageRoot); files != 0 {
+		t.Fatalf("expected no stored files after bucket delete, got %d", files)
+	}
+}
+
+func TestDeletedBucketReadEndpointsReturnBucketNotFound(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "gone-bucket")
+	uploadObject(t, router, "/api/v1/buckets/gone-bucket/objects/docs/readme.txt", "hello", "public")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/gone-bucket", nil)
+	deleteReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	testCases := []string{
+		"/api/v1/buckets/gone-bucket/objects",
+		"/api/v1/buckets/gone-bucket/folders",
+		"/api/v1/buckets/gone-bucket/entries",
+		"/api/v1/buckets/gone-bucket/folders/archive?path=" + url.QueryEscape("docs/"),
+	}
+
+	for _, targetURL := range testCases {
+		req := httptest.NewRequest(http.MethodGet, targetURL, nil)
+		req.Header.Set("Authorization", "Bearer dev-token")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s expected 404, got %d, body=%s", targetURL, rec.Code, rec.Body.String())
+		}
+
+		assertAPIErrorCode(t, rec.Body.Bytes(), "bucket_not_found")
+	}
+}
+
+func TestDeleteMissingBucketReturnsNotFound(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/missing-bucket", nil)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	assertAPIErrorCode(t, rec.Body.Bytes(), "bucket_not_found")
+}
+
 func TestDownloadFolderArchive(t *testing.T) {
 	router := newTestRouter(t, 1024)
 
@@ -2078,6 +2179,9 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("enable sqlite foreign keys: %v", err)
+	}
 
 	if err := db.AutoMigrate(&model.Bucket{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
@@ -2117,7 +2221,7 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		DB:                 sqlDB,
 		GormDB:             db,
 		AuthValidator:      middleware.NewTokenValidator(cfg.BearerTokens),
-		BucketService:      service.NewBucketService(bucketRepo),
+		BucketService:      service.NewBucketService(zap.NewNop(), db, bucketRepo, objectRepo, siteRepo, localStorage),
 		ObjectService:      objectService,
 		SiteService:        siteService,
 		SitePublishService: service.NewSitePublishService(db, objectRepo, siteRepo, localStorage, siteService),
@@ -2188,6 +2292,16 @@ func decodeJSON(t *testing.T, body []byte, target any) {
 	t.Helper()
 	if err := json.Unmarshal(body, target); err != nil {
 		t.Fatalf("decode json: %v, body=%s", err, string(body))
+	}
+}
+
+func assertAPIErrorCode(t *testing.T, body []byte, code string) {
+	t.Helper()
+
+	var envelope apiEnvelope[map[string]any]
+	decodeJSON(t, body, &envelope)
+	if envelope.Error == nil || envelope.Error.Code != code {
+		t.Fatalf("expected error code %q, got %+v", code, envelope.Error)
 	}
 }
 

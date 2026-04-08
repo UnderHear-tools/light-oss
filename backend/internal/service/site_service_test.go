@@ -182,6 +182,9 @@ func newTestSiteServices(t *testing.T) (*repository.BucketRepository, *ObjectSer
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("enable sqlite foreign keys: %v", err)
+	}
 	if err := db.AutoMigrate(&model.Bucket{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}

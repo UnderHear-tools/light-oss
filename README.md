@@ -21,7 +21,7 @@ Light OSS 由四部分组成：
 
 ## 后端核心功能清单
 
-- Bucket 管理：创建 Bucket、列出 Bucket。
+- Bucket 管理：创建 Bucket、列出 Bucket、删除 Bucket（级联删除对象与关联站点）。
 - 对象管理：上传、下载、HEAD 查看元数据、按 `prefix/cursor/limit` 列表查询、删除对象。
 - 访问控制：支持 `public/private` 可见性，私有对象支持 Bearer Token 鉴权和签名下载 URL。
 - 目录浏览：支持完整文件夹树、创建文件夹、删除文件夹、按目录浏览 entries、搜索与分页。
@@ -321,6 +321,18 @@ curl "$BASE_URL/api/v1/buckets" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+### 删除 Bucket（危险操作）
+
+这个接口会删除整个 Bucket，并级联删除：
+
+- Bucket 下的所有对象与文件夹标记对象
+- 绑定到该 Bucket 的站点配置与域名绑定
+
+```bash
+curl -X DELETE "$BASE_URL/api/v1/buckets/$BUCKET" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ### 5. 上传 public 对象
 
 ```bash
@@ -557,6 +569,7 @@ curl -H "Host: $SITE_DOMAIN" http://127.0.0.1/
 
 - 创建新的 Bucket
 - 查看已有 Bucket 列表
+- 删除整个 Bucket（会级联删除其中的文件与关联站点）
 
 ### `/buckets/:bucket`
 
@@ -665,7 +678,6 @@ curl -H "Host: demo.underhear.cn" http://127.0.0.1/
 ## 已知限制
 
 - 当前使用本地文件系统保存对象内容，不是分布式对象存储。
-- 当前没有 Bucket 删除接口。
 - 站点托管只对 public 对象生效。
 - gateway 当前只处理 HTTP，不包含 HTTPS、证书签发或 TLS 终止。
 - 项目目标是轻量 OSS MVP，不是完整 S3 兼容实现。

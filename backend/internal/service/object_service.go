@@ -72,12 +72,8 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 		return nil, err
 	}
 
-	exists, err := s.bucketRepo.Exists(ctx, input.BucketName)
-	if err != nil {
-		return nil, apperrors.Wrap(http.StatusInternalServerError, "bucket_lookup_failed", "failed to look up bucket", err)
-	}
-	if !exists {
-		return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+	if err := s.ensureBucketExists(ctx, input.BucketName); err != nil {
+		return nil, err
 	}
 
 	stored, err := s.storage.Save(ctx, input.Body)
@@ -100,6 +96,10 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 	saved, err := s.objectRepo.Upsert(ctx, object)
 	if err != nil {
 		_ = s.storage.Delete(stored.RelativePath)
+		if isForeignKeyError(err) {
+			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+		}
+
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_metadata_failed", "failed to save object metadata", err)
 	}
 
@@ -145,6 +145,9 @@ func (s *ObjectService) List(ctx context.Context, input ListObjectsInput) (*List
 		return nil, err
 	}
 	if err := ValidatePrefix(input.Prefix); err != nil {
+		return nil, err
+	}
+	if err := s.ensureBucketExists(ctx, input.BucketName); err != nil {
 		return nil, err
 	}
 
@@ -306,4 +309,16 @@ func shouldAttachUTF8Charset(mediaType string) bool {
 	default:
 		return false
 	}
+}
+
+func (s *ObjectService) ensureBucketExists(ctx context.Context, bucketName string) error {
+	exists, err := s.bucketRepo.Exists(ctx, bucketName)
+	if err != nil {
+		return apperrors.Wrap(http.StatusInternalServerError, "bucket_lookup_failed", "failed to look up bucket", err)
+	}
+	if !exists {
+		return apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+	}
+
+	return nil
 }

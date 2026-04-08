@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"path"
 	"sort"
 	"strings"
@@ -62,6 +63,9 @@ func (s *ObjectService) ListFolders(ctx context.Context, bucketName string) ([]F
 	if err := ValidateBucketName(bucketName); err != nil {
 		return nil, err
 	}
+	if err := s.ensureBucketExists(ctx, bucketName); err != nil {
+		return nil, err
+	}
 
 	keys, err := s.objectRepo.ListActiveKeys(ctx, bucketName)
 	if err != nil {
@@ -94,6 +98,9 @@ func (s *ObjectService) ListExplorerEntries(ctx context.Context, input ListExplo
 		return nil, err
 	}
 	if err := ValidateFolderPrefix(input.Prefix); err != nil {
+		return nil, err
+	}
+	if err := s.ensureBucketExists(ctx, input.BucketName); err != nil {
 		return nil, err
 	}
 
@@ -338,6 +345,10 @@ func (s *ObjectService) createInternalObject(ctx context.Context, input internal
 	saved, err := s.objectRepo.Upsert(ctx, object)
 	if err != nil {
 		_ = s.storage.Delete(stored.RelativePath)
+		if isForeignKeyError(err) {
+			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+		}
+
 		return nil, apperrors.Wrap(500, "object_metadata_failed", "failed to save object metadata", err)
 	}
 

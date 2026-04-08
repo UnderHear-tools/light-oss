@@ -26,6 +26,7 @@ type Site struct {
 	SPAFallback   bool         `gorm:"not null;default:false"`
 	CreatedAt     time.Time    `gorm:"not null"`
 	UpdatedAt     time.Time    `gorm:"not null"`
+	Bucket        *Bucket      `json:"-" gorm:"foreignKey:BucketName;references:Name;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	Domains       []SiteDomain `gorm:"foreignKey:SiteID"`
 }
 
@@ -35,6 +36,7 @@ type SiteDomain struct {
 	Domain    string    `gorm:"size:255;not null;uniqueIndex:udx_site_domains_domain"`
 	CreatedAt time.Time `gorm:"not null"`
 	UpdatedAt time.Time `gorm:"not null"`
+	Site      *Site     `json:"-" gorm:"foreignKey:SiteID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type Object struct {
@@ -51,6 +53,7 @@ type Object struct {
 	IsDeleted        bool       `gorm:"not null;default:false;index:idx_objects_bucket_created,priority:2;index:idx_objects_bucket_key,priority:2;index:idx_objects_bucket_fingerprint,priority:2"`
 	CreatedAt        time.Time  `gorm:"not null;index:idx_objects_bucket_created,priority:3,sort:desc"`
 	UpdatedAt        time.Time  `gorm:"not null"`
+	Bucket           *Bucket    `json:"-" gorm:"foreignKey:BucketName;references:Name;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type UploadSession struct {

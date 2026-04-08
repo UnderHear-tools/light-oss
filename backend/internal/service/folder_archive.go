@@ -32,6 +32,9 @@ func (s *ObjectService) OpenFolderArchive(
 	if err := ValidateFolderPath(folderPath); err != nil {
 		return nil, err
 	}
+	if err := s.ensureBucketExists(ctx, bucketName); err != nil {
+		return nil, err
+	}
 
 	exists, err := s.objectRepo.ExistsActiveWithPrefix(ctx, bucketName, folderPath)
 	if err != nil {

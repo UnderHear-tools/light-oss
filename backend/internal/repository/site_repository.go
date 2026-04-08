@@ -150,6 +150,23 @@ func (r *SiteRepository) Delete(ctx context.Context, id uint64) (bool, error) {
 	return result.RowsAffected > 0, result.Error
 }
 
+func (r *SiteRepository) DeleteByBucket(ctx context.Context, bucketName string) error {
+	siteIDs := r.db.WithContext(ctx).
+		Model(&model.Site{}).
+		Select("id").
+		Where("bucket_name = ?", bucketName)
+
+	if err := r.db.WithContext(ctx).
+		Where("site_id IN (?)", siteIDs).
+		Delete(&model.SiteDomain{}).Error; err != nil {
+		return err
+	}
+
+	return r.db.WithContext(ctx).
+		Where("bucket_name = ?", bucketName).
+		Delete(&model.Site{}).Error
+}
+
 func (r *SiteRepository) replaceDomains(ctx context.Context, siteID uint64, domains []string, now time.Time) error {
 	if err := r.db.WithContext(ctx).Where("site_id = ?", siteID).Delete(&model.SiteDomain{}).Error; err != nil {
 		return err

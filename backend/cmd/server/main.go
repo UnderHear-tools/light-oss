@@ -87,7 +87,7 @@ func main() {
 	objectRepo := repository.NewObjectRepository(gormDB)
 	siteRepo := repository.NewSiteRepository(gormDB)
 	localStorage := storage.NewLocalStorage(cfg.StorageRoot)
-	bucketService := service.NewBucketService(bucketRepo)
+	bucketService := service.NewBucketService(logger, gormDB, bucketRepo, objectRepo, siteRepo, localStorage)
 	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, siteService)

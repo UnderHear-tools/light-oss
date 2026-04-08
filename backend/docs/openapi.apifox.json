@@ -233,6 +233,69 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Buckets"
+        ],
+        "operationId": "deleteBucket",
+        "summary": "Delete a bucket",
+        "description": "Deletes the bucket together with all objects, folder markers, linked sites, and bound domains. Storage file cleanup runs after metadata deletion succeeds.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BucketParam"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bucket deleted. No response body."
+          },
+          "400": {
+            "description": "Bucket name is invalid. Error code: invalid_bucket_name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token. Error code: unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete bucket. Error codes: bucket_lookup_failed, bucket_delete_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/buckets/{bucket}/folders": {
@@ -284,8 +347,18 @@
               }
             }
           },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "500": {
-            "description": "Failed to list folders. Error code: folder_list_failed.",
+            "description": "Failed to list folders. Error codes: bucket_lookup_failed, folder_list_failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -513,7 +586,7 @@
             }
           },
           "404": {
-            "description": "Folder not found. Error code: folder_not_found.",
+            "description": "Bucket or folder not found. Error codes: bucket_not_found, folder_not_found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -523,7 +596,7 @@
             }
           },
           "500": {
-            "description": "Folder archive preparation failed. Error codes: folder_lookup_failed, folder_archive_failed.",
+            "description": "Folder archive preparation failed. Error codes: bucket_lookup_failed, folder_lookup_failed, folder_archive_failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -598,8 +671,18 @@
               }
             }
           },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "500": {
-            "description": "Failed to list explorer entries. Error code: explorer_list_failed.",
+            "description": "Failed to list explorer entries. Error codes: bucket_lookup_failed, explorer_list_failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -671,8 +754,18 @@
               }
             }
           },
+          "404": {
+            "description": "Bucket not found. Error code: bucket_not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "500": {
-            "description": "Failed to list objects. Error code: object_list_failed.",
+            "description": "Failed to list objects. Error codes: bucket_lookup_failed, object_list_failed.",
             "content": {
               "application/json": {
                 "schema": {

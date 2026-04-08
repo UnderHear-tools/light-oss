@@ -69,6 +69,28 @@ describe("BucketObjectsPage", () => {
     });
   });
 
+  it("shows the bucket missing empty state instead of a generic error alert", async () => {
+    vi.mocked(listExplorerEntries).mockRejectedValue(
+      Object.assign(new Error("bucket not found"), {
+        code: "bucket_not_found",
+      }),
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    expect(
+      await screen.findByText("Open this page again from the bucket list."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Failed to load folder entries"),
+    ).not.toBeInTheDocument();
+  });
+
   it("navigates into a directory from the table", async () => {
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({

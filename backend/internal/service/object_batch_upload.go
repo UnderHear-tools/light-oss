@@ -107,6 +107,10 @@ func (s *ObjectService) UploadBatch(
 
 			saved, err := repo.Upsert(ctx, object)
 			if err != nil {
+				if isForeignKeyError(err) {
+					return apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+				}
+
 				return apperrors.Wrap(http.StatusInternalServerError, "object_metadata_failed", "failed to save object metadata", err)
 			}
 

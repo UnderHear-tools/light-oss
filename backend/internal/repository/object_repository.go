@@ -151,6 +151,16 @@ func (r *ObjectRepository) ListActiveKeys(ctx context.Context, bucketName string
 	return keys, err
 }
 
+func (r *ObjectRepository) ListAllByBucket(ctx context.Context, bucketName string) ([]model.Object, error) {
+	var objects []model.Object
+
+	err := r.db.WithContext(ctx).
+		Where("bucket_name = ?", bucketName).
+		Order("id ASC").
+		Find(&objects).Error
+	return objects, err
+}
+
 func (r *ObjectRepository) ExistsActiveWithPrefix(ctx context.Context, bucketName string, prefix string) (bool, error) {
 	var count int64
 
@@ -205,6 +215,12 @@ func (r *ObjectRepository) SoftDeleteByPrefix(ctx context.Context, bucketName st
 			"updated_at": time.Now().UTC(),
 		})
 	return result.RowsAffected, result.Error
+}
+
+func (r *ObjectRepository) HardDeleteByBucket(ctx context.Context, bucketName string) error {
+	return r.db.WithContext(ctx).
+		Where("bucket_name = ?", bucketName).
+		Delete(&model.Object{}).Error
 }
 
 func likePrefixPattern(prefix string) string {

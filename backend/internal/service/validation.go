@@ -256,3 +256,14 @@ func isDuplicateError(err error) bool {
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "duplicate") || strings.Contains(message, "unique constraint failed")
 }
+
+func isForeignKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "foreign key constraint failed") ||
+		strings.Contains(message, "foreign key constraint fails") ||
+		strings.Contains(message, "violates foreign key constraint")
+}

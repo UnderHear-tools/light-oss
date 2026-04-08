@@ -48,7 +48,14 @@ export async function apiEnvelopeRequest<T>(
 ): Promise<ApiEnvelope<T>> {
   try {
     const response =
-      await createApiClient(settings).request<ApiEnvelope<T>>(request);
+      await createApiClient(settings).request<ApiEnvelope<T> | "">(request);
+    if (response.status === 204 || response.data === "") {
+      return {
+        request_id: "",
+        data: undefined as T,
+      };
+    }
+
     return response.data;
   } catch (error) {
     throw normalizeApiError(error);

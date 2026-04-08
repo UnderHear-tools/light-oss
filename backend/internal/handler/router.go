@@ -185,6 +185,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/healthz", handler.healthz)
 	protected.POST("/buckets", handler.createBucket)
 	protected.GET("/buckets", handler.listBuckets)
+	protected.DELETE("/buckets/:bucket", handler.deleteBucket)
 	protected.GET("/buckets/:bucket/folders", handler.listFolders)
 	protected.GET("/buckets/:bucket/folders/archive", handler.downloadFolderArchive)
 	protected.POST("/buckets/:bucket/folders", handler.createFolder)
@@ -258,6 +259,15 @@ func (h *apiHandler) listBuckets(c *gin.Context) {
 	}
 
 	response.JSON(c, http.StatusOK, gin.H{"items": items})
+}
+
+func (h *apiHandler) deleteBucket(c *gin.Context) {
+	if err := h.bucketService.Delete(c.Request.Context(), c.Param("bucket")); err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.NoContent(c, http.StatusNoContent)
 }
 
 func (h *apiHandler) createSite(c *gin.Context) {

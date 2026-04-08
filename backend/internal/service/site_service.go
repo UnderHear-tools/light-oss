@@ -67,6 +67,9 @@ func (s *SiteService) Create(ctx context.Context, input SiteInput) (*model.Site,
 		if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
 			return nil, apperrors.New(http.StatusConflict, "domain_conflict", "domain is already bound to another site")
 		}
+		if isForeignKeyError(err) {
+			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+		}
 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "site_create_failed", "failed to create site", err)
 	}
@@ -115,6 +118,9 @@ func (s *SiteService) Update(ctx context.Context, id uint64, input SiteInput) (*
 		}
 		if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
 			return nil, apperrors.New(http.StatusConflict, "domain_conflict", "domain is already bound to another site")
+		}
+		if isForeignKeyError(err) {
+			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
 		}
 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "site_update_failed", "failed to update site", err)

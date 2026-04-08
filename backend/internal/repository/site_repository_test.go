@@ -18,12 +18,19 @@ func TestSiteRepositoryFindByDomainPreloadsDomains(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Site{}, &model.SiteDomain{}); err != nil {
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("enable sqlite foreign keys: %v", err)
+	}
+	if err := db.AutoMigrate(&model.Bucket{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 
 	repo := NewSiteRepository(db)
 	ctx := context.Background()
+
+	if err := db.Create(&model.Bucket{Name: "websites"}).Error; err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
 
 	var created *model.Site
 	if err := repo.Transaction(ctx, func(txRepo *SiteRepository) error {
@@ -62,12 +69,19 @@ func TestSiteRepositoryDuplicateDomainFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Site{}, &model.SiteDomain{}); err != nil {
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("enable sqlite foreign keys: %v", err)
+	}
+	if err := db.AutoMigrate(&model.Bucket{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 
 	repo := NewSiteRepository(db)
 	ctx := context.Background()
+
+	if err := db.Create(&model.Bucket{Name: "websites"}).Error; err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
 
 	if err := repo.Transaction(ctx, func(txRepo *SiteRepository) error {
 		_, createErr := txRepo.Create(ctx, &model.Site{
