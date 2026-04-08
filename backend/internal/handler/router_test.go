@@ -74,11 +74,12 @@ type folderListResponse struct {
 }
 
 type explorerEntryResponse struct {
-	Type      string  `json:"type"`
-	Path      string  `json:"path"`
-	Name      string  `json:"name"`
-	IsEmpty   *bool   `json:"is_empty"`
-	ObjectKey *string `json:"object_key"`
+	Type      string     `json:"type"`
+	Path      string     `json:"path"`
+	Name      string     `json:"name"`
+	IsEmpty   *bool      `json:"is_empty"`
+	ObjectKey *string    `json:"object_key"`
+	CreatedAt *time.Time `json:"created_at"`
 }
 
 type explorerListResponse struct {
@@ -1372,8 +1373,14 @@ func TestListFoldersAndExplorerEntries(t *testing.T) {
 	if firstEntriesBody.Data.Items[0].IsEmpty == nil || !*firstEntriesBody.Data.Items[0].IsEmpty {
 		t.Fatalf("expected empty directory flag on %+v", firstEntriesBody.Data.Items[0])
 	}
+	if firstEntriesBody.Data.Items[0].CreatedAt != nil {
+		t.Fatalf("expected directory created_at to be nil, got %+v", firstEntriesBody.Data.Items[0].CreatedAt)
+	}
 	if firstEntriesBody.Data.Items[1].Type != "directory" || firstEntriesBody.Data.Items[1].Name != "images" {
 		t.Fatalf("unexpected second directory entry: %+v", firstEntriesBody.Data.Items[1])
+	}
+	if firstEntriesBody.Data.Items[1].CreatedAt != nil {
+		t.Fatalf("expected directory created_at to be nil, got %+v", firstEntriesBody.Data.Items[1].CreatedAt)
 	}
 	if firstEntriesBody.Data.NextCursor == "" {
 		t.Fatalf("expected next cursor for first entries page")
@@ -1399,8 +1406,14 @@ func TestListFoldersAndExplorerEntries(t *testing.T) {
 	if secondEntriesBody.Data.Items[0].Type != "file" || secondEntriesBody.Data.Items[0].Name != "alpha.txt" {
 		t.Fatalf("unexpected file entry: %+v", secondEntriesBody.Data.Items[0])
 	}
+	if secondEntriesBody.Data.Items[0].CreatedAt == nil || secondEntriesBody.Data.Items[0].CreatedAt.IsZero() {
+		t.Fatalf("expected file created_at on %+v", secondEntriesBody.Data.Items[0])
+	}
 	if secondEntriesBody.Data.Items[1].Type != "file" || secondEntriesBody.Data.Items[1].Name != "zeta.txt" {
 		t.Fatalf("unexpected file entry: %+v", secondEntriesBody.Data.Items[1])
+	}
+	if secondEntriesBody.Data.Items[1].CreatedAt == nil || secondEntriesBody.Data.Items[1].CreatedAt.IsZero() {
+		t.Fatalf("expected file created_at on %+v", secondEntriesBody.Data.Items[1])
 	}
 
 	searchReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/tree-bucket/entries?prefix=docs/&search=alp", nil)

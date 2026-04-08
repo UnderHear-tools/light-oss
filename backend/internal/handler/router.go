@@ -116,6 +116,7 @@ type explorerEntryResponse struct {
 	ContentType      *string    `json:"content_type"`
 	ETag             *string    `json:"etag"`
 	Visibility       *string    `json:"visibility"`
+	CreatedAt        *time.Time `json:"created_at"`
 	UpdatedAt        *time.Time `json:"updated_at"`
 }
 
@@ -743,6 +744,7 @@ func explorerEntryToResponse(entry service.ExplorerEntry) explorerEntryResponse 
 	contentType := entry.Object.ContentType
 	etag := entry.Object.ETag
 	visibility := string(entry.Object.Visibility)
+	createdAt := entry.Object.CreatedAt
 	updatedAt := entry.Object.UpdatedAt
 
 	response.ObjectKey = &objectKey
@@ -751,6 +753,7 @@ func explorerEntryToResponse(entry service.ExplorerEntry) explorerEntryResponse 
 	response.ContentType = &contentType
 	response.ETag = &etag
 	response.Visibility = &visibility
+	response.CreatedAt = &createdAt
 	response.UpdatedAt = &updatedAt
 
 	return response

@@ -113,7 +113,7 @@ export function ExplorerTable({
             {t("explorer.table.storageType")}
           </TableHead>
           <TableHead className="w-[220px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.updatedAt")}
+            {t("objects.table.createdAt")}
           </TableHead>
           <TableHead className="w-[180px] text-base font-semibold text-muted-foreground">
             {t("explorer.table.actions")}
@@ -148,7 +148,7 @@ export function ExplorerTable({
               )}
             </TableCell>
             <TableCell className={entry.type === "directory" ? "text-muted-foreground" : undefined}>
-              {entry.type === "directory" ? "-" : formatDate(entry.updated_at, locale)}
+              {entry.type === "directory" ? "-" : formatDate(entry.created_at ?? entry.updated_at, locale)}
             </TableCell>
             <TableCell>
               <div className="flex items-center justify-start gap-1">
@@ -486,9 +486,14 @@ function FileDetailsButton({
                 </div>
               </div>
             </DetailField>
-            <DetailField label={t("explorer.table.updatedAt")}>
-              {formatDate(entry.updated_at, locale)}
-            </DetailField>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <DetailField className="flex-1" label={t("explorer.table.updatedAt")}>
+                {formatDate(entry.updated_at, locale)}
+              </DetailField>
+              <DetailField className="flex-1" label={t("objects.table.createdAt")}>
+                {formatDate(entry.created_at ?? entry.updated_at, locale)}
+              </DetailField>
+            </div>
           </dl>
         </div>
       </DialogContent>
@@ -498,15 +503,17 @@ function FileDetailsButton({
 
 function DetailField({
   children,
+  className,
   label,
   monospace,
 }: {
   children: React.ReactNode;
+  className?: string;
   label: string;
   monospace?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border/70 bg-muted/30 p-3">
+    <div className={cn("min-w-0 rounded-lg border border-border/70 bg-muted/30 p-3", className)}>
       <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
