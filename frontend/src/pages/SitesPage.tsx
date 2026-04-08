@@ -10,6 +10,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { CreateSiteRequest, PublishSiteResult, Site } from "@/api/types";
 import { listBuckets } from "@/api/buckets";
 import {
@@ -21,7 +22,6 @@ import {
   uploadAndPublishSite,
 } from "@/api/sites";
 import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/components/ToastProvider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -69,7 +69,6 @@ import { useAppSettings } from "@/lib/settings";
 export function SitesPage() {
   const { settings } = useAppSettings();
   const { locale, t } = useI18n();
-  const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const [uploadProgress, setUploadProgress] = useState(0);
   const sitesQueryKey = [
@@ -94,13 +93,13 @@ export function SitesPage() {
     mutationFn: (value: SiteFormValue) =>
       createSite(settings, toSiteRequest(value)),
     onSuccess: async () => {
-      pushToast("success", t("toast.siteCreated"));
+      toast.success(t("toast.siteCreated"));
       await queryClient.invalidateQueries({ queryKey: sitesQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.createSite");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -108,13 +107,13 @@ export function SitesPage() {
     mutationFn: (input: { siteId: number; value: SiteFormValue }) =>
       updateSite(settings, input.siteId, toSiteRequest(input.value)),
     onSuccess: async () => {
-      pushToast("success", t("toast.siteUpdated"));
+      toast.success(t("toast.siteUpdated"));
       await queryClient.invalidateQueries({ queryKey: sitesQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.updateSite");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -154,27 +153,27 @@ export function SitesPage() {
     },
     onSuccess: async () => {
       setUploadProgress(0);
-      pushToast("success", t("toast.sitePublished"));
+      toast.success(t("toast.sitePublished"));
       await queryClient.invalidateQueries({ queryKey: sitesQueryKey });
     },
     onError: (error) => {
       setUploadProgress(0);
       const message =
         error instanceof Error ? error.message : t("errors.publishSite");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
   const deleteSiteMutation = useMutation({
     mutationFn: (siteId: number) => deleteSite(settings, siteId),
     onSuccess: async () => {
-      pushToast("success", t("toast.siteDeleted"));
+      toast.success(t("toast.siteDeleted"));
       await queryClient.invalidateQueries({ queryKey: sitesQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.deleteSite");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 

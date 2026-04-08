@@ -14,6 +14,7 @@ import {
 import { forwardRef, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 import type {
   ExplorerDirectoryEntry,
   ExplorerEntry,
@@ -32,7 +33,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ToastProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -302,7 +302,6 @@ function ExplorerEntryUrlCell({
   entry: ExplorerEntry;
 }) {
   const { t } = useI18n();
-  const { pushToast } = useToast();
 
   if (entry.type !== "file" || entry.visibility !== "public") {
     return <span className="text-muted-foreground">-</span>;
@@ -317,9 +316,9 @@ function ExplorerEntryUrlCell({
       }
 
       await navigator.clipboard.writeText(url);
-      pushToast("success", t("toast.urlCopied"));
+      toast.success(t("toast.urlCopied"));
     } catch {
-      pushToast("error", t("errors.copyUrl"));
+      toast.error(t("errors.copyUrl"));
     }
   }
 
@@ -362,7 +361,6 @@ function FileDetailsButton({
   const [currentVisibility, setCurrentVisibility] = useState<ObjectVisibility>(entry.visibility);
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const { locale, t } = useI18n();
-  const { pushToast } = useToast();
   const publicUrl =
     currentVisibility === "public" ? buildPublicUrl(entry.object_key) : "";
   const previewType = getPreviewType(entry);
@@ -381,10 +379,10 @@ function FileDetailsButton({
     try {
       await onUpdateVisibility(entry.object_key, selectedVisibility);
       setCurrentVisibility(selectedVisibility);
-      pushToast("success", t("toast.objectVisibilityUpdated"));
+      toast.success(t("toast.objectVisibilityUpdated"));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("errors.updateObjectVisibility");
-      pushToast("error", message);
+      toast.error(message);
     } finally {
       setIsSavingVisibility(false);
     }

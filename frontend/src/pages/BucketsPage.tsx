@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { CircleAlertIcon } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import type { Site } from "@/api/types";
 import { createBucket, deleteBucket, listBuckets } from "@/api/buckets";
 import { listSites } from "@/api/sites";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ToastProvider";
 import { BucketList } from "@/features/buckets/BucketList";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
@@ -13,7 +13,6 @@ import { useAppSettings } from "@/lib/settings";
 export function BucketsPage() {
   const { settings } = useAppSettings();
   const { t } = useI18n();
-  const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const [deletingBucketName, setDeletingBucketName] = useState("");
   const bucketsQueryKey = [
@@ -42,13 +41,13 @@ export function BucketsPage() {
   const createBucketMutation = useMutation({
     mutationFn: (name: string) => createBucket(settings, name),
     onSuccess: async () => {
-      pushToast("success", t("toast.bucketCreated"));
+      toast.success(t("toast.bucketCreated"));
       await queryClient.invalidateQueries({ queryKey: bucketsQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.createBucket");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -66,7 +65,7 @@ export function BucketsPage() {
           bucketName,
         ],
       });
-      pushToast("success", t("toast.bucketDeleted"));
+      toast.success(t("toast.bucketDeleted"));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: bucketsQueryKey }),
         queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
@@ -75,7 +74,7 @@ export function BucketsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.deleteBucket");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setDeletingBucketName("");

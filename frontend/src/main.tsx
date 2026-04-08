@@ -3,9 +3,9 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AppToaster } from "./components/AppToaster";
 import { SettingsProvider } from "./lib/settings";
 import { PreferencesProvider } from "./lib/preferences";
-import { ToastProvider } from "./components/ToastProvider";
 import { TooltipProvider } from "./components/ui/tooltip";
 import "./styles.css";
 
@@ -16,18 +16,17 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <PreferencesProvider>
-          <ToastProvider>
-            <TooltipProvider delayDuration={150}>
-              <BrowserRouter
-                future={{
-                  v7_relativeSplatPath: true,
-                  v7_startTransition: true,
-                }}
-              >
-                <App />
-              </BrowserRouter>
-            </TooltipProvider>
-          </ToastProvider>
+          <TooltipProvider delayDuration={150}>
+            <BrowserRouter
+              future={{
+                v7_relativeSplatPath: true,
+                v7_startTransition: true,
+              }}
+            >
+              <App />
+            </BrowserRouter>
+          </TooltipProvider>
+          <AppToaster />
         </PreferencesProvider>
       </SettingsProvider>
     </QueryClientProvider>

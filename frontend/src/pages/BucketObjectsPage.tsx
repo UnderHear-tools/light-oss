@@ -9,6 +9,7 @@ import {
   RefreshCcwIcon,
   SearchIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildPublicObjectURL,
@@ -52,7 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ToastProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateFolderDialog } from "@/features/explorer/CreateFolderDialog";
 import { ExplorerTable } from "@/features/explorer/ExplorerTable";
@@ -87,7 +87,6 @@ export function BucketObjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings } = useAppSettings();
   const { t } = useI18n();
-  const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
@@ -152,14 +151,14 @@ export function BucketObjectsPage() {
       }),
     onSuccess: async () => {
       setUploadProgress(0);
-      pushToast("success", t("toast.objectUploaded"));
+      toast.success(t("toast.objectUploaded"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       setUploadProgress(0);
       const message =
         error instanceof Error ? error.message : t("errors.uploadObject");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -174,14 +173,14 @@ export function BucketObjectsPage() {
       }),
     onSuccess: async () => {
       setUploadProgress(0);
-      pushToast("success", t("toast.folderUploaded"));
+      toast.success(t("toast.folderUploaded"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       setUploadProgress(0);
       const message =
         error instanceof Error ? error.message : t("errors.uploadFolder");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -193,13 +192,13 @@ export function BucketObjectsPage() {
         name,
       }),
     onSuccess: async () => {
-      pushToast("success", t("toast.folderCreated"));
+      toast.success(t("toast.folderCreated"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.createFolder");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -239,7 +238,7 @@ export function BucketObjectsPage() {
     },
     onSuccess: async () => {
       setUploadProgress(0);
-      pushToast("success", t("toast.sitePublished"));
+      toast.success(t("toast.sitePublished"));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
         queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
@@ -249,7 +248,7 @@ export function BucketObjectsPage() {
       setUploadProgress(0);
       const message =
         error instanceof Error ? error.message : t("errors.publishSite");
-      pushToast("error", message);
+      toast.error(message);
     },
   });
 
@@ -259,7 +258,7 @@ export function BucketObjectsPage() {
       await deleteObject(settings, bucket, objectKey);
     },
     onSuccess: async () => {
-      pushToast("success", t("toast.objectDeleted"));
+      toast.success(t("toast.objectDeleted"));
       await queryClient.invalidateQueries({
         queryKey: entriesBaseQueryKey,
       });
@@ -267,7 +266,7 @@ export function BucketObjectsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.deleteObject");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setDeletingPath("");
@@ -280,13 +279,13 @@ export function BucketObjectsPage() {
       await deleteFolder(settings, bucket, folderPath, { recursive: true });
     },
     onSuccess: async () => {
-      pushToast("success", t("toast.folderDeleted"));
+      toast.success(t("toast.folderDeleted"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.deleteFolder");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setDeletingPath("");
@@ -300,12 +299,12 @@ export function BucketObjectsPage() {
     },
     onSuccess: (result) => {
       window.open(result.url, "_blank", "noopener");
-      pushToast("success", t("toast.signedDownloadReady"));
+      toast.success(t("toast.signedDownloadReady"));
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.signObject");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setSigningPath("");
@@ -320,7 +319,7 @@ export function BucketObjectsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.downloadFolderZip");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setDownloadingFolderPath("");
@@ -359,12 +358,12 @@ export function BucketObjectsPage() {
       });
     },
     onSuccess: () => {
-      pushToast("success", t("toast.sitePublished"));
+      toast.success(t("toast.sitePublished"));
     },
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.publishSite");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setPublishingPath("");
@@ -387,7 +386,7 @@ export function BucketObjectsPage() {
       });
     },
     onSuccess: async () => {
-      pushToast("success", t("toast.sitePublished"));
+      toast.success(t("toast.sitePublished"));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey }),
         queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
@@ -396,7 +395,7 @@ export function BucketObjectsPage() {
     onError: (error) => {
       const message =
         error instanceof Error ? error.message : t("errors.publishSite");
-      pushToast("error", message);
+      toast.error(message);
     },
     onSettled: () => {
       setPublishingPath("");

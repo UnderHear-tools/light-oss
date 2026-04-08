@@ -1,5 +1,6 @@
 import { FormEvent, useRef, useState } from "react";
 import { ShieldAlertIcon, SlidersHorizontalIcon } from "lucide-react";
+import { toast } from "sonner";
 import { getHealthStatus } from "@/api/health";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,14 +27,12 @@ import {
 } from "@/lib/health";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useToast } from "@/components/ToastProvider";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
 
 export function SettingsPage() {
   const { settings, saveSettings } = useAppSettings();
   const { t } = useI18n();
-  const { pushToast } = useToast();
   const [apiBaseUrl, setApiBaseUrl] = useState(settings.apiBaseUrl);
   const [bearerToken, setBearerToken] = useState(settings.bearerToken);
   const [isBearerTokenVisible, setIsBearerTokenVisible] = useState(false);
@@ -60,7 +59,7 @@ export function SettingsPage() {
       apiBaseUrl: draftSettings.apiBaseUrl,
       bearerToken: draftSettings.bearerToken,
     });
-    pushToast("success", t("toast.settingsSaved"));
+    toast.success(t("toast.settingsSaved"));
   }
 
   async function handleTestConnection() {
