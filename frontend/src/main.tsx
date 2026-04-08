@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
+import "@fontsource-variable/noto-sans-sc";
 import App from "./App";
 import { AppToaster } from "./components/AppToaster";
 import { SettingsProvider } from "./lib/settings";
