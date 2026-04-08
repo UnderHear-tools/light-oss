@@ -10,6 +10,8 @@ import {
   LoaderCircleIcon,
   ShieldAlertIcon,
   Trash2Icon,
+  LockOpenIcon,
+  LockIcon,
 } from "lucide-react";
 import { forwardRef, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -110,7 +112,7 @@ export function ExplorerTable({
             {t("explorer.table.size")}
           </TableHead>
           <TableHead className="w-[160px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.storageType")}
+            {t("objects.form.visibility.label")}
           </TableHead>
           <TableHead className="w-[220px] text-base font-semibold text-muted-foreground">
             {t("objects.table.createdAt")}
@@ -140,10 +142,21 @@ export function ExplorerTable({
               {entry.type === "directory" ? (
                 "-"
               ) : (
-                <Badge variant={entry.visibility === "public" ? "default" : "secondary"}>
-                  {entry.visibility === "public"
-                    ? t("objects.visibility.public")
-                    : t("objects.visibility.private")}
+                <Badge
+                  variant={entry.visibility === "public" ? "outline" : "secondary"}
+                  className="flex items-center"
+                >
+                  {entry.visibility === "public" ? (
+                    <>
+                      <LockOpenIcon data-icon="inline-start" />
+                      {t("objects.visibility.public")}
+                    </>
+                  ) : (
+                    <>
+                      <LockIcon data-icon="inline-start" />
+                      {t("objects.visibility.private")}
+                    </>
+                  )}
                 </Badge>
               )}
             </TableCell>
@@ -446,11 +459,6 @@ function FileDetailsButton({
             </DetailField>
             <DetailField label={t("objects.table.visibility")}>
               <div className="flex flex-col gap-2">
-                <Badge variant={currentVisibility === "public" ? "default" : "secondary"}>
-                  {currentVisibility === "public"
-                    ? t("objects.visibility.public")
-                    : t("objects.visibility.private")}
-                </Badge>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select
                     onValueChange={(value) => setSelectedVisibility(value as ObjectVisibility)}
