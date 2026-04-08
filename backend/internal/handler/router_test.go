@@ -1431,6 +1431,138 @@ func TestListFoldersAndExplorerEntries(t *testing.T) {
 	}
 }
 
+func TestListExplorerEntriesSupportsSorting(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	assertEntryNames := func(items []explorerEntryResponse, expected []string) {
+		t.Helper()
+		if len(items) != len(expected) {
+			t.Fatalf("unexpected entry count: got %d want %d (%+v)", len(items), len(expected), items)
+		}
+
+		for index, item := range items {
+			if item.Name != expected[index] {
+				t.Fatalf("unexpected entries at index %d: got %+v want %s", index, items, expected[index])
+			}
+		}
+	}
+
+	createBucket(t, router, "sort-bucket")
+
+	uploadObject(t, router, "/api/v1/buckets/sort-bucket/objects/docs/bravo.txt", "22", "public")
+	createFolder(t, router, "sort-bucket", "docs/", "empty")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/sort-bucket/objects/docs/delta.txt", "4444", "public")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/sort-bucket/objects/docs/alpha.txt", "1", "public")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/sort-bucket/objects/docs/charlie.txt", "33", "public")
+
+	sizeAscReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&limit=3&sort_by=size&sort_order=asc",
+		nil,
+	)
+	sizeAscReq.Header.Set("Authorization", "Bearer dev-token")
+	sizeAscRec := httptest.NewRecorder()
+	router.ServeHTTP(sizeAscRec, sizeAscReq)
+	if sizeAscRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", sizeAscRec.Code, sizeAscRec.Body.String())
+	}
+
+	var sizeAscBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, sizeAscRec.Body.Bytes(), &sizeAscBody)
+	assertEntryNames(sizeAscBody.Data.Items, []string{"empty", "alpha.txt", "bravo.txt"})
+	if sizeAscBody.Data.Items[0].Type != "directory" {
+		t.Fatalf("expected directory to stay first, got %+v", sizeAscBody.Data.Items[0])
+	}
+	if sizeAscBody.Data.NextCursor == "" {
+		t.Fatalf("expected next cursor for size asc page")
+	}
+
+	sizeAscNextReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&limit=3&sort_by=size&sort_order=asc&cursor="+url.QueryEscape(sizeAscBody.Data.NextCursor),
+		nil,
+	)
+	sizeAscNextReq.Header.Set("Authorization", "Bearer dev-token")
+	sizeAscNextRec := httptest.NewRecorder()
+	router.ServeHTTP(sizeAscNextRec, sizeAscNextReq)
+	if sizeAscNextRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", sizeAscNextRec.Code, sizeAscNextRec.Body.String())
+	}
+
+	var sizeAscNextBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, sizeAscNextRec.Body.Bytes(), &sizeAscNextBody)
+	assertEntryNames(sizeAscNextBody.Data.Items, []string{"charlie.txt", "delta.txt"})
+
+	sizeDescReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&sort_by=size&sort_order=desc",
+		nil,
+	)
+	sizeDescReq.Header.Set("Authorization", "Bearer dev-token")
+	sizeDescRec := httptest.NewRecorder()
+	router.ServeHTTP(sizeDescRec, sizeDescReq)
+	if sizeDescRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", sizeDescRec.Code, sizeDescRec.Body.String())
+	}
+
+	var sizeDescBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, sizeDescRec.Body.Bytes(), &sizeDescBody)
+	assertEntryNames(sizeDescBody.Data.Items, []string{"empty", "delta.txt", "charlie.txt", "bravo.txt", "alpha.txt"})
+
+	createdAscReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&sort_by=created_at&sort_order=asc",
+		nil,
+	)
+	createdAscReq.Header.Set("Authorization", "Bearer dev-token")
+	createdAscRec := httptest.NewRecorder()
+	router.ServeHTTP(createdAscRec, createdAscReq)
+	if createdAscRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", createdAscRec.Code, createdAscRec.Body.String())
+	}
+
+	var createdAscBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, createdAscRec.Body.Bytes(), &createdAscBody)
+	assertEntryNames(createdAscBody.Data.Items, []string{"empty", "bravo.txt", "delta.txt", "alpha.txt", "charlie.txt"})
+
+	createdDescReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&sort_by=created_at&sort_order=desc",
+		nil,
+	)
+	createdDescReq.Header.Set("Authorization", "Bearer dev-token")
+	createdDescRec := httptest.NewRecorder()
+	router.ServeHTTP(createdDescRec, createdDescReq)
+	if createdDescRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", createdDescRec.Code, createdDescRec.Body.String())
+	}
+
+	var createdDescBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, createdDescRec.Body.Bytes(), &createdDescBody)
+	assertEntryNames(createdDescBody.Data.Items, []string{"empty", "charlie.txt", "alpha.txt", "delta.txt", "bravo.txt"})
+
+	invalidCursorReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/sort-bucket/entries?prefix=docs/&limit=3&sort_by=size&sort_order=desc&cursor="+url.QueryEscape(sizeAscBody.Data.NextCursor),
+		nil,
+	)
+	invalidCursorReq.Header.Set("Authorization", "Bearer dev-token")
+	invalidCursorRec := httptest.NewRecorder()
+	router.ServeHTTP(invalidCursorRec, invalidCursorReq)
+	if invalidCursorRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", invalidCursorRec.Code, invalidCursorRec.Body.String())
+	}
+
+	var invalidCursorBody apiEnvelope[struct{}]
+	decodeJSON(t, invalidCursorRec.Body.Bytes(), &invalidCursorBody)
+	if invalidCursorBody.Error == nil || invalidCursorBody.Error.Code != "invalid_cursor" {
+		t.Fatalf("expected invalid_cursor, got %+v", invalidCursorBody.Error)
+	}
+}
+
 func TestCreateAndDeleteFolder(t *testing.T) {
 	router := newTestRouter(t, 1024)
 

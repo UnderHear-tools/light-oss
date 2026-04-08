@@ -153,6 +153,205 @@ describe("BucketObjectsPage", () => {
     });
   });
 
+  it("applies explorer sorting from the popover and only refetches after confirmation", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "file",
+          path: "docs/readme.txt",
+          name: "readme.txt",
+          is_empty: null,
+          object_key: "docs/readme.txt",
+          original_filename: "readme.txt",
+          size: 12,
+          content_type: "text/plain",
+          etag: "abcdef1234567890",
+          visibility: "public",
+          updated_at: "2026-03-25T00:00:00Z",
+        },
+      ],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?cursor=cursor-1" },
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          cursor: "cursor-1",
+          sortBy: "",
+          sortOrder: "",
+        }),
+      );
+    });
+
+    const initialCallCount = vi.mocked(listExplorerEntries).mock.calls.length;
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Sort Size: not sorted" }),
+    );
+
+    const sizeTitle = await screen.findByText("Sort by Size");
+    const sizePopover = sizeTitle.closest(
+      "[data-slot='popover-content']",
+    ) as HTMLElement | null;
+    expect(sizePopover).not.toBeNull();
+    expect(
+      within(sizePopover!).getByText(
+        "Choose an order and confirm to apply it.",
+      ),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenCalledTimes(initialCallCount);
+    });
+
+    await userEvent.click(
+      within(sizePopover!).getByRole("radio", { name: "Descending" }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenCalledTimes(initialCallCount);
+    });
+
+    await userEvent.click(
+      within(sizePopover!).getByRole("button", { name: "Cancel" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Sort by Size")).not.toBeInTheDocument();
+      expect(listExplorerEntries).toHaveBeenCalledTimes(initialCallCount);
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sort Size: not sorted" }),
+    );
+
+    const reopenedSizeTitle = await screen.findByText("Sort by Size");
+    const reopenedSizePopover = reopenedSizeTitle.closest(
+      "[data-slot='popover-content']",
+    ) as HTMLElement | null;
+    expect(reopenedSizePopover).not.toBeNull();
+
+    await userEvent.click(
+      within(reopenedSizePopover!).getByRole("button", { name: "Apply" }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          cursor: "",
+          sortBy: "size",
+          sortOrder: "asc",
+        }),
+      );
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "Sort Size: ascending" }),
+    ).toBeInTheDocument();
+
+    const appliedAscCallCount =
+      vi.mocked(listExplorerEntries).mock.calls.length;
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sort Size: ascending" }),
+    );
+
+    const descendingSizeTitle = await screen.findByText("Sort by Size");
+    const descendingSizePopover = descendingSizeTitle.closest(
+      "[data-slot='popover-content']",
+    ) as HTMLElement | null;
+    expect(descendingSizePopover).not.toBeNull();
+
+    await userEvent.click(
+      within(descendingSizePopover!).getByRole("radio", {
+        name: "Descending",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenCalledTimes(appliedAscCallCount);
+    });
+
+    await userEvent.click(
+      within(descendingSizePopover!).getByRole("button", { name: "Apply" }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          cursor: "",
+          sortBy: "size",
+          sortOrder: "desc",
+        }),
+      );
+    });
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Sort Created: not sorted" }),
+    );
+
+    const createdTitle = await screen.findByText("Sort by Created");
+    const createdPopover = createdTitle.closest(
+      "[data-slot='popover-content']",
+    ) as HTMLElement | null;
+    expect(createdPopover).not.toBeNull();
+
+    await userEvent.click(
+      within(createdPopover!).getByRole("button", { name: "Apply" }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          cursor: "",
+          sortBy: "created_at",
+          sortOrder: "asc",
+        }),
+      );
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sort Created: ascending" }),
+    );
+
+    const clearTitle = await screen.findByText("Sort by Created");
+    const clearPopover = clearTitle.closest(
+      "[data-slot='popover-content']",
+    ) as HTMLElement | null;
+    expect(clearPopover).not.toBeNull();
+
+    await userEvent.click(
+      within(clearPopover!).getByRole("button", { name: "Clear sorting" }),
+    );
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          cursor: "",
+          sortBy: "",
+          sortOrder: "",
+        }),
+      );
+    });
+  });
+
   it("downloads a directory archive and only disables the active row action", async () => {
     let resolveDownload: (() => void) | undefined;
     vi.mocked(listExplorerEntries).mockResolvedValue({

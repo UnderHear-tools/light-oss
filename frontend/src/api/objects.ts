@@ -11,6 +11,7 @@ import type {
   SignedDownloadResult,
 } from "./types";
 import { buildFolderUploadManifest } from "../lib/folder-upload";
+import type { ExplorerSortBy, ExplorerSortOrder } from "../lib/explorer";
 
 export interface ListObjectsParams {
   bucket: string;
@@ -41,6 +42,8 @@ export interface ListExplorerEntriesParams {
   search: string;
   limit: number;
   cursor: string;
+  sortBy: ExplorerSortBy | "";
+  sortOrder: ExplorerSortOrder | "";
 }
 
 export interface CreateFolderParams {
@@ -83,6 +86,8 @@ export function listExplorerEntries(
       search: params.search || undefined,
       limit: params.limit,
       cursor: params.cursor || undefined,
+      sort_by: params.sortBy || undefined,
+      sort_order: params.sortOrder || undefined,
     },
   });
 }
