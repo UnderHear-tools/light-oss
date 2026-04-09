@@ -166,11 +166,19 @@ describe("BucketsPage", () => {
 
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText("Delete bucket?")).toBeInTheDocument();
-    expect(within(dialog).getByText("Root prefix: docs/")).toBeInTheDocument();
     expect(
-      within(dialog).getByText(
-        "Domains: demo.underhear.cn, www.underhear.cn",
-      ),
+      within(dialog).getByText((_, element) => {
+        return element?.textContent === "Root prefix: docs/";
+      }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("docs/")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText((_, element) => {
+        return (
+          element?.textContent ===
+          "Domains: demo.underhear.cn, www.underhear.cn"
+        );
+      }),
     ).toBeInTheDocument();
 
     const confirmButton = within(dialog).getByRole("button", {
@@ -208,7 +216,7 @@ describe("BucketsPage", () => {
   });
 
   it("disables bucket deletion when the site list fails to load", async () => {
-    vi.mocked(listBuckets).mockResolvedValueOnce({
+    vi.mocked(listBuckets).mockResolvedValue({
       items: [
         {
           id: 1,
@@ -227,7 +235,8 @@ describe("BucketsPage", () => {
       { route: "/buckets" },
     );
 
-    expect(await screen.findByText("site load failed")).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("site load failed")).toBeInTheDocument();
     const deleteButtons = await screen.findAllByRole("button", {
       name: "Delete",
     });

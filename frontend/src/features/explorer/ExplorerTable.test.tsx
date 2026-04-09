@@ -138,6 +138,57 @@ describe("ExplorerTable", () => {
     expect(await screen.findByText("Delete folder?")).toBeInTheDocument();
   });
 
+  it("applies wrap-anywhere classes to long file names in details dialogs", async () => {
+    const longFileName =
+      "averyveryveryveryveryveryveryveryveryveryveryverylongfilenamewithoutspaces.txt";
+
+    renderExplorerTable(
+      createFileEntry({
+        content_type: "text/plain",
+        name: longFileName,
+        object_key: `docs/${longFileName}`,
+        original_filename: longFileName,
+        path: `docs/${longFileName}`,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: longFileName }));
+
+    const dialog = await screen.findByRole("dialog");
+    const title = within(dialog).getByRole("heading", { name: "File details" });
+    const originalFilenameValue = within(dialog).getByText((_, element) => {
+      return element?.tagName === "DD" && element.textContent === longFileName;
+    });
+
+    expect(title.className).toContain("[overflow-wrap:anywhere]");
+    expect(originalFilenameValue.className).toContain("[overflow-wrap:anywhere]");
+  });
+
+  it("uses shared wrap-anywhere classes for long object keys in delete dialogs", async () => {
+    const longObjectKey =
+      "docs/averyveryveryveryveryveryveryveryveryveryveryveryveryveryveryverylongobjectkey.txt";
+
+    renderExplorerTable(
+      createFileEntry({
+        object_key: longObjectKey,
+        path: longObjectKey,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    const description = within(dialog).getByText((_, element) => {
+      return (
+        element?.getAttribute("data-slot") === "alert-dialog-description" &&
+        element.textContent?.includes(longObjectKey) === true
+      );
+    });
+
+    expect(description.className).toContain("[overflow-wrap:anywhere]");
+  });
+
   it("renders markdown previews as markdown content", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -214,11 +214,15 @@ function DeleteBucketButton({
                   <div className="grid gap-1 text-sm" key={site.id}>
                     <div>
                       {t("sites.table.rootPrefix")}:{" "}
-                      {site.root_prefix || t("explorer.rootFolder")}
+                      <span className="[overflow-wrap:anywhere]">
+                        {site.root_prefix || t("explorer.rootFolder")}
+                      </span>
                     </div>
                     <div>
                       {t("sites.table.domains")}:{" "}
-                      {site.domains.join(", ") || t("common.noData")}
+                      <span className="[overflow-wrap:anywhere]">
+                        {site.domains.join(", ") || t("common.noData")}
+                      </span>
                     </div>
                   </div>
                 ))}
