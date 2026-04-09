@@ -925,7 +925,7 @@ function PreviewFullscreenButton({
       </DialogTrigger>
       <DialogContent
         aria-describedby={undefined}
-        className="flex h-[96vh] w-[96vw] max-w-none flex-col gap-3 p-5"
+        className="flex h-[96vh] w-[96vw] max-w-[1300px] flex-col gap-3 p-5"
       >
         <DialogHeader className="pr-10">
           <DialogTitle>{fileName}</DialogTitle>
