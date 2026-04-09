@@ -15,12 +15,14 @@ export function PublishObjectSiteDialog({
   pending,
   onSubmit,
   trigger,
+  triggerTooltipLabel,
 }: {
   bucket: string;
   objectKey: string;
   pending: boolean;
   onSubmit: (value: PublishObjectSiteValue) => Promise<void>;
   trigger?: ReactNode;
+  triggerTooltipLabel?: string;
 }) {
   const { t } = useI18n();
   const { indexDocument, rootPrefix } = resolveSiteLocation(objectKey);
@@ -51,6 +53,7 @@ export function PublishObjectSiteDialog({
       submitLabel={t("explorer.actions.publishSite")}
       title={t("sites.publishObject.title")}
       trigger={trigger}
+      triggerTooltipLabel={triggerTooltipLabel}
     />
   );
 }

@@ -702,6 +702,11 @@
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AllowOverwriteHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -753,6 +758,16 @@
               }
             }
           },
+          "409": {
+            "description": "存在同名对象且未允许覆盖。错误代码：object_exists。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "413": {
             "description": "请求正文超过配置的上传大小。错误代码： payload_too_large。",
             "content": {
@@ -764,7 +779,7 @@
             }
           },
           "500": {
-            "description": "批量上传失败。错误代码可能包括 bucket_lookup_failed、batch_file_buffer_failed、batch_file_open_failed、object_store_failed、object_metadata_failed。",
+            "description": "批量上传失败。错误代码可能包括 bucket_lookup_failed、object_lookup_failed、batch_file_buffer_failed、batch_file_open_failed、object_store_failed、object_metadata_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -954,8 +969,8 @@
           "对象"
         ],
         "operationId": "uploadObject",
-        "summary": "上传或替换对象",
-        "description": "请求体会直接以流式方式写入存储。省略时，`X-Object-Visibility` 默认为 `private`。",
+        "summary": "上传对象",
+        "description": "请求体会直接以流式方式写入存储。省略时，`X-Object-Visibility` 默认为 `private`，`X-Allow-Overwrite` 默认为 `false`。",
         "security": [
           {
             "bearerAuth": []
@@ -964,6 +979,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/UploadVisibilityHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AllowOverwriteHeader"
           },
           {
             "$ref": "#/components/parameters/OriginalFilenameHeader"
@@ -1021,6 +1039,16 @@
               }
             }
           },
+          "409": {
+            "description": "对象键已存在且未允许覆盖。错误代码：object_exists。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "413": {
             "description": "请求正文超过配置的上传大小。错误代码： payload_too_large。",
             "content": {
@@ -1032,7 +1060,7 @@
             }
           },
           "500": {
-            "description": "上传失败。错误代码： bucket_lookup_failed、object_store_failed、object_metadata_failed。",
+            "description": "上传失败。错误代码： bucket_lookup_failed、object_lookup_failed、object_store_failed、object_metadata_failed。",
             "content": {
               "application/json": {
                 "schema": {
@@ -1920,6 +1948,19 @@
           "enum": [
             "public",
             "private"
+          ]
+        }
+      },
+      "AllowOverwriteHeader": {
+        "name": "X-Allow-Overwrite",
+        "in": "header",
+        "required": false,
+        "description": "是否允许覆盖同对象键的已存在对象。省略时默认为 `false`。",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
           ]
         }
       },

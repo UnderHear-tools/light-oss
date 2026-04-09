@@ -28,6 +28,7 @@ type UploadObjectInput struct {
 	BucketName       string
 	ObjectKey        string
 	Visibility       string
+	AllowOverwrite   bool
 	OriginalFilename string
 	ContentType      string
 	Body             io.Reader
@@ -74,6 +75,16 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 
 	if err := s.ensureBucketExists(ctx, input.BucketName); err != nil {
 		return nil, err
+	}
+
+	if !input.AllowOverwrite {
+		exists, err := s.objectRepo.ExistsActive(ctx, input.BucketName, input.ObjectKey)
+		if err != nil {
+			return nil, apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
+		}
+		if exists {
+			return nil, apperrors.New(http.StatusConflict, "object_exists", "object already exists; set X-Allow-Overwrite=true to overwrite")
+		}
 	}
 
 	stored, err := s.storage.Save(ctx, input.Body)

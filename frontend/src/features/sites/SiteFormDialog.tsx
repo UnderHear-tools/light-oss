@@ -12,6 +12,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Field,
   FieldDescription,
   FieldGroup,
@@ -77,6 +82,7 @@ export function SiteFormDialog({
   submitLabel,
   title,
   trigger,
+  triggerTooltipLabel,
 }: {
   buckets?: Bucket[];
   description: string;
@@ -92,6 +98,7 @@ export function SiteFormDialog({
   submitLabel?: string;
   title: string;
   trigger?: ReactNode;
+  triggerTooltipLabel?: string;
 }) {
   const resolvedBuckets = buckets ?? emptyBuckets;
   const [open, setOpen] = useState(false);
@@ -135,6 +142,12 @@ export function SiteFormDialog({
     (mode === "create"
       ? t("sites.form.submitCreate")
       : t("sites.form.submitUpdate"));
+  const resolvedTrigger = trigger ?? (
+    <Button type="button" variant="outline">
+      <GlobeIcon data-icon="inline-start" />
+      {resolvedSubmitLabel}
+    </Button>
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -160,14 +173,23 @@ export function SiteFormDialog({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button type="button" variant="outline">
-            <GlobeIcon data-icon="inline-start" />
-            {resolvedSubmitLabel}
-          </Button>
-        )}
-      </DialogTrigger>
+      {triggerTooltipLabel ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent
+            className="whitespace-nowrap leading-none"
+            sideOffset={6}
+          >
+            {triggerTooltipLabel}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
+      )}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

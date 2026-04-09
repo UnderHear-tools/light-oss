@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { LoaderCircleIcon, UploadIcon } from "lucide-react";
 import type { ObjectVisibility } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -40,17 +40,32 @@ export function UploadObjectDialog({
   onSubmit,
   pending,
   progress,
+  resetSignal,
 }: {
   currentPrefix: string;
   onSubmit: (value: UploadDialogValue) => Promise<void>;
   pending: boolean;
   progress: number;
+  resetSignal?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [objectKey, setObjectKey] = useState("");
   const [visibility, setVisibility] = useState<ObjectVisibility>("private");
   const { t } = useI18n();
+
+  function resetDialogState() {
+    setSelectedFile(null);
+    setObjectKey("");
+    setVisibility("private");
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    if (typeof resetSignal === "number") {
+      resetDialogState();
+    }
+  }, [resetSignal]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +80,7 @@ export function UploadObjectDialog({
         visibility,
       });
 
-      setSelectedFile(null);
-      setObjectKey("");
-      setVisibility("private");
-      setOpen(false);
+      resetDialogState();
     } catch {
       return;
     }

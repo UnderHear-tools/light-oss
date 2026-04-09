@@ -25,6 +25,7 @@ export interface UploadObjectParams {
   objectKey: string;
   file: File;
   visibility: ObjectVisibility;
+  allowOverwrite?: boolean;
   onProgress?: (value: number) => void;
 }
 
@@ -33,6 +34,7 @@ export interface UploadFolderParams {
   prefix: string;
   files: File[];
   visibility: ObjectVisibility;
+  allowOverwrite?: boolean;
   onProgress?: (value: number) => void;
 }
 
@@ -122,6 +124,29 @@ export function deleteFolder(
   });
 }
 
+export async function checkObjectExists(
+  settings: AppSettings,
+  bucket: string,
+  objectKey: string,
+) {
+  try {
+    await createApiClient(settings).request({
+      method: "HEAD",
+      url: `/api/v1/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKey(
+        objectKey,
+      )}`,
+    });
+
+    return true;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return false;
+    }
+
+    throw normalizeRequestError(error, "Failed to check object existence");
+  }
+}
+
 export async function uploadObject(
   settings: AppSettings,
   params: UploadObjectParams,
@@ -138,6 +163,7 @@ export async function uploadObject(
         "Content-Type": resolveUploadContentType(params.file),
         "X-Object-Visibility": params.visibility,
         "X-Original-Filename": encodeHeaderFilename(params.file.name),
+        "X-Allow-Overwrite": params.allowOverwrite ? "true" : "false",
       },
       onUploadProgress: (event: AxiosProgressEvent) => {
         if (!params.onProgress || !event.total) {
@@ -149,13 +175,7 @@ export async function uploadObject(
 
     return response.data.data as ObjectItem;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Upload failed");
+    throw normalizeRequestError(error, "Upload failed");
   }
 }
 
@@ -189,6 +209,9 @@ export async function uploadFolder(
       url: `/api/v1/buckets/${encodeURIComponent(params.bucket)}/objects/batch`,
       timeout: 0,
       data: formData,
+      headers: {
+        "X-Allow-Overwrite": params.allowOverwrite ? "true" : "false",
+      },
       onUploadProgress: (event: AxiosProgressEvent) => {
         if (!params.onProgress || !event.total) {
           return;
@@ -199,13 +222,7 @@ export async function uploadFolder(
 
     return response.data.data as BatchUploadResult;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Upload failed");
+    throw normalizeRequestError(error, "Upload failed");
   }
 }
 
@@ -394,6 +411,32 @@ async function normalizeBlobDownloadError(
       payload && typeof payload === "object"
         ? (payload as { error?: { code?: string; message?: string } })
         : undefined;
+    return new ApiError(
+      parsed?.error?.message ?? error.message ?? fallbackMessage,
+      status,
+      parsed?.error?.code,
+    );
+  }
+
+  if (error instanceof Error) {
+    return new ApiError(error.message, 500);
+  }
+
+  return new ApiError(fallbackMessage, 500);
+}
+
+function normalizeRequestError(error: unknown, fallbackMessage: string) {
+  if (error instanceof ApiError) {
+    return error;
+  }
+
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status ?? 500;
+    const parsed =
+      error.response?.data && typeof error.response.data === "object"
+        ? (error.response.data as { error?: { code?: string; message?: string } })
+        : undefined;
+
     return new ApiError(
       parsed?.error?.message ?? error.message ?? fallbackMessage,
       status,

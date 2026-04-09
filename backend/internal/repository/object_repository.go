@@ -89,6 +89,38 @@ func (r *ObjectRepository) FindActive(ctx context.Context, bucketName string, ob
 	return &object, nil
 }
 
+func (r *ObjectRepository) ExistsActive(ctx context.Context, bucketName string, objectKey string) (bool, error) {
+	var count int64
+
+	err := r.db.WithContext(ctx).
+		Model(&model.Object{}).
+		Where("bucket_name = ? AND object_key = ? AND is_deleted = ?", bucketName, objectKey, false).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (r *ObjectRepository) ListExistingActiveKeys(ctx context.Context, bucketName string, objectKeys []string) ([]string, error) {
+	if len(objectKeys) == 0 {
+		return []string{}, nil
+	}
+
+	var keys []string
+	err := r.db.WithContext(ctx).
+		Model(&model.Object{}).
+		Where("bucket_name = ? AND is_deleted = ?", bucketName, false).
+		Where("object_key IN ?", objectKeys).
+		Pluck("object_key", &keys).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
 func (r *ObjectRepository) FindAnyActiveByFingerprint(ctx context.Context, fileFingerprint string) (*model.Object, error) {
 	var object model.Object
 	err := r.db.WithContext(ctx).

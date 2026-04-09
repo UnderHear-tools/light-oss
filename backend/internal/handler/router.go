@@ -164,7 +164,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     deps.Config.CORSAllowedOrigins,
 		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
-		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Object-Visibility", "X-Original-Filename", "X-Request-ID"},
+		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Object-Visibility", "X-Original-Filename", "X-Allow-Overwrite", "X-Request-ID"},
 		ExposeHeaders:    []string{"Content-Disposition", "Content-Length", "Content-Type", "ETag", "X-Request-ID", "X-Object-Visibility", "X-Original-Filename"},
 		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
@@ -448,10 +448,17 @@ func (h *apiHandler) listExplorerEntries(c *gin.Context) {
 }
 
 func (h *apiHandler) uploadObject(c *gin.Context) {
+	allowOverwrite, err := parseOptionalBool(c.GetHeader("X-Allow-Overwrite"))
+	if err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "X-Allow-Overwrite must be true or false"))
+		return
+	}
+
 	object, err := h.objectService.Upload(c.Request.Context(), service.UploadObjectInput{
 		BucketName:       c.Param("bucket"),
 		ObjectKey:        normalizeObjectKey(c.Param("key")),
 		Visibility:       c.GetHeader("X-Object-Visibility"),
+		AllowOverwrite:   allowOverwrite,
 		OriginalFilename: c.GetHeader("X-Original-Filename"),
 		ContentType:      c.GetHeader("Content-Type"),
 		Body:             c.Request.Body,
@@ -765,12 +772,16 @@ func normalizeObjectKey(raw string) string {
 	return strings.TrimPrefix(raw, "/")
 }
 
-func parseOptionalBoolQuery(raw string) (bool, error) {
+func parseOptionalBool(raw string) (bool, error) {
 	if strings.TrimSpace(raw) == "" {
 		return false, nil
 	}
 
 	return strconv.ParseBool(raw)
+}
+
+func parseOptionalBoolQuery(raw string) (bool, error) {
+	return parseOptionalBool(raw)
 }
 
 func siteInputFromRequest(req siteRequest) service.SiteInput {

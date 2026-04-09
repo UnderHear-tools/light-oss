@@ -795,6 +795,11 @@
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AllowOverwriteHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -846,6 +851,16 @@
               }
             }
           },
+          "409": {
+            "description": "One or more object keys already exist and overwrite was not allowed. Error code: object_exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
             "content": {
@@ -857,7 +872,7 @@
             }
           },
           "500": {
-            "description": "Batch upload failed. Error codes may include bucket_lookup_failed, batch_file_buffer_failed, batch_file_open_failed, object_store_failed, object_metadata_failed.",
+            "description": "Batch upload failed. Error codes may include bucket_lookup_failed, object_lookup_failed, batch_file_buffer_failed, batch_file_open_failed, object_store_failed, object_metadata_failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1047,8 +1062,8 @@
           "Objects"
         ],
         "operationId": "uploadObject",
-        "summary": "Upload or replace an object",
-        "description": "The request body is streamed directly into storage. X-Object-Visibility defaults to private when omitted.",
+        "summary": "Upload an object",
+        "description": "The request body is streamed directly into storage. X-Object-Visibility defaults to private when omitted. X-Allow-Overwrite defaults to false when omitted.",
         "security": [
           {
             "bearerAuth": []
@@ -1057,6 +1072,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/UploadVisibilityHeader"
+          },
+          {
+            "$ref": "#/components/parameters/AllowOverwriteHeader"
           },
           {
             "$ref": "#/components/parameters/OriginalFilenameHeader"
@@ -1114,6 +1132,16 @@
               }
             }
           },
+          "409": {
+            "description": "Object key already exists and overwrite was not allowed. Error code: object_exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Request body exceeds the configured upload size. Error code: payload_too_large.",
             "content": {
@@ -1125,7 +1153,7 @@
             }
           },
           "500": {
-            "description": "Upload failed. Error codes: bucket_lookup_failed, object_store_failed, object_metadata_failed.",
+            "description": "Upload failed. Error codes: bucket_lookup_failed, object_lookup_failed, object_store_failed, object_metadata_failed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2013,6 +2041,19 @@
           "enum": [
             "public",
             "private"
+          ]
+        }
+      },
+      "AllowOverwriteHeader": {
+        "name": "X-Allow-Overwrite",
+        "in": "header",
+        "required": false,
+        "description": "Whether to allow replacing existing objects with the same key. Defaults to false when omitted.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "true",
+            "false"
           ]
         }
       },
