@@ -11,6 +11,7 @@ import {
   FolderOpenIcon,
   GlobeIcon,
   LoaderCircleIcon,
+  MoreHorizontalIcon,
   ShieldAlertIcon,
   Trash2Icon,
   LockOpenIcon,
@@ -47,6 +48,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -254,87 +262,32 @@ export function ExplorerTable({
                 : formatDate(entry.created_at ?? entry.updated_at, locale)}
             </TableCell>
             <TableCell>
-              <div className="flex items-center justify-start gap-1">
-                {entry.type === "directory" ? (
-                  <>
-                    <ExplorerIconButton
-                      label={t("explorer.actions.openFolder")}
-                      onClick={() => onOpenDirectory(entry.path)}
-                    >
-                      <FolderOpenIcon className="text-amber-500" />
-                    </ExplorerIconButton>
-
-                    <DownloadFolderZipButton
-                      downloadingFolderPath={downloadingFolderPath}
-                      entry={entry}
-                      onDownloadFolder={onDownloadFolder}
-                    />
-
-                    <PublishFolderSiteButton
-                      bucket={bucket}
-                      entry={entry}
-                      onPublishSite={onPublishSite}
-                      publishingPath={publishingPath}
-                    />
-
-                    <DeleteFolderButton
-                      bucket={bucket}
-                      deletingPath={deletingPath}
-                      entry={entry}
-                      onDeleteFolder={onDeleteFolder}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <FileDetailsButton
-                      buildPublicUrl={buildPublicUrl}
-                      entry={entry}
-                      onUpdateVisibility={onUpdateVisibility}
-                    >
-                      <ExplorerIconButton
-                        label={t("explorer.actions.viewDetails")}
-                      >
-                        <EyeIcon className="text-muted-foreground" />
-                      </ExplorerIconButton>
-                    </FileDetailsButton>
-
-                    {entry.visibility === "public" ? (
-                      <ExplorerIconLink
-                        href={buildPublicUrl(entry.object_key)}
-                        label={t("explorer.actions.directDownload")}
-                      >
-                        <DownloadIcon className="text-sky-500" />
-                      </ExplorerIconLink>
-                    ) : (
-                      <ExplorerIconButton
-                        disabled={signingPath === entry.path}
-                        label={t("explorer.actions.signedDownload")}
-                        onClick={() => void onSignDownload(entry.object_key)}
-                      >
-                        {signingPath === entry.path ? (
-                          <LoaderCircleIcon className="animate-spin text-sky-500" />
-                        ) : (
-                          <DownloadIcon className="text-sky-500" />
-                        )}
-                      </ExplorerIconButton>
-                    )}
-
-                    <PublishObjectSiteButton
-                      bucket={bucket}
-                      entry={entry}
-                      onPublishObjectSite={onPublishObjectSite}
-                      publishingPath={publishingPath}
-                    />
-
-                    <DeleteFileButton
-                      bucket={bucket}
-                      deletingPath={deletingPath}
-                      entry={entry}
-                      onDeleteFile={onDeleteFile}
-                    />
-                  </>
-                )}
-              </div>
+              {entry.type === "directory" ? (
+                <ExplorerDirectoryActions
+                  bucket={bucket}
+                  deletingPath={deletingPath}
+                  downloadingFolderPath={downloadingFolderPath}
+                  entry={entry}
+                  onDeleteFolder={onDeleteFolder}
+                  onDownloadFolder={onDownloadFolder}
+                  onOpenDirectory={onOpenDirectory}
+                  onPublishSite={onPublishSite}
+                  publishingPath={publishingPath}
+                />
+              ) : (
+                <ExplorerFileActions
+                  bucket={bucket}
+                  buildPublicUrl={buildPublicUrl}
+                  deletingPath={deletingPath}
+                  entry={entry}
+                  onDeleteFile={onDeleteFile}
+                  onPublishObjectSite={onPublishObjectSite}
+                  onSignDownload={onSignDownload}
+                  onUpdateVisibility={onUpdateVisibility}
+                  publishingPath={publishingPath}
+                  signingPath={signingPath}
+                />
+              )}
             </TableCell>
           </TableRow>
         ))}
@@ -396,6 +349,198 @@ function ExplorerEntryName({
 
   const exhaustiveEntry: never = entry;
   return exhaustiveEntry;
+}
+
+function ExplorerDirectoryActions({
+  bucket,
+  deletingPath,
+  downloadingFolderPath,
+  entry,
+  onDeleteFolder,
+  onDownloadFolder,
+  onOpenDirectory,
+  onPublishSite,
+  publishingPath,
+}: {
+  bucket: string;
+  deletingPath: string;
+  downloadingFolderPath: string;
+  entry: ExplorerDirectoryEntry;
+  onDeleteFolder: (folderPath: string) => Promise<void>;
+  onDownloadFolder: (folderPath: string) => Promise<void>;
+  onOpenDirectory: (folderPath: string) => void;
+  onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
+  publishingPath: string;
+}) {
+  const { t } = useI18n();
+  const deleting = deletingPath === entry.path;
+
+  return (
+    <div className="flex items-center justify-start gap-1">
+      <ExplorerIconButton
+        label={t("explorer.actions.openFolder")}
+        onClick={() => onOpenDirectory(entry.path)}
+      >
+        <FolderOpenIcon className="text-amber-500" />
+      </ExplorerIconButton>
+
+      <DownloadFolderZipButton
+        downloadingFolderPath={downloadingFolderPath}
+        entry={entry}
+        onDownloadFolder={onDownloadFolder}
+      />
+
+      <PublishFolderSiteButton
+        bucket={bucket}
+        entry={entry}
+        onPublishSite={onPublishSite}
+        publishingPath={publishingPath}
+      />
+
+      <ExplorerOverflowMenu label={t("explorer.actions.more")}>
+        <DeleteFolderButton
+          bucket={bucket}
+          deletingPath={deletingPath}
+          entry={entry}
+          onDeleteFolder={onDeleteFolder}
+          trigger={
+            <DropdownMenuItem
+              className="cursor-pointer"
+              disabled={deleting}
+              onSelect={(event) => event.preventDefault()}
+              variant="destructive"
+            >
+              {deleting ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+              {t("explorer.actions.deleteFolder")}
+            </DropdownMenuItem>
+          }
+        />
+      </ExplorerOverflowMenu>
+    </div>
+  );
+}
+
+function ExplorerFileActions({
+  bucket,
+  buildPublicUrl,
+  deletingPath,
+  entry,
+  onDeleteFile,
+  onPublishObjectSite,
+  onSignDownload,
+  onUpdateVisibility,
+  publishingPath,
+  signingPath,
+}: {
+  bucket: string;
+  buildPublicUrl: (objectKey: string) => string;
+  deletingPath: string;
+  entry: ExplorerFileEntry;
+  onDeleteFile: (objectKey: string) => Promise<void>;
+  onPublishObjectSite: (
+    objectKey: string,
+    value: PublishObjectSiteValue,
+  ) => Promise<void>;
+  onSignDownload: (objectKey: string) => Promise<void>;
+  onUpdateVisibility: (
+    objectKey: string,
+    visibility: ObjectVisibility,
+  ) => Promise<void>;
+  publishingPath: string;
+  signingPath: string;
+}) {
+  const { t } = useI18n();
+  const deleting = deletingPath === entry.object_key;
+
+  return (
+    <div className="flex items-center justify-start gap-1">
+      <FileDetailsButton
+        buildPublicUrl={buildPublicUrl}
+        entry={entry}
+        onUpdateVisibility={onUpdateVisibility}
+      >
+        <ExplorerIconButton label={t("explorer.actions.viewDetails")}>
+          <EyeIcon className="text-muted-foreground" />
+        </ExplorerIconButton>
+      </FileDetailsButton>
+
+      {entry.visibility === "public" ? (
+        <ExplorerIconLink
+          href={buildPublicUrl(entry.object_key)}
+          label={t("explorer.actions.directDownload")}
+        >
+          <DownloadIcon className="text-sky-500" />
+        </ExplorerIconLink>
+      ) : (
+        <ExplorerIconButton
+          disabled={signingPath === entry.path}
+          label={t("explorer.actions.signedDownload")}
+          onClick={() => void onSignDownload(entry.object_key)}
+        >
+          {signingPath === entry.path ? (
+            <LoaderCircleIcon className="animate-spin text-sky-500" />
+          ) : (
+            <DownloadIcon className="text-sky-500" />
+          )}
+        </ExplorerIconButton>
+      )}
+
+      <PublishObjectSiteButton
+        bucket={bucket}
+        entry={entry}
+        onPublishObjectSite={onPublishObjectSite}
+        publishingPath={publishingPath}
+      />
+
+      <ExplorerOverflowMenu label={t("explorer.actions.more")}>
+        <DeleteFileButton
+          bucket={bucket}
+          deletingPath={deletingPath}
+          entry={entry}
+          onDeleteFile={onDeleteFile}
+          trigger={
+            <DropdownMenuItem
+              className="cursor-pointer"
+              disabled={deleting}
+              onSelect={(event) => event.preventDefault()}
+              variant="destructive"
+            >
+              {deleting ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+              {t("common.delete")}
+            </DropdownMenuItem>
+          }
+        />
+      </ExplorerOverflowMenu>
+    </div>
+  );
+}
+
+function ExplorerOverflowMenu({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={label}
+          className="[&_svg]:size-4"
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <MoreHorizontalIcon />
+          <span className="sr-only">{label}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuGroup>{children}</DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function ExplorerSortHeader({
@@ -1191,30 +1336,35 @@ function DeleteFolderButton({
   deletingPath,
   entry,
   onDeleteFolder,
+  trigger,
 }: {
   bucket: string;
   deletingPath: string;
   entry: ExplorerDirectoryEntry;
   onDeleteFolder: (folderPath: string) => Promise<void>;
+  trigger?: React.ReactNode;
 }) {
   const { t } = useI18n();
+  const pending = deletingPath === entry.path;
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={deletingPath === entry.path}
-            label={t("explorer.actions.deleteFolder")}
-            onClick={() => undefined}
-          >
-            {deletingPath === entry.path ? (
-              <LoaderCircleIcon className="animate-spin text-destructive" />
-            ) : (
-              <Trash2Icon className="text-destructive" />
-            )}
-          </ExplorerIconButton>
-        </span>
+        {trigger ?? (
+          <span className="inline-flex">
+            <ExplorerIconButton
+              disabled={pending}
+              label={t("explorer.actions.deleteFolder")}
+              onClick={() => undefined}
+            >
+              {pending ? (
+                <LoaderCircleIcon className="animate-spin text-destructive" />
+              ) : (
+                <Trash2Icon className="text-destructive" />
+              )}
+            </ExplorerIconButton>
+          </span>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
@@ -1364,30 +1514,35 @@ function DeleteFileButton({
   deletingPath,
   entry,
   onDeleteFile,
+  trigger,
 }: {
   bucket: string;
   deletingPath: string;
   entry: ExplorerFileEntry;
   onDeleteFile: (objectKey: string) => Promise<void>;
+  trigger?: React.ReactNode;
 }) {
   const { t } = useI18n();
+  const pending = deletingPath === entry.object_key;
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={deletingPath === entry.object_key}
-            label={t("common.delete")}
-            onClick={() => undefined}
-          >
-            {deletingPath === entry.object_key ? (
-              <LoaderCircleIcon className="animate-spin text-destructive" />
-            ) : (
-              <Trash2Icon className="text-destructive" />
-            )}
-          </ExplorerIconButton>
-        </span>
+        {trigger ?? (
+          <span className="inline-flex">
+            <ExplorerIconButton
+              disabled={pending}
+              label={t("common.delete")}
+              onClick={() => undefined}
+            >
+              {pending ? (
+                <LoaderCircleIcon className="animate-spin text-destructive" />
+              ) : (
+                <Trash2Icon className="text-destructive" />
+              )}
+            </ExplorerIconButton>
+          </span>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>

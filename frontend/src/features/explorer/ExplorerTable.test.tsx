@@ -1,7 +1,11 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
-import type { ExplorerFileEntry } from "../../api/types";
+import type {
+  ExplorerDirectoryEntry,
+  ExplorerEntry,
+  ExplorerFileEntry,
+} from "../../api/types";
 import type { ExplorerSortBy, ExplorerSortOrder } from "../../lib/explorer";
 import { renderWithApp } from "../../test/test-utils";
 import { ExplorerTable } from "./ExplorerTable";
@@ -86,6 +90,52 @@ describe("ExplorerTable", () => {
       within(popover!).getByRole("button", { name: "Clear sorting" }),
     );
     expect(onSortClear).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps file row actions within three visible actions plus an overflow menu", async () => {
+    renderExplorerTable(createFileEntry({}));
+
+    expect(
+      screen.getByRole("button", { name: "View details" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Direct download" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Publish site" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+    expect(await screen.findByText("Delete object?")).toBeInTheDocument();
+  });
+
+  it("keeps directory row actions within three visible actions plus an overflow menu", async () => {
+    renderExplorerTable(createDirectoryEntry({}));
+
+    expect(
+      screen.getByRole("button", { name: "Open folder" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download ZIP" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Publish site" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete folder" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await userEvent.click(
+      screen.getByRole("menuitem", { name: "Delete folder" }),
+    );
+
+    expect(await screen.findByText("Delete folder?")).toBeInTheDocument();
   });
 
   it("renders markdown previews as markdown content", async () => {
@@ -355,8 +405,28 @@ function createFileEntry(
   };
 }
 
+function createDirectoryEntry(
+  overrides: Partial<ExplorerDirectoryEntry>,
+): ExplorerDirectoryEntry {
+  return {
+    type: "directory",
+    path: "docs/",
+    name: "docs",
+    is_empty: false,
+    object_key: null,
+    original_filename: null,
+    size: null,
+    content_type: null,
+    etag: null,
+    visibility: null,
+    created_at: null,
+    updated_at: null,
+    ...overrides,
+  };
+}
+
 function renderExplorerTable(
-  entry: ExplorerFileEntry,
+  entry: ExplorerEntry,
   options?: {
     onSortApply?: (
       sortBy: ExplorerSortBy,
