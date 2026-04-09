@@ -16,12 +16,14 @@ export function PublishSiteDialog({
   pending,
   onSubmit,
   trigger,
+  triggerTooltipLabel,
 }: {
   bucket: string;
   prefix: string;
   pending: boolean;
   onSubmit: (value: PublishSiteValue) => Promise<void>;
   trigger?: ReactNode;
+  triggerTooltipLabel?: string;
 }) {
   const { t } = useI18n();
 
@@ -52,6 +54,7 @@ export function PublishSiteDialog({
       submitLabel={t("explorer.actions.publishSite")}
       title={t("sites.publish.title")}
       trigger={trigger}
+      triggerTooltipLabel={triggerTooltipLabel}
     />
   );
 }

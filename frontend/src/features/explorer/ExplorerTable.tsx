@@ -1300,24 +1300,32 @@ function DeleteFolderButton({
   onDeleteFolder: (folderPath: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const label = t("explorer.actions.deleteFolder");
+  const pending = deletingPath === entry.path;
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={deletingPath === entry.path}
-            label={t("explorer.actions.deleteFolder")}
-            onClick={() => undefined}
-          >
-            {deletingPath === entry.path ? (
-              <LoaderCircleIcon className="animate-spin text-destructive" />
-            ) : (
-              <Trash2Icon className="text-destructive" />
-            )}
-          </ExplorerIconButton>
-        </span>
-      </AlertDialogTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <AlertDialogTrigger asChild>
+              <ExplorerIconActionButton disabled={pending} label={label}>
+                {pending ? (
+                  <LoaderCircleIcon className="animate-spin text-destructive" />
+                ) : (
+                  <Trash2Icon className="text-destructive" />
+                )}
+              </ExplorerIconActionButton>
+            </AlertDialogTrigger>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent
+          className="whitespace-nowrap leading-none"
+          sideOffset={6}
+        >
+          {label}
+        </TooltipContent>
+      </Tooltip>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
@@ -1393,6 +1401,7 @@ function PublishFolderSiteButton({
 }) {
   const { t } = useI18n();
   const pending = publishingPath === entry.path;
+  const label = t("explorer.actions.publishSite");
 
   return (
     <PublishSiteDialog
@@ -1401,20 +1410,15 @@ function PublishFolderSiteButton({
       pending={pending}
       prefix={entry.path}
       trigger={
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={pending}
-            label={t("explorer.actions.publishSite")}
-            onClick={() => undefined}
-          >
-            {pending ? (
-              <LoaderCircleIcon className="animate-spin text-emerald-500" />
-            ) : (
-              <GlobeIcon className="text-emerald-500" />
-            )}
-          </ExplorerIconButton>
-        </span>
+        <ExplorerIconActionButton disabled={pending} label={label}>
+          {pending ? (
+            <LoaderCircleIcon className="animate-spin text-emerald-500" />
+          ) : (
+            <GlobeIcon className="text-emerald-500" />
+          )}
+        </ExplorerIconActionButton>
       }
+      triggerTooltipLabel={label}
     />
   );
 }
@@ -1435,6 +1439,7 @@ function PublishObjectSiteButton({
 }) {
   const { t } = useI18n();
   const pending = publishingPath === entry.path;
+  const label = t("explorer.actions.publishSite");
 
   return (
     <PublishObjectSiteDialog
@@ -1443,20 +1448,15 @@ function PublishObjectSiteButton({
       onSubmit={(value) => onPublishObjectSite(entry.object_key, value)}
       pending={pending}
       trigger={
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={pending}
-            label={t("explorer.actions.publishSite")}
-            onClick={() => undefined}
-          >
-            {pending ? (
-              <LoaderCircleIcon className="animate-spin text-emerald-500" />
-            ) : (
-              <GlobeIcon className="text-emerald-500" />
-            )}
-          </ExplorerIconButton>
-        </span>
+        <ExplorerIconActionButton disabled={pending} label={label}>
+          {pending ? (
+            <LoaderCircleIcon className="animate-spin text-emerald-500" />
+          ) : (
+            <GlobeIcon className="text-emerald-500" />
+          )}
+        </ExplorerIconActionButton>
       }
+      triggerTooltipLabel={label}
     />
   );
 }
@@ -1473,24 +1473,32 @@ function DeleteFileButton({
   onDeleteFile: (objectKey: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const label = t("common.delete");
+  const pending = deletingPath === entry.object_key;
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <span className="inline-flex">
-          <ExplorerIconButton
-            disabled={deletingPath === entry.object_key}
-            label={t("common.delete")}
-            onClick={() => undefined}
-          >
-            {deletingPath === entry.object_key ? (
-              <LoaderCircleIcon className="animate-spin text-destructive" />
-            ) : (
-              <Trash2Icon className="text-destructive" />
-            )}
-          </ExplorerIconButton>
-        </span>
-      </AlertDialogTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <AlertDialogTrigger asChild>
+              <ExplorerIconActionButton disabled={pending} label={label}>
+                {pending ? (
+                  <LoaderCircleIcon className="animate-spin text-destructive" />
+                ) : (
+                  <Trash2Icon className="text-destructive" />
+                )}
+              </ExplorerIconActionButton>
+            </AlertDialogTrigger>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent
+          className="whitespace-nowrap leading-none"
+          sideOffset={6}
+        >
+          {label}
+        </TooltipContent>
+      </Tooltip>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
@@ -1531,24 +1539,48 @@ const ExplorerIconButton = forwardRef<
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="inline-flex">
-          <Button
+          <ExplorerIconActionButton
             ref={ref}
-            className="[&_svg]:size-4"
             disabled={disabled}
+            label={label}
             onClick={onClick}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
           >
             {children}
-            <span className="sr-only">{label}</span>
-          </Button>
+          </ExplorerIconActionButton>
         </span>
       </TooltipTrigger>
       <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
         {label}
       </TooltipContent>
     </Tooltip>
+  );
+});
+
+const ExplorerIconActionButton = forwardRef<
+  HTMLButtonElement,
+  {
+    children: React.ReactNode;
+    disabled?: boolean;
+    label: string;
+    onClick?: () => void;
+  }
+>(function ExplorerIconActionButton(
+  { children, disabled, label, onClick },
+  ref,
+) {
+  return (
+    <Button
+      ref={ref}
+      className="[&_svg]:size-4"
+      disabled={disabled}
+      onClick={onClick}
+      size="icon-sm"
+      type="button"
+      variant="ghost"
+    >
+      {children}
+      <span className="sr-only">{label}</span>
+    </Button>
   );
 });
 
