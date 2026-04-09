@@ -8,6 +8,7 @@ import { renderWithApp } from "../test/test-utils";
 vi.mock("../api/objects", () => ({
   listExplorerEntries: vi.fn(),
   createFolder: vi.fn(),
+  checkObjectExists: vi.fn(),
   uploadFolder: vi.fn(),
   uploadObject: vi.fn(),
   deleteObject: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("../api/sites", () => ({
 }));
 
 import {
+  checkObjectExists,
   createFolder,
   deleteFolder,
   deleteObject,
@@ -45,6 +47,7 @@ import {
 describe("BucketObjectsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(checkObjectExists).mockResolvedValue(false);
     Object.defineProperty(Element.prototype, "hasPointerCapture", {
       configurable: true,
       value: vi.fn(() => false),
@@ -517,6 +520,11 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start upload" }));
 
     await waitFor(() => {
+      expect(checkObjectExists).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        "docs/new.txt",
+      );
       expect(uploadObject).toHaveBeenCalledWith(
         { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
         expect.objectContaining({
@@ -527,6 +535,130 @@ describe("BucketObjectsPage", () => {
     });
 
     expect(await screen.findByText("new.txt")).toBeInTheDocument();
+  });
+
+  it("prompts overwrite before object upload when a conflict is detected", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({ items: [], next_cursor: "" })
+      .mockResolvedValue({
+        items: [
+          {
+            type: "file",
+            path: "docs/new.txt",
+            name: "new.txt",
+            is_empty: null,
+            object_key: "docs/new.txt",
+            original_filename: "new.txt",
+            size: 16,
+            content_type: "text/plain",
+            etag: "feedface12345678",
+            visibility: "private",
+            updated_at: "2026-03-25T00:02:00Z",
+          },
+        ],
+        next_cursor: "",
+      });
+
+    let resolveOverwriteUpload: (() => void) | undefined;
+
+    vi.mocked(checkObjectExists).mockResolvedValueOnce(true);
+    vi.mocked(uploadObject).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOverwriteUpload = () =>
+            resolve({
+              id: 2,
+              bucket_name: "demo",
+              object_key: "docs/new.txt",
+              original_filename: "new.txt",
+              size: 16,
+              content_type: "text/plain",
+              etag: "feedface12345678",
+              visibility: "private",
+              created_at: "2026-03-25T00:02:00Z",
+              updated_at: "2026-03-25T00:02:00Z",
+            });
+        }),
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload" }),
+    );
+
+    const file = new File(["hello"], "new.txt", { type: "text/plain" });
+    await userEvent.upload(await screen.findByLabelText("File"), file);
+    await userEvent.type(screen.getByLabelText("Object name"), "new.txt");
+    await userEvent.click(screen.getByRole("button", { name: "Start upload" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(
+      within(dialog).getByText("Overwrite existing files?"),
+    ).toBeInTheDocument();
+
+    expect(uploadObject).not.toHaveBeenCalled();
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Overwrite and upload" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    resolveOverwriteUpload?.();
+
+    await waitFor(() => {
+      expect(uploadObject).toHaveBeenCalledTimes(1);
+      expect(uploadObject).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          objectKey: "docs/new.txt",
+          allowOverwrite: true,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "Start upload" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("cancels object upload when preflight conflict prompt is dismissed", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({ items: [], next_cursor: "" });
+    vi.mocked(checkObjectExists).mockResolvedValueOnce(true);
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload" }),
+    );
+
+    const file = new File(["hello"], "new.txt", { type: "text/plain" });
+    await userEvent.upload(await screen.findByLabelText("File"), file);
+    await userEvent.type(screen.getByLabelText("Object name"), "new.txt");
+    await userEvent.click(screen.getByRole("button", { name: "Start upload" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(uploadObject).not.toHaveBeenCalled();
+    });
   });
 
   it("supports folder upload flow in the current folder", async () => {
@@ -612,6 +744,18 @@ describe("BucketObjectsPage", () => {
     );
 
     await waitFor(() => {
+      expect(checkObjectExists).toHaveBeenNthCalledWith(
+        1,
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        "docs/assets/readme.txt",
+      );
+      expect(checkObjectExists).toHaveBeenNthCalledWith(
+        2,
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        "docs/assets/images/logo.png",
+      );
       expect(uploadFolder).toHaveBeenCalledWith(
         { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
         expect.objectContaining({
@@ -623,6 +767,110 @@ describe("BucketObjectsPage", () => {
     });
 
     expect(await screen.findByText("readme.txt")).toBeInTheDocument();
+  });
+
+  it("prompts overwrite before folder upload when a conflict is detected", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({ items: [], next_cursor: "" })
+      .mockResolvedValue({
+        items: [
+          {
+            type: "file",
+            path: "docs/assets/readme.txt",
+            name: "readme.txt",
+            is_empty: null,
+            object_key: "docs/assets/readme.txt",
+            original_filename: "readme.txt",
+            size: 16,
+            content_type: "text/plain",
+            etag: "feedface12345678",
+            visibility: "private",
+            updated_at: "2026-03-25T00:02:00Z",
+          },
+        ],
+        next_cursor: "",
+      });
+
+    let resolveOverwriteUpload: (() => void) | undefined;
+
+    vi.mocked(checkObjectExists).mockResolvedValueOnce(true);
+    vi.mocked(uploadFolder).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOverwriteUpload = () =>
+            resolve({
+              uploaded_count: 1,
+              items: [
+                {
+                  id: 2,
+                  bucket_name: "demo",
+                  object_key: "docs/assets/readme.txt",
+                  original_filename: "readme.txt",
+                  size: 16,
+                  content_type: "text/plain",
+                  etag: "feedface12345678",
+                  visibility: "private",
+                  created_at: "2026-03-25T00:02:00Z",
+                  updated_at: "2026-03-25T00:02:00Z",
+                },
+              ],
+            });
+        }),
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload folder" }),
+    );
+
+    const readme = new File(["hello"], "readme.txt", { type: "text/plain" });
+    Object.defineProperty(readme, "webkitRelativePath", {
+      configurable: true,
+      value: "assets/readme.txt",
+    });
+
+    await userEvent.upload(await screen.findByLabelText("Folder"), [readme]);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Start folder upload" }),
+    );
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(uploadFolder).not.toHaveBeenCalled();
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Overwrite and upload" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    resolveOverwriteUpload?.();
+
+    await waitFor(() => {
+      expect(uploadFolder).toHaveBeenCalledTimes(1);
+      expect(uploadFolder).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          prefix: "docs/",
+          files: [readme],
+          allowOverwrite: true,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "Start folder upload" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("uploads a folder and publishes a site from the toolbar", async () => {

@@ -206,6 +206,49 @@ func TestUploadAndDownloadPublicObject(t *testing.T) {
 	}
 }
 
+func TestUploadObjectConflictRequiresAllowOverwriteHeader(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "overwrite-single")
+	uploadObject(t, router, "/api/v1/buckets/overwrite-single/objects/docs/readme.txt", "old", "public")
+
+	conflictReq := httptest.NewRequest(http.MethodPut, "/api/v1/buckets/overwrite-single/objects/docs/readme.txt", strings.NewReader("new"))
+	conflictReq.Header.Set("Authorization", "Bearer dev-token")
+	conflictReq.Header.Set("X-Object-Visibility", "public")
+	conflictReq.Header.Set("X-Original-Filename", "readme.txt")
+	conflictReq.Header.Set("Content-Type", "text/plain")
+	conflictRec := httptest.NewRecorder()
+	router.ServeHTTP(conflictRec, conflictReq)
+
+	if conflictRec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d, body=%s", conflictRec.Code, conflictRec.Body.String())
+	}
+	assertAPIErrorCode(t, conflictRec.Body.Bytes(), "object_exists")
+
+	overwriteReq := httptest.NewRequest(http.MethodPut, "/api/v1/buckets/overwrite-single/objects/docs/readme.txt", strings.NewReader("new"))
+	overwriteReq.Header.Set("Authorization", "Bearer dev-token")
+	overwriteReq.Header.Set("X-Object-Visibility", "public")
+	overwriteReq.Header.Set("X-Original-Filename", "readme.txt")
+	overwriteReq.Header.Set("X-Allow-Overwrite", "true")
+	overwriteReq.Header.Set("Content-Type", "text/plain")
+	overwriteRec := httptest.NewRecorder()
+	router.ServeHTTP(overwriteRec, overwriteReq)
+
+	if overwriteRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", overwriteRec.Code, overwriteRec.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/overwrite-single/objects/docs/readme.txt", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", getRec.Code)
+	}
+	if body := getRec.Body.String(); body != "new" {
+		t.Fatalf("unexpected body %q", body)
+	}
+}
+
 func TestPrivateObjectRequiresAuthOrSignature(t *testing.T) {
 	router := newTestRouter(t, 1024)
 
@@ -429,6 +472,112 @@ func TestUploadObjectBatchSuccess(t *testing.T) {
 	if body.Data.Items[0].Visibility != "public" || body.Data.Items[1].Visibility != "public" {
 		t.Fatalf("expected public visibility, got %+v", body.Data.Items)
 	}
+}
+
+func TestUploadObjectBatchConflictRequiresAllowOverwriteHeader(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "overwrite-batch")
+	uploadObject(t, router, "/api/v1/buckets/overwrite-batch/objects/docs/assets/readme.txt", "old", "public")
+
+	fields := map[string]string{
+		"prefix":     "docs/",
+		"visibility": "public",
+		"manifest": mustMarshalJSON(t, []map[string]string{
+			{"file_field": "file_0", "relative_path": "assets/readme.txt"},
+			{"file_field": "file_1", "relative_path": "assets/new.txt"},
+		}),
+	}
+	files := map[string]multipartUploadFile{
+		"file_0": {Filename: "readme.txt", Content: "new", ContentType: "text/plain"},
+		"file_1": {Filename: "new.txt", Content: "new-file", ContentType: "text/plain"},
+	}
+
+	conflictReq := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/buckets/overwrite-batch/objects/batch",
+		fields,
+		files,
+	)
+	conflictRec := httptest.NewRecorder()
+	router.ServeHTTP(conflictRec, conflictReq)
+
+	if conflictRec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d, body=%s", conflictRec.Code, conflictRec.Body.String())
+	}
+	assertAPIErrorCode(t, conflictRec.Body.Bytes(), "object_exists")
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/overwrite-batch/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected only original object after conflict, got %d", len(listBody.Data.Items))
+	}
+
+	overwriteReq := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/buckets/overwrite-batch/objects/batch",
+		fields,
+		files,
+	)
+	overwriteReq.Header.Set("X-Allow-Overwrite", "true")
+	overwriteRec := httptest.NewRecorder()
+	router.ServeHTTP(overwriteRec, overwriteReq)
+	if overwriteRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", overwriteRec.Code, overwriteRec.Body.String())
+	}
+
+	var uploadBody apiEnvelope[uploadBatchResponse]
+	decodeJSON(t, overwriteRec.Body.Bytes(), &uploadBody)
+	if uploadBody.Data.UploadedCount != 2 {
+		t.Fatalf("expected uploaded_count 2, got %d", uploadBody.Data.UploadedCount)
+	}
+}
+
+func TestUploadRejectsInvalidAllowOverwriteHeader(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "overwrite-invalid")
+
+	objectReq := httptest.NewRequest(http.MethodPut, "/api/v1/buckets/overwrite-invalid/objects/docs/readme.txt", strings.NewReader("hello"))
+	objectReq.Header.Set("Authorization", "Bearer dev-token")
+	objectReq.Header.Set("X-Allow-Overwrite", "invalid")
+	objectReq.Header.Set("X-Object-Visibility", "public")
+	objectReq.Header.Set("X-Original-Filename", "readme.txt")
+	objectReq.Header.Set("Content-Type", "text/plain")
+	objectRec := httptest.NewRecorder()
+	router.ServeHTTP(objectRec, objectReq)
+	if objectRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", objectRec.Code, objectRec.Body.String())
+	}
+	assertAPIErrorCode(t, objectRec.Body.Bytes(), "invalid_request")
+
+	batchReq := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/buckets/overwrite-invalid/objects/batch",
+		map[string]string{
+			"manifest": mustMarshalJSON(t, []map[string]string{{
+				"file_field":    "file_0",
+				"relative_path": "docs/readme.txt",
+			}}),
+		},
+		map[string]multipartUploadFile{
+			"file_0": {Filename: "readme.txt", Content: "hello", ContentType: "text/plain"},
+		},
+	)
+	batchReq.Header.Set("X-Allow-Overwrite", "invalid")
+	batchRec := httptest.NewRecorder()
+	router.ServeHTTP(batchRec, batchReq)
+	if batchRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", batchRec.Code, batchRec.Body.String())
+	}
+	assertAPIErrorCode(t, batchRec.Body.Bytes(), "invalid_request")
 }
 
 func TestUploadObjectBatchSupportsMoreThanThousandFiles(t *testing.T) {

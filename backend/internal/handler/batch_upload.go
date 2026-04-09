@@ -64,6 +64,11 @@ func (h *apiHandler) uploadObjectBatch(c *gin.Context) {
 
 	prefix := strings.TrimSpace(formValues["prefix"])
 	visibility := strings.TrimSpace(formValues["visibility"])
+	allowOverwrite, err := parseOptionalBool(c.GetHeader("X-Allow-Overwrite"))
+	if err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "X-Allow-Overwrite must be true or false"))
+		return
+	}
 
 	items, err := buildUploadBatchItemsFromManifest(fileParts, manifest)
 	if err != nil {
@@ -72,10 +77,11 @@ func (h *apiHandler) uploadObjectBatch(c *gin.Context) {
 	}
 
 	result, err := h.objectService.UploadBatch(c.Request.Context(), service.UploadObjectBatchInput{
-		BucketName: c.Param("bucket"),
-		Prefix:     prefix,
-		Visibility: visibility,
-		Items:      items,
+		BucketName:     c.Param("bucket"),
+		Prefix:         prefix,
+		Visibility:     visibility,
+		AllowOverwrite: allowOverwrite,
+		Items:          items,
 	})
 	if err != nil {
 		response.Error(c, err)

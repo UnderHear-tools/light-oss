@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildPublicObjectURL,
+  checkObjectExists,
   createFolder,
   createSignedDownloadURL,
   deleteFolder,
@@ -32,6 +33,17 @@ import {
 import type { PublishSiteResult } from "@/api/types";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -86,8 +98,21 @@ import {
   type ExplorerSortBy,
   type ExplorerSortOrder,
 } from "@/lib/explorer";
+import { buildFolderUploadManifest } from "@/lib/folder-upload";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
+
+type PendingOverwriteUpload =
+  | {
+      kind: "object";
+      value: UploadDialogValue;
+      target?: string;
+    }
+  | {
+      kind: "folder";
+      value: UploadFolderDialogValue;
+      target?: string;
+    };
 
 export function BucketObjectsPage() {
   const { bucket = "" } = useParams();
@@ -99,6 +124,13 @@ export function BucketObjectsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadDialogResetSignal, setUploadDialogResetSignal] = useState(0);
+  const [uploadFolderDialogResetSignal, setUploadFolderDialogResetSignal] =
+    useState(0);
+  const [isCheckingOverwrite, setIsCheckingOverwrite] = useState(false);
+  const [pendingOverwriteUpload, setPendingOverwriteUpload] =
+    useState<PendingOverwriteUpload | null>(null);
+  const [isRetryingOverwrite, setIsRetryingOverwrite] = useState(false);
   const [deletingPath, setDeletingPath] = useState("");
   const [downloadingFolderPath, setDownloadingFolderPath] = useState("");
   const [publishingPath, setPublishingPath] = useState("");
@@ -156,22 +188,73 @@ export function BucketObjectsPage() {
     enabled: bucket !== "",
   });
 
+  function uploadObjectRequest(value: UploadDialogValue, allowOverwrite: boolean) {
+    return uploadObject(settings, {
+      bucket,
+      objectKey: joinExplorerPath(prefix, value.objectKey),
+      file: value.file,
+      visibility: value.visibility,
+      allowOverwrite,
+      onProgress: setUploadProgress,
+    });
+  }
+
+  function uploadFolderRequest(
+    value: UploadFolderDialogValue,
+    allowOverwrite: boolean,
+  ) {
+    return uploadFolder(settings, {
+      bucket,
+      prefix,
+      files: value.files,
+      visibility: value.visibility,
+      allowOverwrite,
+      onProgress: setUploadProgress,
+    });
+  }
+
+  async function findObjectConflictTarget(value: UploadDialogValue) {
+    const objectKey = joinExplorerPath(prefix, value.objectKey);
+    const exists = await checkObjectExists(settings, bucket, objectKey);
+    return exists ? objectKey : null;
+  }
+
+  async function findFolderConflictTarget(value: UploadFolderDialogValue) {
+    const manifest = buildFolderUploadManifest(value.files);
+    const objectKeys = Array.from(
+      new Set(
+        manifest.map((item) => joinExplorerPath(prefix, item.relative_path)),
+      ),
+    );
+
+    for (const objectKey of objectKeys) {
+      const exists = await checkObjectExists(settings, bucket, objectKey);
+      if (exists) {
+        return objectKey;
+      }
+    }
+
+    return null;
+  }
+
   const uploadMutation = useMutation({
-    mutationFn: (value: UploadDialogValue) =>
-      uploadObject(settings, {
-        bucket,
-        objectKey: joinExplorerPath(prefix, value.objectKey),
-        file: value.file,
-        visibility: value.visibility,
-        onProgress: setUploadProgress,
-      }),
+    mutationFn: (value: UploadDialogValue) => uploadObjectRequest(value, false),
     onSuccess: async () => {
       setUploadProgress(0);
       toast.success(t("toast.objectUploaded"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
-    onError: (error) => {
+    onError: (error, value) => {
       setUploadProgress(0);
+      if (isObjectExistsError(error)) {
+        setPendingOverwriteUpload({
+          kind: "object",
+          value,
+          target: joinExplorerPath(prefix, value.objectKey),
+        });
+        return;
+      }
+
       const message =
         error instanceof Error ? error.message : t("errors.uploadObject");
       toast.error(message);
@@ -180,20 +263,19 @@ export function BucketObjectsPage() {
 
   const uploadFolderMutation = useMutation({
     mutationFn: (value: UploadFolderDialogValue) =>
-      uploadFolder(settings, {
-        bucket,
-        prefix,
-        files: value.files,
-        visibility: value.visibility,
-        onProgress: setUploadProgress,
-      }),
+      uploadFolderRequest(value, false),
     onSuccess: async () => {
       setUploadProgress(0);
       toast.success(t("toast.folderUploaded"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
-    onError: (error) => {
+    onError: (error, value) => {
       setUploadProgress(0);
+      if (isObjectExistsError(error)) {
+        setPendingOverwriteUpload({ kind: "folder", value });
+        return;
+      }
+
       const message =
         error instanceof Error ? error.message : t("errors.uploadFolder");
       toast.error(message);
@@ -423,8 +505,19 @@ export function BucketObjectsPage() {
   const uploadPending =
     uploadMutation.isPending ||
     uploadFolderMutation.isPending ||
-    uploadAndPublishSiteMutation.isPending;
+    uploadAndPublishSiteMutation.isPending ||
+    isCheckingOverwrite ||
+    isRetryingOverwrite;
   const bucketMissing = isBucketNotFoundError(entriesQuery.error);
+  const overwriteTarget =
+    pendingOverwriteUpload?.target ??
+    (pendingOverwriteUpload?.kind === "object"
+      ? joinExplorerPath(
+          prefix,
+          pendingOverwriteUpload.value.objectKey ||
+            pendingOverwriteUpload.value.file.name,
+        )
+      : prefix || t("explorer.rootFolder"));
 
   if (!bucket) {
     return (
@@ -478,11 +571,90 @@ export function BucketObjectsPage() {
   }
 
   async function handleUpload(value: UploadDialogValue) {
+    setUploadProgress(0);
+
+    let conflictTarget: string | null = null;
+    setIsCheckingOverwrite(true);
+    try {
+      conflictTarget = await findObjectConflictTarget(value);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.uploadObject");
+      toast.error(message);
+      return;
+    } finally {
+      setIsCheckingOverwrite(false);
+    }
+
+    if (conflictTarget) {
+      setPendingOverwriteUpload({ kind: "object", value, target: conflictTarget });
+      throw new Error("overwrite_confirmation_required");
+    }
+
     await uploadMutation.mutateAsync(value);
   }
 
   async function handleUploadFolder(value: UploadFolderDialogValue) {
+    setUploadProgress(0);
+
+    let conflictTarget: string | null = null;
+    setIsCheckingOverwrite(true);
+    try {
+      conflictTarget = await findFolderConflictTarget(value);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.uploadFolder");
+      toast.error(message);
+      return;
+    } finally {
+      setIsCheckingOverwrite(false);
+    }
+
+    if (conflictTarget) {
+      setPendingOverwriteUpload({ kind: "folder", value, target: conflictTarget });
+      throw new Error("overwrite_confirmation_required");
+    }
+
     await uploadFolderMutation.mutateAsync(value);
+  }
+
+  async function handleConfirmOverwriteUpload() {
+    if (!pendingOverwriteUpload || isRetryingOverwrite) {
+      return;
+    }
+
+    const overwriteUpload = pendingOverwriteUpload;
+    setPendingOverwriteUpload(null);
+    setIsRetryingOverwrite(true);
+    try {
+      if (overwriteUpload.kind === "object") {
+        await uploadObjectRequest(overwriteUpload.value, true);
+        setUploadDialogResetSignal((value) => value + 1);
+        toast.success(t("toast.objectUploaded"));
+      } else {
+        await uploadFolderRequest(overwriteUpload.value, true);
+        setUploadFolderDialogResetSignal((value) => value + 1);
+        toast.success(t("toast.folderUploaded"));
+      }
+
+      await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.uploadObject");
+      toast.error(message);
+    } finally {
+      setIsRetryingOverwrite(false);
+      setUploadProgress(0);
+    }
+  }
+
+  function handleCancelOverwriteUpload() {
+    if (isRetryingOverwrite) {
+      return;
+    }
+
+    setPendingOverwriteUpload(null);
+    setUploadProgress(0);
   }
 
   async function handleCreateFolder(name: string) {
@@ -667,6 +839,7 @@ export function BucketObjectsPage() {
                     onSubmit={handleUpload}
                     pending={uploadPending}
                     progress={uploadProgress}
+                    resetSignal={uploadDialogResetSignal}
                   />
 
                   <UploadFolderDialog
@@ -674,6 +847,7 @@ export function BucketObjectsPage() {
                     onSubmit={handleUploadFolder}
                     pending={uploadPending}
                     progress={uploadProgress}
+                    resetSignal={uploadFolderDialogResetSignal}
                   />
 
                   <Separator
@@ -877,6 +1051,49 @@ export function BucketObjectsPage() {
           </div>
         </div>
       </Card>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelOverwriteUpload();
+          }
+        }}
+        open={pendingOverwriteUpload !== null}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <CircleAlertIcon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>{t("explorer.overwrite.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("explorer.overwrite.description", {
+                target: overwriteTarget,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRetryingOverwrite}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRetryingOverwrite}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmOverwriteUpload();
+              }}
+            >
+              {isRetryingOverwrite ? (
+                <LoaderCircleIcon
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
+              ) : null}
+              {t("explorer.overwrite.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
@@ -887,5 +1104,14 @@ function isBucketNotFoundError(error: unknown) {
     error !== null &&
     "code" in error &&
     error.code === "bucket_not_found"
+  );
+}
+
+function isObjectExistsError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "object_exists"
   );
 }

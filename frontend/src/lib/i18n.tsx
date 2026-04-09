@@ -277,6 +277,10 @@ const enUS = {
   "explorer.upload.objectNameLabel": "Object name",
   "explorer.upload.objectNamePlaceholder": "file.txt",
   "explorer.upload.submit": "Start upload",
+  "explorer.overwrite.title": "Overwrite existing files?",
+  "explorer.overwrite.description":
+    "This upload will overwrite existing files in {target}. Continue?",
+  "explorer.overwrite.confirm": "Overwrite and upload",
   "explorer.folderUpload.title": "Upload folder",
   "explorer.folderUpload.description":
     "All files in the selected folder are uploaded in one request.",
@@ -564,6 +568,9 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.upload.objectNameLabel": "对象名称",
   "explorer.upload.objectNamePlaceholder": "file.txt",
   "explorer.upload.submit": "开始上传",
+  "explorer.overwrite.title": "覆盖已存在文件？",
+  "explorer.overwrite.description": "本次上传会覆盖 {target} 下的同名文件，是否继续？",
+  "explorer.overwrite.confirm": "覆盖并上传",
   "explorer.folderUpload.title": "上传文件夹",
   "explorer.folderUpload.description":
     "将所选文件夹中的所有文件通过一次请求上传到当前目录。",

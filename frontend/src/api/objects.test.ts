@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "../lib/settings";
 import {
   buildPublicObjectURL,
+  checkObjectExists,
   deleteFolder,
   downloadFolderZip,
   updateObjectVisibility,
@@ -13,7 +14,17 @@ const request = vi.fn();
 const apiRequestMock = vi.fn();
 
 vi.mock("./client", () => ({
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    status: number;
+    code?: string;
+
+    constructor(message: string, status: number, code?: string) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+      this.code = code;
+    }
+  },
   apiRequest: (...args: unknown[]) => apiRequestMock(...args),
   createApiClient: vi.fn(() => ({
     request,
@@ -62,8 +73,99 @@ describe("objects api helpers", () => {
       expect.objectContaining({
         timeout: 0,
         url: "/api/v1/buckets/demo/objects/docs/underhear%2Epostgresql%2Esql",
+        headers: expect.objectContaining({
+          "X-Allow-Overwrite": "false",
+        }),
       }),
     );
+  });
+
+  it("checks object existence with HEAD requests", async () => {
+    await expect(
+      checkObjectExists(settings, "demo", "docs/underhear.postgresql.sql"),
+    ).resolves.toBe(true);
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "HEAD",
+        url: "/api/v1/buckets/demo/objects/docs/underhear%2Epostgresql%2Esql",
+      }),
+    );
+  });
+
+  it("returns false for missing objects in HEAD checks", async () => {
+    request.mockRejectedValueOnce({
+      isAxiosError: true,
+      message: "Request failed with status code 404",
+      response: {
+        status: 404,
+        data: {
+          error: {
+            code: "object_not_found",
+            message: "object not found",
+          },
+        },
+      },
+    });
+
+    await expect(
+      checkObjectExists(settings, "demo", "docs/missing.txt"),
+    ).resolves.toBe(false);
+  });
+
+  it("sets overwrite header when explicit overwrite is requested", async () => {
+    const file = new File(["sql"], "underhear.postgresql.sql", {
+      type: "application/sql",
+    });
+
+    await uploadObject(settings, {
+      bucket: "demo",
+      objectKey: "docs/underhear.postgresql.sql",
+      file,
+      visibility: "private",
+      allowOverwrite: true,
+    });
+
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Allow-Overwrite": "true",
+        }),
+      }),
+    );
+  });
+
+  it("normalizes upload conflict responses into ApiError with code", async () => {
+    request.mockRejectedValueOnce({
+      isAxiosError: true,
+      message: "Request failed with status code 409",
+      response: {
+        status: 409,
+        data: {
+          error: {
+            code: "object_exists",
+            message: "object already exists",
+          },
+        },
+      },
+    });
+
+    const file = new File(["sql"], "underhear.postgresql.sql", {
+      type: "application/sql",
+    });
+
+    await expect(
+      uploadObject(settings, {
+        bucket: "demo",
+        objectKey: "docs/underhear.postgresql.sql",
+        file,
+        visibility: "private",
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "object_exists",
+      message: "object already exists",
+    });
   });
 
   it("falls back to text/markdown for markdown files without a browser mime type", async () => {
@@ -138,6 +240,9 @@ describe("objects api helpers", () => {
         method: "POST",
         timeout: 0,
         url: "/api/v1/buckets/demo/objects/batch",
+        headers: expect.objectContaining({
+          "X-Allow-Overwrite": "false",
+        }),
       }),
     );
 
@@ -154,6 +259,41 @@ describe("objects api helpers", () => {
     expect((formData.get("file_0") as File).name).toBe("readme.txt");
     expect(formData.get("file_1")).toBeInstanceOf(File);
     expect((formData.get("file_1") as File).name).toBe("logo.png");
+  });
+
+  it("normalizes folder upload conflict responses into ApiError with code", async () => {
+    request.mockRejectedValueOnce({
+      isAxiosError: true,
+      message: "Request failed with status code 409",
+      response: {
+        status: 409,
+        data: {
+          error: {
+            code: "object_exists",
+            message: "one or more objects already exist",
+          },
+        },
+      },
+    });
+
+    const readme = new File(["hello"], "readme.txt", { type: "text/plain" });
+    Object.defineProperty(readme, "webkitRelativePath", {
+      configurable: true,
+      value: "assets/readme.txt",
+    });
+
+    await expect(
+      uploadFolder(settings, {
+        bucket: "demo",
+        prefix: "docs/",
+        files: [readme],
+        visibility: "private",
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "object_exists",
+      message: "one or more objects already exist",
+    });
   });
 
   it("passes recursive deletion to the folder endpoint when requested", async () => {
