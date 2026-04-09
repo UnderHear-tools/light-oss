@@ -484,7 +484,7 @@ func explorerTypeOrder(entryType ExplorerEntryType) int {
 func normalizeExplorerSortBy(value string) ExplorerSortBy {
 	sortBy := ExplorerSortBy(strings.ToLower(strings.TrimSpace(value)))
 	if !isValidExplorerSortBy(sortBy) {
-		return ExplorerSortByName
+		return ExplorerSortByCreatedAt
 	}
 	return sortBy
 }
@@ -496,7 +496,7 @@ func isValidExplorerSortBy(value ExplorerSortBy) bool {
 func normalizeExplorerSortOrder(value string) ExplorerSortOrder {
 	sortOrder := ExplorerSortOrder(strings.ToLower(strings.TrimSpace(value)))
 	if !isValidExplorerSortOrder(sortOrder) {
-		return ExplorerSortOrderAsc
+		return ExplorerSortOrderDesc
 	}
 	return sortOrder
 }

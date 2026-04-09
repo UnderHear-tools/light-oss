@@ -140,10 +140,10 @@ export function BucketObjectsPage() {
   const search = normalizeExplorerSearch(searchParams.get("search"));
   const cursor = searchParams.get("cursor") ?? "";
   const limit = parseExplorerLimit(searchParams.get("limit"));
-  const sortBy = normalizeExplorerSortBy(searchParams.get("sort_by"));
-  const sortOrder = sortBy
-    ? (normalizeExplorerSortOrder(searchParams.get("sort_order")) ?? "asc")
-    : null;
+  const sortBy =
+    normalizeExplorerSortBy(searchParams.get("sort_by")) ?? "created_at";
+  const sortOrder =
+    normalizeExplorerSortOrder(searchParams.get("sort_order")) ?? "desc";
   const entriesBaseQueryKey = [
     "explorer-entries",
     settings.apiBaseUrl,
@@ -161,8 +161,8 @@ export function BucketObjectsPage() {
     search,
     cursor,
     limit,
-    sortBy ?? "",
-    sortOrder ?? "",
+    sortBy,
+    sortOrder,
   ] as const;
 
   useEffect(() => {
@@ -182,8 +182,8 @@ export function BucketObjectsPage() {
         search,
         limit,
         cursor,
-        sortBy: sortBy ?? "",
-        sortOrder: sortOrder ?? "",
+        sortBy,
+        sortOrder,
       }),
     enabled: bucket !== "",
   });

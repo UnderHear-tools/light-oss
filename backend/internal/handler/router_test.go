@@ -1712,6 +1712,53 @@ func TestListExplorerEntriesSupportsSorting(t *testing.T) {
 	}
 }
 
+func TestListExplorerEntriesDefaultsToCreatedAtDesc(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	assertEntryNames := func(items []explorerEntryResponse, expected []string) {
+		t.Helper()
+		if len(items) != len(expected) {
+			t.Fatalf("unexpected entry count: got %d want %d (%+v)", len(items), len(expected), items)
+		}
+
+		for index, item := range items {
+			if item.Name != expected[index] {
+				t.Fatalf("unexpected entries at index %d: got %+v want %s", index, items, expected[index])
+			}
+		}
+	}
+
+	createBucket(t, router, "default-sort-bucket")
+
+	uploadObject(t, router, "/api/v1/buckets/default-sort-bucket/objects/docs/bravo.txt", "22", "public")
+	createFolder(t, router, "default-sort-bucket", "docs/", "empty")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/default-sort-bucket/objects/docs/delta.txt", "4444", "public")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/default-sort-bucket/objects/docs/alpha.txt", "1", "public")
+	time.Sleep(10 * time.Millisecond)
+	uploadObject(t, router, "/api/v1/buckets/default-sort-bucket/objects/docs/charlie.txt", "33", "public")
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets/default-sort-bucket/entries?prefix=docs/",
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[explorerListResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	assertEntryNames(body.Data.Items, []string{"empty", "charlie.txt", "alpha.txt", "delta.txt", "bravo.txt"})
+	if body.Data.Items[0].Type != "directory" {
+		t.Fatalf("expected directory to stay first, got %+v", body.Data.Items[0])
+	}
+}
+
 func TestCreateAndDeleteFolder(t *testing.T) {
 	router := newTestRouter(t, 1024)
 

@@ -189,8 +189,8 @@ describe("BucketObjectsPage", () => {
         expect.objectContaining({
           bucket: "demo",
           cursor: "cursor-1",
-          sortBy: "",
-          sortOrder: "",
+          sortBy: "created_at",
+          sortOrder: "desc",
         }),
       );
     });
@@ -348,8 +348,8 @@ describe("BucketObjectsPage", () => {
         expect.objectContaining({
           bucket: "demo",
           cursor: "",
-          sortBy: "",
-          sortOrder: "",
+          sortBy: "created_at",
+          sortOrder: "desc",
         }),
       );
     });
@@ -1153,8 +1153,12 @@ describe("BucketObjectsPage", () => {
       { route: "/buckets/demo" },
     );
 
+    const fileRow = await screen.findByRole("row", { name: /readme\.txt/ });
     await userEvent.click(
-      await screen.findByRole("button", { name: "Delete" }),
+      within(fileRow).getByRole("button", { name: "More actions" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Delete" }),
     );
 
     const dialog = await screen.findByRole("alertdialog");
@@ -1201,8 +1205,12 @@ describe("BucketObjectsPage", () => {
       { route: "/buckets/demo" },
     );
 
+    const folderRow = await screen.findByRole("row", { name: /docs/ });
     await userEvent.click(
-      await screen.findByRole("button", { name: "Delete folder" }),
+      within(folderRow).getByRole("button", { name: "More actions" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Delete folder" }),
     );
 
     const dialog = await screen.findByRole("alertdialog");
@@ -1270,7 +1278,10 @@ describe("BucketObjectsPage", () => {
     expect(
       await screen.findAllByRole("button", { name: "Publish site" }),
     ).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "More actions" }),
+    ).toHaveLength(2);
   });
 
   it("publishes a folder as a site from the explorer table", async () => {
