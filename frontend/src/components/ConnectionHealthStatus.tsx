@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { getHealthStatus } from "@/api/health";
-import { Badge } from "@/components/ui/badge";
 import {
   resolveConnectionHealthStates,
   type ConnectionHealthBadgeState,
@@ -40,36 +39,34 @@ export function ConnectionHealthStatus({
     });
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <Badge
-        className={cn("gap-1.5", getBadgeClassName(resolvedStates.service))}
-        variant="outline"
-      >
+    <div className={cn("flex flex-wrap items-center gap-4 text-sm font-medium", className)}>
+      <div className={cn("flex items-center gap-1.5", getStatusTextClassName(resolvedStates.service))}>
         <HealthStatusDot state={resolvedStates.service} />
-        {t("health.service")} {getHealthStateLabel(t, resolvedStates.service)}
-      </Badge>
-      <Badge
-        className={cn("gap-1.5", getBadgeClassName(resolvedStates.database))}
-        variant="outline"
-      >
+        <span>
+          {t("health.service")} {getHealthStateLabel(t, resolvedStates.service)}
+        </span>
+      </div>
+      <div className={cn("flex items-center gap-1.5", getStatusTextClassName(resolvedStates.database))}>
         <HealthStatusDot state={resolvedStates.database} />
-        {t("health.database")} {getHealthStateLabel(t, resolvedStates.database)}
-      </Badge>
+        <span>
+          {t("health.database")} {getHealthStateLabel(t, resolvedStates.database)}
+        </span>
+      </div>
     </div>
   );
 }
 
-function getBadgeClassName(state: ConnectionHealthBadgeState) {
+function getStatusTextClassName(state: ConnectionHealthBadgeState) {
   switch (state) {
     case "ok":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300";
+      return "text-emerald-700 dark:text-emerald-400";
     case "error":
     case "token_error":
     case "unreachable":
     case "unknown":
-      return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300";
+      return "text-red-600 dark:text-red-400";
     default:
-      return "border-border bg-background text-muted-foreground";
+      return "text-muted-foreground";
   }
 }
 

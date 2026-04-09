@@ -125,9 +125,6 @@ export function SettingsPage() {
                 <ConnectionHealthStatus
                   states={manualHealthStates ?? undefined}
                 />
-                <Badge className="w-fit" variant="secondary">
-                  {t("common.localStorage")}
-                </Badge>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">

@@ -28,8 +28,8 @@ export function NavUser() {
           tooltip={t("nav.settings")}
         >
           <NavLink to="/settings">
-            <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarFallback className="rounded-lg">LO</AvatarFallback>
+            <Avatar>
+              <AvatarFallback>LO</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{t("nav.settings")}</span>
