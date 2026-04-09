@@ -144,7 +144,7 @@ export function SiteFormDialog({
       : t("sites.form.submitUpdate"));
   const resolvedTrigger = trigger ?? (
     <Button type="button" variant="outline">
-      <GlobeIcon data-icon="inline-start" />
+      <GlobeIcon />
       {resolvedSubmitLabel}
     </Button>
   );
@@ -387,7 +387,7 @@ export function SiteFormDialog({
                   data-icon="inline-start"
                 />
               ) : (
-                <GlobeIcon data-icon="inline-start" />
+                <GlobeIcon />
               )}
               {resolvedSubmitLabel}
             </Button>

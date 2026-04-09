@@ -154,9 +154,9 @@ export function UploadPanel({
         <CardFooter className="justify-end">
           <Button disabled={pending || !selectedFile} type="submit">
             {pending ? (
-              <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+              <LoaderCircleIcon className="animate-spin" />
             ) : (
-              <UploadIcon data-icon="inline-start" />
+              <UploadIcon />
             )}
             {pending ? t("objects.form.submitting") : t("objects.form.submit")}
           </Button>

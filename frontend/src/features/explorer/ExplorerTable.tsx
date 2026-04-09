@@ -323,12 +323,12 @@ export function ExplorerTable({
                   >
                     {entry.visibility === "public" ? (
                       <>
-                        <LockOpenIcon data-icon="inline-start" />
+                        <LockOpenIcon />
                         {t("objects.visibility.public")}
                       </>
                     ) : (
                       <>
-                        <LockIcon data-icon="inline-start" />
+                        <LockIcon />
                         {t("objects.visibility.private")}
                       </>
                     )}

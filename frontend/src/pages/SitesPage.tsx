@@ -221,7 +221,7 @@ export function SitesPage() {
                 type="button"
                 variant="outline"
               >
-                <UploadIcon data-icon="inline-start" />
+                <UploadIcon />
                 {t("sites.actions.uploadAndPublish")}
               </Button>
             }
@@ -239,7 +239,7 @@ export function SitesPage() {
                 disabled={bucketsQuery.isLoading || buckets.length === 0}
                 type="button"
               >
-                <PlusIcon data-icon="inline-start" />
+                <PlusIcon />
                 {t("sites.actions.create")}
               </Button>
             }
@@ -356,7 +356,7 @@ export function SitesPage() {
                           title={t("sites.form.editTitle")}
                           trigger={
                             <Button size="sm" type="button" variant="outline">
-                              <PencilLineIcon data-icon="inline-start" />
+                              <PencilLineIcon />
                               {t("common.edit")}
                             </Button>
                           }
@@ -394,7 +394,7 @@ function DeleteSiteButton({
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button size="sm" type="button" variant="outline">
-          <Trash2Icon data-icon="inline-start" />
+          <Trash2Icon />
           {t("common.delete")}
         </Button>
       </AlertDialogTrigger>

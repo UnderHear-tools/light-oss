@@ -42,7 +42,7 @@ export function CreateFolderDialog({
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
         <Button type="button" variant="outline">
-          <FolderPlusIcon data-icon="inline-start" />
+          <FolderPlusIcon />
           {t("explorer.toolbar.newFolder")}
         </Button>
       </DialogTrigger>
@@ -81,9 +81,9 @@ export function CreateFolderDialog({
           <DialogFooter>
             <Button disabled={pending || !name.trim()} type="submit">
               {pending ? (
-                <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                <LoaderCircleIcon className="animate-spin" />
               ) : (
-                <FolderPlusIcon data-icon="inline-start" />
+                <FolderPlusIcon />
               )}
               {pending
                 ? t("explorer.createFolder.submitting")

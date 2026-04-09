@@ -99,7 +99,7 @@ export function UploadFolderDialog({
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>
         <Button disabled={pending} type="button" variant="outline">
-          <UploadIcon data-icon="inline-start" />
+          <UploadIcon />
           {t("explorer.toolbar.uploadFolder")}
         </Button>
       </DialogTrigger>
@@ -192,7 +192,7 @@ export function UploadFolderDialog({
                   data-icon="inline-start"
                 />
               ) : (
-                <UploadIcon data-icon="inline-start" />
+                <UploadIcon />
               )}
               {pending
                 ? t("objects.form.submitting")

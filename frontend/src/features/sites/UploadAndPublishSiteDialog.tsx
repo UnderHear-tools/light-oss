@@ -185,7 +185,7 @@ export function UploadAndPublishSiteDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button type="button" variant="outline">
-            <UploadIcon data-icon="inline-start" />
+            <UploadIcon />
             {t("sites.actions.uploadAndPublish")}
           </Button>
         )}
@@ -463,7 +463,7 @@ export function UploadAndPublishSiteDialog({
                   data-icon="inline-start"
                 />
               ) : (
-                <GlobeIcon data-icon="inline-start" />
+                <GlobeIcon />
               )}
               {pending
                 ? t("objects.form.submitting")

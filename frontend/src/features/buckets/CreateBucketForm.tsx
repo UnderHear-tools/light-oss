@@ -93,7 +93,7 @@ export function CreateBucketDialog({
                   data-icon="inline-start"
                 />
               ) : (
-                <PlusIcon data-icon="inline-start" />
+                <PlusIcon />
               )}
               {pending
                 ? t("buckets.form.submitting")

@@ -114,7 +114,7 @@ export function BucketList({
               />
               <Button asChild size="sm" variant="outline">
                 <Link to={`/buckets/${bucket.name}`}>
-                  <ArrowUpRightIcon data-icon="inline-start" />
+                  <ArrowUpRightIcon />
                   {t("common.open")}
                 </Link>
               </Button>
@@ -190,7 +190,7 @@ function DeleteBucketButton({
     <AlertDialog onOpenChange={handleOpenChange} open={open}>
       <AlertDialogTrigger asChild>
         <Button disabled={disabled} size="sm" type="button" variant="outline">
-          <Trash2Icon data-icon="inline-start" />
+          <Trash2Icon />
           {t("common.delete")}
         </Button>
       </AlertDialogTrigger>

@@ -116,7 +116,7 @@ export function ObjectTable({
                           rel="noreferrer"
                           target="_blank"
                         >
-                          <DownloadIcon data-icon="inline-start" />
+                          <DownloadIcon />
                           {t("objects.actions.directDownload")}
                         </a>
                       </Button>
@@ -134,7 +134,7 @@ export function ObjectTable({
                             data-icon="inline-start"
                           />
                         ) : (
-                          <DownloadIcon data-icon="inline-start" />
+                          <DownloadIcon />
                         )}
                         {signingKey === item.object_key
                           ? t("objects.actions.signing")
@@ -156,7 +156,7 @@ export function ObjectTable({
                               data-icon="inline-start"
                             />
                           ) : (
-                            <Trash2Icon data-icon="inline-start" />
+                            <Trash2Icon />
                           )}
                           {deletingKey === item.object_key
                             ? t("objects.actions.deleting")
