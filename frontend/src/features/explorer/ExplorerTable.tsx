@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -147,11 +148,72 @@ export function ExplorerTable({
 }) {
   const { locale, t } = useI18n();
   const [openSortBy, setOpenSortBy] = useState<ExplorerSortBy | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const selectedCount = entries.filter((entry) =>
+    selectedPaths.has(entry.path),
+  ).length;
+  const allSelected = entries.length > 0 && selectedCount === entries.length;
+  const partiallySelected = selectedCount > 0 && !allSelected;
+
+  useEffect(() => {
+    setSelectedPaths((current) => {
+      const visiblePaths = new Set(entries.map((entry) => entry.path));
+      let changed = false;
+      const next = new Set<string>();
+
+      current.forEach((path) => {
+        if (visiblePaths.has(path)) {
+          next.add(path);
+          return;
+        }
+
+        changed = true;
+      });
+
+      return changed ? next : current;
+    });
+  }, [entries]);
+
+  function handleSelectAll(checked: boolean | "indeterminate") {
+    setSelectedPaths(
+      checked === true
+        ? new Set(entries.map((entry) => entry.path))
+        : new Set(),
+    );
+  }
+
+  function handleSelectEntry(
+    entryPath: string,
+    checked: boolean | "indeterminate",
+  ) {
+    setSelectedPaths((current) => {
+      const next = new Set(current);
+
+      if (checked === true) {
+        next.add(entryPath);
+      } else {
+        next.delete(entryPath);
+      }
+
+      return next;
+    });
+  }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-4">
+            <Checkbox
+              aria-label={t("explorer.selection.selectAll")}
+              checked={
+                allSelected ? true : partiallySelected ? "indeterminate" : false
+              }
+              onCheckedChange={handleSelectAll}
+            />
+          </TableHead>
           <TableHead className="w-[360px] max-w-[360px] text-base font-semibold text-muted-foreground">
             <ExplorerSortHeader
               activeSortBy={sortBy}
@@ -200,97 +262,121 @@ export function ExplorerTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {entries.map((entry) => (
-          <TableRow key={entry.path}>
-            <TableCell className="w-[360px] max-w-[360px]">
-              <ExplorerEntryName
-                entry={entry}
-                buildPublicUrl={buildPublicUrl}
-                onOpenDirectory={onOpenDirectory}
-                onUpdateVisibility={onUpdateVisibility}
-              />
-            </TableCell>
-            <TableCell className="max-w-[280px]">
-              <ExplorerEntryUrlCell
-                buildPublicUrl={buildPublicUrl}
-                copyLabel={t("explorer.actions.copyUrl")}
-                entry={entry}
-              />
-            </TableCell>
-            <TableCell
-              className={
-                entry.type === "directory" ? "text-muted-foreground" : undefined
-              }
+        {entries.map((entry) => {
+          const selected = selectedPaths.has(entry.path);
+
+          return (
+            <TableRow
+              data-state={selected ? "selected" : undefined}
+              key={entry.path}
             >
-              {entry.type === "directory" ? "-" : formatBytes(entry.size)}
-            </TableCell>
-            <TableCell
-              className={
-                entry.type === "directory" ? "text-muted-foreground" : undefined
-              }
-            >
-              {entry.type === "directory" ? (
-                "-"
-              ) : (
-                <Badge
-                  variant={
-                    entry.visibility === "public" ? "outline" : "secondary"
+              <TableCell className="w-4">
+                <Checkbox
+                  aria-label={t("explorer.selection.selectRow", {
+                    name: entry.name,
+                  })}
+                  checked={selected}
+                  onCheckedChange={(checked) =>
+                    handleSelectEntry(entry.path, checked)
                   }
-                  className="flex items-center"
-                >
-                  {entry.visibility === "public" ? (
-                    <>
-                      <LockOpenIcon data-icon="inline-start" />
-                      {t("objects.visibility.public")}
-                    </>
-                  ) : (
-                    <>
-                      <LockIcon data-icon="inline-start" />
-                      {t("objects.visibility.private")}
-                    </>
-                  )}
-                </Badge>
-              )}
-            </TableCell>
-            <TableCell
-              className={
-                entry.type === "directory" ? "text-muted-foreground" : undefined
-              }
-            >
-              {entry.type === "directory"
-                ? "-"
-                : formatDate(entry.created_at ?? entry.updated_at, locale)}
-            </TableCell>
-            <TableCell>
-              {entry.type === "directory" ? (
-                <ExplorerDirectoryActions
-                  bucket={bucket}
-                  deletingPath={deletingPath}
-                  downloadingFolderPath={downloadingFolderPath}
-                  entry={entry}
-                  onDeleteFolder={onDeleteFolder}
-                  onDownloadFolder={onDownloadFolder}
-                  onOpenDirectory={onOpenDirectory}
-                  onPublishSite={onPublishSite}
-                  publishingPath={publishingPath}
                 />
-              ) : (
-                <ExplorerFileActions
-                  bucket={bucket}
+              </TableCell>
+              <TableCell className="w-[360px] max-w-[360px]">
+                <ExplorerEntryName
+                  entry={entry}
                   buildPublicUrl={buildPublicUrl}
-                  deletingPath={deletingPath}
-                  entry={entry}
-                  onDeleteFile={onDeleteFile}
-                  onPublishObjectSite={onPublishObjectSite}
-                  onSignDownload={onSignDownload}
+                  onOpenDirectory={onOpenDirectory}
                   onUpdateVisibility={onUpdateVisibility}
-                  publishingPath={publishingPath}
-                  signingPath={signingPath}
                 />
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+              <TableCell className="max-w-[280px]">
+                <ExplorerEntryUrlCell
+                  buildPublicUrl={buildPublicUrl}
+                  copyLabel={t("explorer.actions.copyUrl")}
+                  entry={entry}
+                />
+              </TableCell>
+              <TableCell
+                className={
+                  entry.type === "directory"
+                    ? "text-muted-foreground"
+                    : undefined
+                }
+              >
+                {entry.type === "directory" ? "-" : formatBytes(entry.size)}
+              </TableCell>
+              <TableCell
+                className={
+                  entry.type === "directory"
+                    ? "text-muted-foreground"
+                    : undefined
+                }
+              >
+                {entry.type === "directory" ? (
+                  "-"
+                ) : (
+                  <Badge
+                    variant={
+                      entry.visibility === "public" ? "outline" : "secondary"
+                    }
+                    className="flex items-center"
+                  >
+                    {entry.visibility === "public" ? (
+                      <>
+                        <LockOpenIcon data-icon="inline-start" />
+                        {t("objects.visibility.public")}
+                      </>
+                    ) : (
+                      <>
+                        <LockIcon data-icon="inline-start" />
+                        {t("objects.visibility.private")}
+                      </>
+                    )}
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell
+                className={
+                  entry.type === "directory"
+                    ? "text-muted-foreground"
+                    : undefined
+                }
+              >
+                {entry.type === "directory"
+                  ? "-"
+                  : formatDate(entry.created_at ?? entry.updated_at, locale)}
+              </TableCell>
+              <TableCell>
+                {entry.type === "directory" ? (
+                  <ExplorerDirectoryActions
+                    bucket={bucket}
+                    deletingPath={deletingPath}
+                    downloadingFolderPath={downloadingFolderPath}
+                    entry={entry}
+                    onDeleteFolder={onDeleteFolder}
+                    onDownloadFolder={onDownloadFolder}
+                    onOpenDirectory={onOpenDirectory}
+                    onPublishSite={onPublishSite}
+                    publishingPath={publishingPath}
+                  />
+                ) : (
+                  <ExplorerFileActions
+                    bucket={bucket}
+                    buildPublicUrl={buildPublicUrl}
+                    deletingPath={deletingPath}
+                    entry={entry}
+                    onDeleteFile={onDeleteFile}
+                    onPublishObjectSite={onPublishObjectSite}
+                    onSignDownload={onSignDownload}
+                    onUpdateVisibility={onUpdateVisibility}
+                    publishingPath={publishingPath}
+                    signingPath={signingPath}
+                  />
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -313,13 +399,13 @@ function ExplorerEntryName({
   if (entry.type === "directory") {
     return (
       <Button
-        className="w-full max-w-full min-w-0 cursor-pointer justify-start items-center gap-2 px-0 font-normal hover:bg-transparent"
+        className="px-0 flex w-full min-w-0 justify-start items-center font-normal hover:bg-transparent"
         onClick={() => onOpenDirectory(entry.path)}
         type="button"
         variant="ghost"
       >
         <span className="inline-flex size-4 items-center justify-center text-amber-500 [&_svg]:size-4">
-          <FolderIcon data-icon="inline-start" />
+          <FolderIcon />
         </span>
         <span className="min-w-0 truncate">{entry.name}</span>
       </Button>
@@ -334,12 +420,12 @@ function ExplorerEntryName({
         onUpdateVisibility={onUpdateVisibility}
       >
         <Button
-          className="flex w-full min-w-0 cursor-pointer justify-start items-center gap-2 px-0 font-normal hover:bg-transparent"
+          className="px-0 flex w-full min-w-0 justify-start items-center font-normal hover:bg-transparent"
           type="button"
           variant="ghost"
         >
           <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
-            <FileTextIcon data-icon="inline-start" />
+            <FileTextIcon />
           </span>
           <span className="min-w-0 truncate">{entry.name}</span>
         </Button>

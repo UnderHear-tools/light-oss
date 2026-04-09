@@ -92,6 +92,78 @@ describe("ExplorerTable", () => {
     expect(onSortClear).toHaveBeenCalledTimes(1);
   });
 
+  it("toggles row selection with checkboxes", async () => {
+    renderExplorerTable(createFileEntry({}));
+
+    const rowCheckbox = screen.getByRole("checkbox", {
+      name: "Select file.txt",
+    });
+    const row = rowCheckbox.closest("tr");
+
+    expect(row).not.toHaveAttribute("data-state", "selected");
+
+    await userEvent.click(rowCheckbox);
+
+    expect(row).toHaveAttribute("data-state", "selected");
+
+    await userEvent.click(rowCheckbox);
+
+    expect(row).not.toHaveAttribute("data-state", "selected");
+  });
+
+  it("supports select all and indeterminate selection states", async () => {
+    renderExplorerTable([
+      createFileEntry({
+        name: "alpha.txt",
+        object_key: "docs/alpha.txt",
+        original_filename: "alpha.txt",
+        path: "docs/alpha.txt",
+      }),
+      createDirectoryEntry({
+        name: "assets",
+        path: "assets/",
+      }),
+    ]);
+
+    const selectAllCheckbox = screen.getByRole("checkbox", {
+      name: "Select all items",
+    });
+    const firstRowCheckbox = screen.getByRole("checkbox", {
+      name: "Select alpha.txt",
+    });
+    const secondRowCheckbox = screen.getByRole("checkbox", {
+      name: "Select assets",
+    });
+
+    await userEvent.click(firstRowCheckbox);
+
+    expect(selectAllCheckbox).toHaveAttribute("data-state", "indeterminate");
+
+    await userEvent.click(selectAllCheckbox);
+
+    expect(selectAllCheckbox).toHaveAttribute("data-state", "checked");
+    expect(firstRowCheckbox.closest("tr")).toHaveAttribute(
+      "data-state",
+      "selected",
+    );
+    expect(secondRowCheckbox.closest("tr")).toHaveAttribute(
+      "data-state",
+      "selected",
+    );
+
+    await userEvent.click(selectAllCheckbox);
+
+    expect(selectAllCheckbox).toHaveAttribute("data-state", "unchecked");
+    expect(firstRowCheckbox.closest("tr")).not.toHaveAttribute(
+      "data-state",
+      "selected",
+    );
+    expect(secondRowCheckbox.closest("tr")).not.toHaveAttribute(
+      "data-state",
+      "selected",
+    );
+  });
+
   it("keeps file row actions within three visible actions plus an overflow menu", async () => {
     renderExplorerTable(createFileEntry({}));
 
@@ -483,7 +555,7 @@ function createDirectoryEntry(
 }
 
 function renderExplorerTable(
-  entry: ExplorerEntry,
+  entry: ExplorerEntry | ExplorerEntry[],
   options?: {
     onSortApply?: (
       sortBy: ExplorerSortBy,
@@ -494,6 +566,8 @@ function renderExplorerTable(
     sortOrder?: ExplorerSortOrder | null;
   },
 ) {
+  const entries = Array.isArray(entry) ? entry : [entry];
+
   renderWithApp(
     <ExplorerTable
       bucket="demo"
@@ -502,7 +576,7 @@ function renderExplorerTable(
       }
       deletingPath=""
       downloadingFolderPath=""
-      entries={[entry]}
+      entries={entries}
       onDeleteFile={vi.fn().mockResolvedValue(undefined)}
       onDeleteFolder={vi.fn().mockResolvedValue(undefined)}
       onDownloadFolder={vi.fn().mockResolvedValue(undefined)}
