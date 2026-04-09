@@ -33,18 +33,28 @@ import { useAppSettings } from "@/lib/settings";
 export function SettingsPage() {
   const { settings, saveSettings } = useAppSettings();
   const { t } = useI18n();
-  const [apiBaseUrl, setApiBaseUrl] = useState(settings.apiBaseUrl);
-  const [bearerToken, setBearerToken] = useState(settings.bearerToken);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [isBearerTokenVisible, setIsBearerTokenVisible] = useState(false);
   const [manualHealthStates, setManualHealthStates] =
     useState<ConnectionHealthStates | null>(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const testRequestRef = useRef(0);
 
-  const draftSettings = {
-    apiBaseUrl: apiBaseUrl.trim(),
-    bearerToken: bearerToken.trim(),
-  };
+  function readDraftSettings() {
+    if (formRef.current === null) {
+      return {
+        apiBaseUrl: settings.apiBaseUrl.trim(),
+        bearerToken: settings.bearerToken.trim(),
+      };
+    }
+
+    const formData = new FormData(formRef.current);
+
+    return {
+      apiBaseUrl: String(formData.get("apiBaseUrl") ?? "").trim(),
+      bearerToken: String(formData.get("bearerToken") ?? "").trim(),
+    };
+  }
 
   function clearManualHealthStates() {
     testRequestRef.current += 1;
@@ -54,6 +64,7 @@ export function SettingsPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const draftSettings = readDraftSettings();
     clearManualHealthStates();
     saveSettings({
       apiBaseUrl: draftSettings.apiBaseUrl,
@@ -63,6 +74,8 @@ export function SettingsPage() {
   }
 
   async function handleTestConnection() {
+    const draftSettings = readDraftSettings();
+
     if (draftSettings.apiBaseUrl === "") {
       return;
     }
@@ -131,7 +144,7 @@ export function SettingsPage() {
               {t("settings.connection.description")}
             </p>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} ref={formRef}>
             <CardContent>
               <FieldGroup>
                 <Field>
@@ -139,13 +152,10 @@ export function SettingsPage() {
                     {t("settings.connection.apiBaseUrl")}
                   </FieldLabel>
                   <Input
+                    defaultValue={settings.apiBaseUrl}
                     id="api-base-url"
-                    onChange={(event) => {
-                      setApiBaseUrl(event.target.value);
-                      clearManualHealthStates();
-                    }}
+                    name="apiBaseUrl"
                     placeholder="http://localhost:8080"
-                    value={apiBaseUrl}
                   />
                   <FieldDescription>
                     {t("settings.connection.apiBaseUrlDescription")}
@@ -159,14 +169,11 @@ export function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <Input
+                        defaultValue={settings.bearerToken}
                         id="bearer-token"
-                        onChange={(event) => {
-                          setBearerToken(event.target.value);
-                          clearManualHealthStates();
-                        }}
+                        name="bearerToken"
                         placeholder="dev-token"
                         type={isBearerTokenVisible ? "text" : "password"}
-                        value={bearerToken}
                       />
                     </div>
                     <Button
@@ -189,7 +196,7 @@ export function SettingsPage() {
             </CardContent>
             <CardFooter className="flex flex-wrap justify-end gap-2">
               <Button
-                disabled={draftSettings.apiBaseUrl === "" || isTestingConnection}
+                disabled={isTestingConnection}
                 onClick={handleTestConnection}
                 type="button"
                 variant="outline"
