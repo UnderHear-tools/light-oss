@@ -5,6 +5,8 @@ import {
   ChevronRightIcon,
   CircleAlertIcon,
   DownloadIcon,
+  FileTextIcon,
+  FolderIcon,
   FolderSearchIcon,
   LoaderCircleIcon,
   RefreshCcwIcon,
@@ -65,6 +67,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -109,7 +112,7 @@ import {
 } from "@/lib/explorer";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
-import { downloadFile } from "@/lib/utils";
+import { cn, downloadFile } from "@/lib/utils";
 
 type PendingOverwriteUpload = {
   kind: "object";
@@ -199,7 +202,8 @@ export function BucketObjectsPage() {
     enabled: bucket !== "",
   });
 
-  const entries = entriesQuery.data?.items ?? [];
+  const entryItems = entriesQuery.data?.items;
+  const entries = entryItems ?? [];
   const selectedEntries = entries.filter((entry) =>
     selectedPaths.has(entry.path),
   );
@@ -208,7 +212,7 @@ export function BucketObjectsPage() {
 
   useEffect(() => {
     setSelectedPaths((current) => {
-      const visiblePaths = new Set(entries.map((entry) => entry.path));
+      const visiblePaths = new Set((entryItems ?? []).map((entry) => entry.path));
       let changed = false;
       const next = new Set<string>();
 
@@ -223,7 +227,7 @@ export function BucketObjectsPage() {
 
       return changed ? next : current;
     });
-  }, [entries]);
+  }, [entryItems]);
 
   function uploadObjectRequest(
     value: UploadDialogValue,
@@ -499,10 +503,6 @@ export function BucketObjectsPage() {
           pendingOverwriteUpload.value.file.name,
       )
     : "";
-  const bulkDeletePreviewEntries = selectedEntries.slice(0, 3);
-  const remainingBulkDeletePreviewCount =
-    selectedCount - bulkDeletePreviewEntries.length;
-
   if (!bucket) {
     return (
       <EmptyState
@@ -1277,7 +1277,10 @@ export function BucketObjectsPage() {
         }}
         open={bulkDeleteDialogOpen}
       >
-        <AlertDialogContent size="sm">
+        <AlertDialogContent
+          className="overflow-hidden data-[size=sm]:max-w-[calc(100vw-1.5rem)] sm:data-[size=sm]:max-w-md"
+          size="sm"
+        >
           <AlertDialogHeader>
             <AlertDialogMedia>
               <CircleAlertIcon />
@@ -1292,23 +1295,13 @@ export function BucketObjectsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="space-y-2 text-sm text-muted-foreground">
-            {bulkDeletePreviewEntries.map((entry) => (
-              <div
-                className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 [overflow-wrap:anywhere]"
-                key={entry.path}
-              >
-                {entry.path}
-              </div>
-            ))}
-            {remainingBulkDeletePreviewCount > 0 ? (
-              <div className="text-xs text-muted-foreground">
-                {t("explorer.bulk.deletePreviewMore", {
-                  count: remainingBulkDeletePreviewCount,
-                })}
-              </div>
-            ) : null}
-          </div>
+          <ScrollArea className="max-h-56 w-full min-w-0 overflow-hidden rounded-lg border border-border/70">
+            <ul className="flex min-w-0 flex-col divide-y divide-border/60">
+              {selectedEntries.map((entry) => (
+                <BulkDeletePreviewItem entry={entry} key={entry.path} />
+              ))}
+            </ul>
+          </ScrollArea>
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={bulkDeletePending}>
@@ -1377,6 +1370,34 @@ export function BucketObjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </section>
+  );
+}
+
+function BulkDeletePreviewItem({
+  entry,
+}: {
+  entry: ExplorerDirectoryEntry | ExplorerFileEntry;
+}) {
+  return (
+    <li className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 overflow-hidden px-3 py-2">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 inline-flex size-4 shrink-0 items-center justify-center [&_svg]:size-4",
+          entry.type === "directory" ? "text-amber-500" : "text-muted-foreground",
+        )}
+      >
+        {entry.type === "directory" ? <FolderIcon /> : <FileTextIcon />}
+      </span>
+      <div className="min-w-0 overflow-hidden">
+        <div className="min-w-0 max-w-full overflow-hidden break-all text-sm font-medium text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+          {entry.name}
+        </div>
+        <div className="mt-0.5 block min-w-0 max-w-full truncate text-[11px] text-muted-foreground">
+          {entry.path}
+        </div>
+      </div>
+    </li>
   );
 }
 

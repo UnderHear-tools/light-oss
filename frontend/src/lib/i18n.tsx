@@ -264,7 +264,6 @@ const enUS = {
   "explorer.bulk.deleteConfirmTitle": "Delete selected items?",
   "explorer.bulk.deleteConfirmDescription":
     "This will delete {count} selected files or folders from the current page.",
-  "explorer.bulk.deletePreviewMore": "And {count} more selected items.",
   "sites.publish.title": "Publish folder as a site",
   "sites.publish.description":
     "Bind one or more domains to this folder prefix and serve its public objects as a website.",
@@ -579,7 +578,6 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.bulk.deleteConfirmTitle": "删除所选项目？",
   "explorer.bulk.deleteConfirmDescription":
     "这会删除当前页中选中的 {count} 个文件或文件夹。",
-  "explorer.bulk.deletePreviewMore": "以及另外 {count} 项。",
   "sites.publish.title": "发布站点",
   "sites.publish.description":
     "将当前文件夹前缀绑定到域名并作为网站提供公开对象。",

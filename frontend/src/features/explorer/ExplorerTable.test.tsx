@@ -289,9 +289,9 @@ describe("ExplorerTable", () => {
       return element?.tagName === "DD" && element.textContent === longFileName;
     });
 
-    expect(title.className).toContain("[overflow-wrap:anywhere]");
+    expect(title.className).toContain("wrap-anywhere");
     expect(originalFilenameValue.className).toContain(
-      "[overflow-wrap:anywhere]",
+      "wrap-anywhere",
     );
   });
 
@@ -317,7 +317,7 @@ describe("ExplorerTable", () => {
       );
     });
 
-    expect(description.className).toContain("[overflow-wrap:anywhere]");
+    expect(description.className).toContain("wrap-anywhere");
   });
 
   it("renders markdown previews as markdown content", async () => {
