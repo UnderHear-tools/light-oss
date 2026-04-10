@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+const browserDownloadTriggerDelayMs = 150;
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -16,7 +18,14 @@ export async function downloadFile(url: string, filename?: string) {
     link.rel = "noopener";
     document.body.appendChild(link);
     link.click();
+    await wait(browserDownloadTriggerDelayMs);
   } finally {
-    document.body.removeChild(link);
+    link.remove();
   }
+}
+
+function wait(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
 }
