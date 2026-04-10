@@ -878,7 +878,7 @@ function FileDetailsButton({
             <DetailField label={t("explorer.table.url")} monospace>
               {publicUrl ? (
                 <a
-                  className="min-w-0 [overflow-wrap:anywhere] text-sky-600 hover:underline"
+                  className="min-w-0 wrap-anywhere text-sky-600 hover:underline"
                   href={publicUrl}
                   rel="noreferrer"
                   target="_blank"
@@ -994,7 +994,7 @@ function DetailField({
       </dt>
       <dd
         className={cn(
-          "mt-1 min-w-0 text-sm [overflow-wrap:anywhere]",
+          "mt-1 min-w-0 text-sm wrap-anywhere",
           monospace && "font-mono",
         )}
       >

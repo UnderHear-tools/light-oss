@@ -202,7 +202,8 @@ export function BucketObjectsPage() {
     enabled: bucket !== "",
   });
 
-  const entries = entriesQuery.data?.items ?? [];
+  const entryItems = entriesQuery.data?.items;
+  const entries = entryItems ?? [];
   const selectedEntries = entries.filter((entry) =>
     selectedPaths.has(entry.path),
   );
@@ -211,7 +212,7 @@ export function BucketObjectsPage() {
 
   useEffect(() => {
     setSelectedPaths((current) => {
-      const visiblePaths = new Set(entries.map((entry) => entry.path));
+      const visiblePaths = new Set((entryItems ?? []).map((entry) => entry.path));
       let changed = false;
       const next = new Set<string>();
 
@@ -226,7 +227,7 @@ export function BucketObjectsPage() {
 
       return changed ? next : current;
     });
-  }, [entries]);
+  }, [entryItems]);
 
   function uploadObjectRequest(
     value: UploadDialogValue,
@@ -1389,7 +1390,7 @@ function BulkDeletePreviewItem({
         {entry.type === "directory" ? <FolderIcon /> : <FileTextIcon />}
       </span>
       <div className="min-w-0 overflow-hidden">
-        <div className="block min-w-0 max-w-full overflow-hidden break-all text-sm font-medium text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+        <div className="min-w-0 max-w-full overflow-hidden break-all text-sm font-medium text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
           {entry.name}
         </div>
         <div className="mt-0.5 block min-w-0 max-w-full truncate text-[11px] text-muted-foreground">

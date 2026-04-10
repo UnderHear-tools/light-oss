@@ -53,8 +53,8 @@ describe("BucketList", () => {
     const rootPrefixValue = within(dialog).getByText(rootPrefix);
     const domainsValue = within(dialog).getByText(domains.join(", "));
 
-    expect(rootPrefixValue.className).toContain("[overflow-wrap:anywhere]");
-    expect(domainsValue.className).toContain("[overflow-wrap:anywhere]");
+    expect(rootPrefixValue.className).toContain("wrap-anywhere");
+    expect(domainsValue.className).toContain("wrap-anywhere");
   });
 });
 
