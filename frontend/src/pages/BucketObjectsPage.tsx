@@ -1189,7 +1189,7 @@ export function BucketObjectsPage() {
 
             {selectedCount > 0 ? (
               <div className="border-b border-border/70 px-4 py-3">
-                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="text-sm font-medium text-foreground">
                     {t("explorer.bulk.selectedCount", {
                       count: selectedCount,
