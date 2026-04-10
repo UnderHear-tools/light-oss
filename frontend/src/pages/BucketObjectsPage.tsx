@@ -4,10 +4,13 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleAlertIcon,
+  DownloadIcon,
   FolderSearchIcon,
   LoaderCircleIcon,
   RefreshCcwIcon,
   SearchIcon,
+  Trash2Icon,
+  XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -16,6 +19,7 @@ import {
   checkObjectExists,
   createFolder,
   createSignedDownloadURL,
+  deleteExplorerEntriesBatch,
   deleteFolder,
   deleteObject,
   downloadFolderZip,
@@ -30,7 +34,12 @@ import {
   uploadFileAndPublishSite,
   uploadAndPublishSite,
 } from "@/api/sites";
-import type { PublishSiteResult } from "@/api/types";
+import type {
+  DeleteExplorerEntriesBatchFailedItem,
+  ExplorerDirectoryEntry,
+  ExplorerFileEntry,
+  PublishSiteResult,
+} from "@/api/types";
 import { EmptyState } from "@/components/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -101,6 +110,7 @@ import {
 import { buildFolderUploadManifest } from "@/lib/folder-upload";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
+import { downloadFile } from "@/lib/utils";
 
 type PendingOverwriteUpload =
   | {
@@ -132,9 +142,15 @@ export function BucketObjectsPage() {
     useState<PendingOverwriteUpload | null>(null);
   const [isRetryingOverwrite, setIsRetryingOverwrite] = useState(false);
   const [deletingPath, setDeletingPath] = useState("");
+  const [downloadingFilePath, setDownloadingFilePath] = useState("");
   const [downloadingFolderPath, setDownloadingFolderPath] = useState("");
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [bulkDownloadPending, setBulkDownloadPending] = useState(false);
+  const [bulkDeletePending, setBulkDeletePending] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [publishingPath, setPublishingPath] = useState("");
-  const [signingPath, setSigningPath] = useState("");
 
   const prefix = normalizeExplorerPrefix(searchParams.get("prefix"));
   const search = normalizeExplorerSearch(searchParams.get("search"));
@@ -173,6 +189,10 @@ export function BucketObjectsPage() {
     setCursorHistory([]);
   }, [bucket, prefix, search, limit, sortBy, sortOrder]);
 
+  useEffect(() => {
+    setSelectedPaths(new Set());
+  }, [bucket, prefix, search, cursor, limit, sortBy, sortOrder]);
+
   const entriesQuery = useQuery({
     queryKey: entriesQueryKey,
     queryFn: () =>
@@ -188,7 +208,36 @@ export function BucketObjectsPage() {
     enabled: bucket !== "",
   });
 
-  function uploadObjectRequest(value: UploadDialogValue, allowOverwrite: boolean) {
+  const entries = entriesQuery.data?.items ?? [];
+  const selectedEntries = entries.filter((entry) =>
+    selectedPaths.has(entry.path),
+  );
+  const selectedCount = selectedEntries.length;
+  const bulkActionsPending = bulkDownloadPending || bulkDeletePending;
+
+  useEffect(() => {
+    setSelectedPaths((current) => {
+      const visiblePaths = new Set(entries.map((entry) => entry.path));
+      let changed = false;
+      const next = new Set<string>();
+
+      current.forEach((path) => {
+        if (visiblePaths.has(path)) {
+          next.add(path);
+          return;
+        }
+
+        changed = true;
+      });
+
+      return changed ? next : current;
+    });
+  }, [entries]);
+
+  function uploadObjectRequest(
+    value: UploadDialogValue,
+    allowOverwrite: boolean,
+  ) {
     return uploadObject(settings, {
       bucket,
       objectKey: joinExplorerPath(prefix, value.objectKey),
@@ -390,40 +439,6 @@ export function BucketObjectsPage() {
     },
   });
 
-  const signMutation = useMutation({
-    mutationFn: async (objectKey: string) => {
-      setSigningPath(objectKey);
-      return createSignedDownloadURL(settings, bucket, objectKey, 300);
-    },
-    onSuccess: (result) => {
-      window.open(result.url, "_blank", "noopener");
-      toast.success(t("toast.signedDownloadReady"));
-    },
-    onError: (error) => {
-      const message =
-        error instanceof Error ? error.message : t("errors.signObject");
-      toast.error(message);
-    },
-    onSettled: () => {
-      setSigningPath("");
-    },
-  });
-
-  const downloadFolderMutation = useMutation({
-    mutationFn: async (folderPath: string) => {
-      setDownloadingFolderPath(folderPath);
-      await downloadFolderZip(settings, bucket, folderPath);
-    },
-    onError: (error) => {
-      const message =
-        error instanceof Error ? error.message : t("errors.downloadFolderZip");
-      toast.error(message);
-    },
-    onSettled: () => {
-      setDownloadingFolderPath("");
-    },
-  });
-
   const updateVisibilityMutation = useMutation({
     mutationFn: (input: {
       objectKey: string;
@@ -501,7 +516,6 @@ export function BucketObjectsPage() {
   });
 
   const breadcrumbs = getExplorerBreadcrumbs(prefix);
-  const entries = entriesQuery.data?.items ?? [];
   const uploadPending =
     uploadMutation.isPending ||
     uploadFolderMutation.isPending ||
@@ -518,6 +532,9 @@ export function BucketObjectsPage() {
             pendingOverwriteUpload.value.file.name,
         )
       : prefix || t("explorer.rootFolder"));
+  const bulkDeletePreviewEntries = selectedEntries.slice(0, 3);
+  const remainingBulkDeletePreviewCount =
+    selectedCount - bulkDeletePreviewEntries.length;
 
   if (!bucket) {
     return (
@@ -587,7 +604,11 @@ export function BucketObjectsPage() {
     }
 
     if (conflictTarget) {
-      setPendingOverwriteUpload({ kind: "object", value, target: conflictTarget });
+      setPendingOverwriteUpload({
+        kind: "object",
+        value,
+        target: conflictTarget,
+      });
       throw new Error("overwrite_confirmation_required");
     }
 
@@ -611,7 +632,11 @@ export function BucketObjectsPage() {
     }
 
     if (conflictTarget) {
-      setPendingOverwriteUpload({ kind: "folder", value, target: conflictTarget });
+      setPendingOverwriteUpload({
+        kind: "folder",
+        value,
+        target: conflictTarget,
+      });
       throw new Error("overwrite_confirmation_required");
     }
 
@@ -673,8 +698,83 @@ export function BucketObjectsPage() {
     await deleteFolderMutation.mutateAsync(folderPath);
   }
 
+  function handleSelectAll(checked: boolean | "indeterminate") {
+    if (bulkActionsPending) {
+      return;
+    }
+
+    setSelectedPaths(
+      checked === true
+        ? new Set(entries.map((entry) => entry.path))
+        : new Set(),
+    );
+  }
+
+  function handleSelectEntry(
+    entryPath: string,
+    checked: boolean | "indeterminate",
+  ) {
+    if (bulkActionsPending) {
+      return;
+    }
+
+    setSelectedPaths((current) => {
+      const next = new Set(current);
+
+      if (checked === true) {
+        next.add(entryPath);
+      } else {
+        next.delete(entryPath);
+      }
+
+      return next;
+    });
+  }
+
+  async function downloadExplorerFileEntry(entry: ExplorerFileEntry) {
+    const downloadUrl =
+      entry.visibility === "public"
+        ? buildPublicObjectURL(settings.apiBaseUrl, bucket, entry.object_key)
+        : (
+            await createSignedDownloadURL(
+              settings,
+              bucket,
+              entry.object_key,
+              300,
+            )
+          ).url;
+
+    await downloadFile(downloadUrl, entry.original_filename || entry.name);
+  }
+
+  async function downloadExplorerDirectoryEntry(entry: ExplorerDirectoryEntry) {
+    await downloadFolderZip(settings, bucket, entry.path);
+  }
+
+  async function handleDownloadFile(entry: ExplorerFileEntry) {
+    setDownloadingFilePath(entry.path);
+    try {
+      await downloadExplorerFileEntry(entry);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.downloadObject");
+      toast.error(message);
+    } finally {
+      setDownloadingFilePath("");
+    }
+  }
+
   async function handleDownloadFolder(folderPath: string) {
-    await downloadFolderMutation.mutateAsync(folderPath);
+    setDownloadingFolderPath(folderPath);
+    try {
+      await downloadFolderZip(settings, bucket, folderPath);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.downloadFolderZip");
+      toast.error(message);
+    } finally {
+      setDownloadingFolderPath("");
+    }
   }
 
   async function handlePublishSite(
@@ -691,15 +791,109 @@ export function BucketObjectsPage() {
     await publishObjectSiteMutation.mutateAsync({ objectKey, value });
   }
 
-  async function handleSignDownload(objectKey: string) {
-    await signMutation.mutateAsync(objectKey);
-  }
-
   async function handleUpdateVisibility(
     objectKey: string,
     visibility: "public" | "private",
   ) {
     await updateVisibilityMutation.mutateAsync({ objectKey, visibility });
+  }
+
+  async function handleBulkDownload() {
+    if (selectedEntries.length === 0 || bulkActionsPending) {
+      return;
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    setBulkDownloadPending(true);
+
+    try {
+      for (const entry of selectedEntries) {
+        try {
+          if (entry.type === "file") {
+            setDownloadingFilePath(entry.path);
+            await downloadExplorerFileEntry(entry);
+          } else {
+            setDownloadingFolderPath(entry.path);
+            await downloadExplorerDirectoryEntry(entry);
+          }
+          successCount++;
+        } catch {
+          failedCount++;
+        } finally {
+          setDownloadingFilePath("");
+          setDownloadingFolderPath("");
+        }
+      }
+    } finally {
+      setBulkDownloadPending(false);
+    }
+
+    if (failedCount === 0) {
+      toast.success(
+        t("toast.bulkDownloadCompleted", {
+          count: successCount,
+        }),
+      );
+      return;
+    }
+
+    toast.error(
+      t("toast.bulkDownloadPartial", {
+        successCount,
+        failedCount,
+      }),
+    );
+  }
+
+  async function handleConfirmBulkDelete() {
+    if (selectedEntries.length === 0 || bulkDeletePending) {
+      return;
+    }
+
+    setBulkDeletePending(true);
+    try {
+      const result = await deleteExplorerEntriesBatch(
+        settings,
+        bucket,
+        selectedEntries.map((entry) => ({
+          type: entry.type,
+          path: entry.path,
+        })),
+      );
+
+      const failedPaths = new Set(
+        result.failed_items.map(
+          (item: DeleteExplorerEntriesBatchFailedItem) => item.path,
+        ),
+      );
+
+      if (result.failed_count === 0) {
+        setSelectedPaths(new Set());
+        toast.success(
+          t("toast.bulkDeleteCompleted", {
+            count: result.deleted_count,
+          }),
+        );
+      } else {
+        setSelectedPaths(failedPaths);
+        toast.error(
+          t("toast.bulkDeletePartial", {
+            successCount: result.deleted_count,
+            failedCount: result.failed_count,
+          }),
+        );
+      }
+
+      setBulkDeleteDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("errors.bulkDeleteEntries");
+      toast.error(message);
+    } finally {
+      setBulkDeletePending(false);
+    }
   }
 
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -755,6 +949,47 @@ export function BucketObjectsPage() {
       cursor: previousCursor,
     });
   }
+
+  const bulkActionButtons = [
+    {
+      key: "download",
+      disabled: bulkActionsPending,
+      label: bulkDownloadPending
+        ? t("explorer.bulk.downloading")
+        : t("explorer.bulk.download"),
+      onClick: () => {
+        void handleBulkDownload();
+      },
+      variant: "outline" as const,
+      icon: bulkDownloadPending ? (
+        <LoaderCircleIcon className="animate-spin" />
+      ) : (
+        <DownloadIcon />
+      ),
+    },
+    {
+      key: "delete",
+      disabled: bulkActionsPending,
+      label: bulkDeletePending
+        ? t("explorer.bulk.deleting")
+        : t("explorer.bulk.delete"),
+      onClick: () => setBulkDeleteDialogOpen(true),
+      variant: "destructive" as const,
+      icon: bulkDeletePending ? (
+        <LoaderCircleIcon className="animate-spin" />
+      ) : (
+        <Trash2Icon />
+      ),
+    },
+    {
+      key: "clear",
+      disabled: bulkActionsPending,
+      label: t("explorer.bulk.clearSelection"),
+      onClick: () => setSelectedPaths(new Set()),
+      variant: "ghost" as const,
+      icon: <XIcon />,
+    },
+  ];
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-6">
@@ -937,6 +1172,32 @@ export function BucketObjectsPage() {
               </div>
             </div>
 
+            {selectedCount > 0 ? (
+              <div className="border-b border-border/70 px-4 py-3">
+                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="text-sm font-medium text-foreground">
+                    {t("explorer.bulk.selectedCount", {
+                      count: selectedCount,
+                    })}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {bulkActionButtons.map((action) => (
+                      <Button
+                        key={action.key}
+                        disabled={action.disabled}
+                        onClick={action.onClick}
+                        type="button"
+                        variant={action.variant}
+                      >
+                        {action.icon}
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {entriesQuery.isError ? (
               <div className="border-b border-border/70 p-4">
                 <Alert variant="destructive">
@@ -966,22 +1227,26 @@ export function BucketObjectsPage() {
                       )
                     }
                     deletingPath={deletingPath}
+                    downloadingFilePath={downloadingFilePath}
                     downloadingFolderPath={downloadingFolderPath}
                     entries={entries}
                     onDeleteFile={handleDeleteFile}
                     onDeleteFolder={handleDeleteFolder}
+                    onDownloadFile={handleDownloadFile}
                     onDownloadFolder={handleDownloadFolder}
                     onOpenDirectory={handleNavigatePrefix}
                     onPublishObjectSite={handlePublishObjectSite}
                     onPublishSite={handlePublishSite}
-                    onSignDownload={handleSignDownload}
+                    onSelectAll={handleSelectAll}
+                    onSelectEntry={handleSelectEntry}
                     onSortApply={handleSortApply}
                     onSortClear={handleSortClear}
                     onUpdateVisibility={handleUpdateVisibility}
                     publishingPath={publishingPath}
+                    selectedPaths={selectedPaths}
+                    selectionDisabled={bulkActionsPending}
                     sortBy={sortBy}
                     sortOrder={sortOrder}
-                    signingPath={signingPath}
                   />
                 </div>
                 <div className="flex flex-col gap-4 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1051,6 +1316,71 @@ export function BucketObjectsPage() {
           </div>
         </div>
       </Card>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!bulkDeletePending) {
+            setBulkDeleteDialogOpen(open);
+          }
+        }}
+        open={bulkDeleteDialogOpen}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <CircleAlertIcon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>
+              {t("explorer.bulk.deleteConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("explorer.bulk.deleteConfirmDescription", {
+                count: selectedCount,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            {bulkDeletePreviewEntries.map((entry) => (
+              <div
+                className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 [overflow-wrap:anywhere]"
+                key={entry.path}
+              >
+                {entry.path}
+              </div>
+            ))}
+            {remainingBulkDeletePreviewCount > 0 ? (
+              <div className="text-xs text-muted-foreground">
+                {t("explorer.bulk.deletePreviewMore", {
+                  count: remainingBulkDeletePreviewCount,
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeletePending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={bulkDeletePending}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmBulkDelete();
+              }}
+              variant="destructive"
+            >
+              {bulkDeletePending ? (
+                <LoaderCircleIcon
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
+              ) : null}
+              {t("explorer.bulk.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         onOpenChange={(open) => {

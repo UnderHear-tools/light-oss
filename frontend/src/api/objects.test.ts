@@ -3,6 +3,7 @@ import type { AppSettings } from "../lib/settings";
 import {
   buildPublicObjectURL,
   checkObjectExists,
+  deleteExplorerEntriesBatch,
   deleteFolder,
   downloadFolderZip,
   updateObjectVisibility,
@@ -312,6 +313,27 @@ describe("objects api helpers", () => {
     );
   });
 
+  it("posts mixed explorer entries to the batch delete endpoint", async () => {
+    await deleteExplorerEntriesBatch(settings, "demo", [
+      { type: "file", path: "docs/readme.txt" },
+      { type: "directory", path: "docs/assets/" },
+    ]);
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      settings,
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/v1/buckets/demo/entries/batch-delete",
+        data: {
+          items: [
+            { type: "file", path: "docs/readme.txt" },
+            { type: "directory", path: "docs/assets/" },
+          ],
+        },
+      }),
+    );
+  });
+
   it("downloads folder archives as blobs and honors the response filename", async () => {
     request.mockResolvedValue({
       data: new Blob(["zip-content"], { type: "application/zip" }),
@@ -342,15 +364,16 @@ describe("objects api helpers", () => {
     const createdLinks: HTMLAnchorElement[] = [];
     const originalCreateElement = document.createElement.bind(document);
     const createElementSpy = vi.spyOn(document, "createElement");
-    createElementSpy.mockImplementation(
-      ((tagName: string, options?: ElementCreationOptions) => {
-        const element = originalCreateElement(tagName, options);
-        if (tagName.toLowerCase() === "a") {
-          createdLinks.push(element as HTMLAnchorElement);
-        }
-        return element;
-      }) as typeof document.createElement,
-    );
+    createElementSpy.mockImplementation(((
+      tagName: string,
+      options?: ElementCreationOptions,
+    ) => {
+      const element = originalCreateElement(tagName, options);
+      if (tagName.toLowerCase() === "a") {
+        createdLinks.push(element as HTMLAnchorElement);
+      }
+      return element;
+    }) as typeof document.createElement);
 
     request.mockResolvedValue({
       data: new Blob(["zip-content"], { type: "application/zip" }),

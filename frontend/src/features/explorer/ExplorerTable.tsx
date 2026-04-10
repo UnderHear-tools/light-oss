@@ -97,36 +97,42 @@ import {
   PublishSiteDialog,
   type PublishSiteValue,
 } from "@/features/explorer/PublishSiteDialog";
-import { cn, downloadFile } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function ExplorerTable({
   bucket,
   buildPublicUrl,
   deletingPath,
+  downloadingFilePath,
   downloadingFolderPath,
   entries,
   onDeleteFile,
   onDeleteFolder,
+  onDownloadFile,
   onDownloadFolder,
   onOpenDirectory,
   onPublishObjectSite,
   onPublishSite,
-  onSignDownload,
+  onSelectAll,
+  onSelectEntry,
   onSortApply,
   onSortClear,
   onUpdateVisibility,
   publishingPath,
+  selectedPaths,
+  selectionDisabled = false,
   sortBy,
   sortOrder,
-  signingPath,
 }: {
   bucket: string;
   buildPublicUrl: (objectKey: string) => string;
   deletingPath: string;
+  downloadingFilePath: string;
   downloadingFolderPath: string;
   entries: ExplorerEntry[];
   onDeleteFile: (objectKey: string) => Promise<void>;
   onDeleteFolder: (folderPath: string) => Promise<void>;
+  onDownloadFile: (entry: ExplorerFileEntry) => Promise<void>;
   onDownloadFolder: (folderPath: string) => Promise<void>;
   onOpenDirectory: (folderPath: string) => void;
   onPublishObjectSite: (
@@ -134,7 +140,11 @@ export function ExplorerTable({
     value: PublishObjectSiteValue,
   ) => Promise<void>;
   onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
-  onSignDownload: (objectKey: string) => Promise<void>;
+  onSelectAll: (checked: boolean | "indeterminate") => void;
+  onSelectEntry: (
+    entryPath: string,
+    checked: boolean | "indeterminate",
+  ) => void;
   onSortApply: (sortBy: ExplorerSortBy, sortOrder: ExplorerSortOrder) => void;
   onSortClear: () => void;
   onUpdateVisibility: (
@@ -142,64 +152,18 @@ export function ExplorerTable({
     visibility: ObjectVisibility,
   ) => Promise<void>;
   publishingPath: string;
+  selectedPaths: Set<string>;
+  selectionDisabled?: boolean;
   sortBy: ExplorerSortBy | null;
   sortOrder: ExplorerSortOrder | null;
-  signingPath: string;
 }) {
   const { locale, t } = useI18n();
   const [openSortBy, setOpenSortBy] = useState<ExplorerSortBy | null>(null);
-  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
-    () => new Set(),
-  );
   const selectedCount = entries.filter((entry) =>
     selectedPaths.has(entry.path),
   ).length;
   const allSelected = entries.length > 0 && selectedCount === entries.length;
   const partiallySelected = selectedCount > 0 && !allSelected;
-
-  useEffect(() => {
-    setSelectedPaths((current) => {
-      const visiblePaths = new Set(entries.map((entry) => entry.path));
-      let changed = false;
-      const next = new Set<string>();
-
-      current.forEach((path) => {
-        if (visiblePaths.has(path)) {
-          next.add(path);
-          return;
-        }
-
-        changed = true;
-      });
-
-      return changed ? next : current;
-    });
-  }, [entries]);
-
-  function handleSelectAll(checked: boolean | "indeterminate") {
-    setSelectedPaths(
-      checked === true
-        ? new Set(entries.map((entry) => entry.path))
-        : new Set(),
-    );
-  }
-
-  function handleSelectEntry(
-    entryPath: string,
-    checked: boolean | "indeterminate",
-  ) {
-    setSelectedPaths((current) => {
-      const next = new Set(current);
-
-      if (checked === true) {
-        next.add(entryPath);
-      } else {
-        next.delete(entryPath);
-      }
-
-      return next;
-    });
-  }
 
   return (
     <Table>
@@ -208,10 +172,11 @@ export function ExplorerTable({
           <TableHead className="w-4">
             <Checkbox
               aria-label={t("explorer.selection.selectAll")}
+              disabled={selectionDisabled}
               checked={
                 allSelected ? true : partiallySelected ? "indeterminate" : false
               }
-              onCheckedChange={handleSelectAll}
+              onCheckedChange={onSelectAll}
             />
           </TableHead>
           <TableHead className="w-[360px] max-w-[360px] text-base font-semibold text-muted-foreground">
@@ -275,9 +240,10 @@ export function ExplorerTable({
                   aria-label={t("explorer.selection.selectRow", {
                     name: entry.name,
                   })}
+                  disabled={selectionDisabled}
                   checked={selected}
                   onCheckedChange={(checked) =>
-                    handleSelectEntry(entry.path, checked)
+                    onSelectEntry(entry.path, checked)
                   }
                 />
               </TableCell>
@@ -364,13 +330,13 @@ export function ExplorerTable({
                     bucket={bucket}
                     buildPublicUrl={buildPublicUrl}
                     deletingPath={deletingPath}
+                    downloadingFilePath={downloadingFilePath}
                     entry={entry}
                     onDeleteFile={onDeleteFile}
+                    onDownloadFile={onDownloadFile}
                     onPublishObjectSite={onPublishObjectSite}
-                    onSignDownload={onSignDownload}
                     onUpdateVisibility={onUpdateVisibility}
                     publishingPath={publishingPath}
-                    signingPath={signingPath}
                   />
                 )}
               </TableCell>
@@ -496,7 +462,11 @@ function ExplorerDirectoryActions({
               onSelect={(event) => event.preventDefault()}
               variant="destructive"
             >
-              {deleting ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+              {deleting ? (
+                <LoaderCircleIcon className="animate-spin" />
+              ) : (
+                <Trash2Icon />
+              )}
               {t("explorer.actions.deleteFolder")}
             </DropdownMenuItem>
           }
@@ -510,33 +480,39 @@ function ExplorerFileActions({
   bucket,
   buildPublicUrl,
   deletingPath,
+  downloadingFilePath,
   entry,
   onDeleteFile,
+  onDownloadFile,
   onPublishObjectSite,
-  onSignDownload,
   onUpdateVisibility,
   publishingPath,
-  signingPath,
 }: {
   bucket: string;
   buildPublicUrl: (objectKey: string) => string;
   deletingPath: string;
+  downloadingFilePath: string;
   entry: ExplorerFileEntry;
   onDeleteFile: (objectKey: string) => Promise<void>;
+  onDownloadFile: (entry: ExplorerFileEntry) => Promise<void>;
   onPublishObjectSite: (
     objectKey: string,
     value: PublishObjectSiteValue,
   ) => Promise<void>;
-  onSignDownload: (objectKey: string) => Promise<void>;
   onUpdateVisibility: (
     objectKey: string,
     visibility: ObjectVisibility,
   ) => Promise<void>;
   publishingPath: string;
-  signingPath: string;
 }) {
   const { t } = useI18n();
   const deleting = deletingPath === entry.object_key;
+  const downloading = downloadingFilePath === entry.path;
+  const downloadLabel = downloading
+    ? t("explorer.actions.downloadingFile")
+    : entry.visibility === "public"
+      ? t("explorer.actions.directDownload")
+      : t("explorer.actions.signedDownload");
 
   return (
     <div className="flex items-center justify-start gap-1">
@@ -550,26 +526,17 @@ function ExplorerFileActions({
         </ExplorerIconButton>
       </FileDetailsButton>
 
-      {entry.visibility === "public" ? (
-        <ExplorerIconLink
-          href={buildPublicUrl(entry.object_key)}
-          label={t("explorer.actions.directDownload")}
-        >
+      <ExplorerIconButton
+        disabled={downloading}
+        label={downloadLabel}
+        onClick={() => void onDownloadFile(entry)}
+      >
+        {downloading ? (
+          <LoaderCircleIcon className="animate-spin text-sky-500" />
+        ) : (
           <DownloadIcon className="text-sky-500" />
-        </ExplorerIconLink>
-      ) : (
-        <ExplorerIconButton
-          disabled={signingPath === entry.path}
-          label={t("explorer.actions.signedDownload")}
-          onClick={() => void onSignDownload(entry.object_key)}
-        >
-          {signingPath === entry.path ? (
-            <LoaderCircleIcon className="animate-spin text-sky-500" />
-          ) : (
-            <DownloadIcon className="text-sky-500" />
-          )}
-        </ExplorerIconButton>
-      )}
+        )}
+      </ExplorerIconButton>
 
       <PublishObjectSiteButton
         bucket={bucket}
@@ -591,7 +558,11 @@ function ExplorerFileActions({
               onSelect={(event) => event.preventDefault()}
               variant="destructive"
             >
-              {deleting ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+              {deleting ? (
+                <LoaderCircleIcon className="animate-spin" />
+              ) : (
+                <Trash2Icon />
+              )}
               {t("common.delete")}
             </DropdownMenuItem>
           }
@@ -1188,13 +1159,14 @@ function FilePreview({
 }) {
   const { t } = useI18n();
   const isFullscreen = displayMode === "fullscreen";
-  const inlineAction = !isFullscreen && previewType !== "audio" ? (
-    <PreviewFullscreenButton
-      fileName={fileName}
-      previewType={previewType}
-      publicUrl={publicUrl}
-    />
-  ) : null;
+  const inlineAction =
+    !isFullscreen && previewType !== "audio" ? (
+      <PreviewFullscreenButton
+        fileName={fileName}
+        previewType={previewType}
+        publicUrl={publicUrl}
+      />
+    ) : null;
 
   if (!publicUrl || !previewType) {
     return (
@@ -1208,9 +1180,7 @@ function FilePreview({
       data-testid="inline-preview-surface"
     >
       {inlineAction ? (
-        <div className="absolute top-3 right-5 z-10">
-          {inlineAction}
-        </div>
+        <div className="absolute top-3 right-5 z-10">{inlineAction}</div>
       ) : null}
       {children}
     </div>
@@ -1222,7 +1192,9 @@ function FilePreview({
         alt="file preview"
         className={cn(
           "w-full min-w-0 max-w-full object-contain",
-          isFullscreen ? "h-full max-h-full rounded-md border border-border/70 bg-background" : "max-h-80",
+          isFullscreen
+            ? "h-full max-h-full rounded-md border border-border/70 bg-background"
+            : "max-h-80",
         )}
         src={publicUrl}
       />
@@ -1236,7 +1208,9 @@ function FilePreview({
       <video
         className={cn(
           "w-full min-w-0 max-w-full",
-          isFullscreen ? "h-full max-h-full rounded-md border border-border/70 bg-background" : "max-h-80",
+          isFullscreen
+            ? "h-full max-h-full rounded-md border border-border/70 bg-background"
+            : "max-h-80",
         )}
         controls
         src={publicUrl}
@@ -1283,7 +1257,9 @@ function FilePreview({
     <iframe
       className={cn(
         "w-full min-w-0 max-w-full bg-background",
-        isFullscreen ? "h-full min-h-0 rounded-md border border-border/70" : "h-80",
+        isFullscreen
+          ? "h-full min-h-0 rounded-md border border-border/70"
+          : "h-80",
       )}
       src={previewUrl}
       title="file preview"
@@ -1364,9 +1340,7 @@ function RemoteTextPreview({
           data-testid="inline-preview-surface"
         >
           {action ? (
-            <div className="absolute top-3 right-5 z-10">
-              {action}
-            </div>
+            <div className="absolute top-3 right-5 z-10">{action}</div>
           ) : null}
           <span className="text-muted-foreground">{t("common.loading")}</span>
         </div>
@@ -1384,16 +1358,18 @@ function RemoteTextPreview({
           data-testid="inline-preview-surface"
         >
           {action ? (
-            <div className="absolute top-3 right-5 z-10">
-              {action}
-            </div>
+            <div className="absolute top-3 right-5 z-10">{action}</div>
           ) : null}
-          <span className="text-muted-foreground">{t("common.notAvailable")}</span>
+          <span className="text-muted-foreground">
+            {t("common.notAvailable")}
+          </span>
         </div>
       );
     }
 
-    return <span className="text-muted-foreground">{t("common.notAvailable")}</span>;
+    return (
+      <span className="text-muted-foreground">{t("common.notAvailable")}</span>
+    );
   }
 
   if (mode === "markdown") {
@@ -1404,9 +1380,7 @@ function RemoteTextPreview({
           data-testid="inline-preview-surface"
         >
           {action ? (
-            <div className="absolute top-3 right-5 z-10">
-              {action}
-            </div>
+            <div className="absolute top-3 right-5 z-10">{action}</div>
           ) : null}
           <div className="max-h-80 min-w-0 max-w-full overflow-auto p-4 pt-12">
             <div className="flex min-w-0 flex-col gap-4 text-sm">
@@ -1424,9 +1398,7 @@ function RemoteTextPreview({
     }
 
     return (
-      <div
-        className="h-full min-h-0 min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-4"
-      >
+      <div className="h-full min-h-0 min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-4">
         <div className="flex min-w-0 flex-col gap-4 text-sm">
           <ReactMarkdown
             components={markdownComponents}
@@ -1447,9 +1419,7 @@ function RemoteTextPreview({
         data-testid="inline-preview-surface"
       >
         {action ? (
-          <div className="absolute top-3 right-5 z-10">
-            {action}
-          </div>
+          <div className="absolute top-3 right-5 z-10">{action}</div>
         ) : null}
         <div className="max-h-80 min-w-0 max-w-full overflow-auto">
           <pre className="w-full min-w-0 max-w-full p-3 pt-12 font-mono text-sm whitespace-pre-wrap wrap-break-word">
@@ -1461,9 +1431,7 @@ function RemoteTextPreview({
   }
 
   return (
-    <pre
-      className="h-full min-h-0 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap wrap-break-word"
-    >
+    <pre className="h-full min-h-0 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border/70 bg-background p-3 font-mono text-sm whitespace-pre-wrap wrap-break-word">
       {previewText}
     </pre>
   );
@@ -1827,56 +1795,3 @@ const ExplorerIconActionButton = forwardRef<
     </Button>
   );
 });
-
-function ExplorerIconLink({
-  children,
-  href,
-  label,
-}: {
-  children: React.ReactNode;
-  href: string;
-  label: string;
-}) {
-  // 从 href 中提取文件名（最后一个 '/' 之后的部分，并解码）
-  const getFileName = (url: string) => {
-    const decodedUrl = decodeURIComponent(url);
-    const parts = decodedUrl.split("/");
-    // 数组的 pop方法移除数组的 最后一个元素并返回
-    const lastPart = parts.pop() || "download";
-    return lastPart;
-  };
-
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const filename = getFileName(href);
-    downloadFile(href, filename);
-  };
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex">
-          <Button
-            asChild
-            className="[&_svg]:size-4"
-            size="icon-sm"
-            variant="ghost"
-          >
-            <a
-              href={href}
-              rel="noreferrer"
-              target="_blank"
-              onClick={handleClick}
-            >
-              {children}
-              <span className="sr-only">{label}</span>
-            </a>
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="whitespace-nowrap leading-none" sideOffset={6}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
-}

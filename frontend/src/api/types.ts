@@ -77,6 +77,22 @@ export interface ExplorerEntriesResult {
   next_cursor: string;
 }
 
+export interface DeleteExplorerEntriesBatchItem {
+  type: "file" | "directory";
+  path: string;
+}
+
+export interface DeleteExplorerEntriesBatchFailedItem extends DeleteExplorerEntriesBatchItem {
+  code: string;
+  message: string;
+}
+
+export interface DeleteExplorerEntriesBatchResult {
+  deleted_count: number;
+  failed_count: number;
+  failed_items: DeleteExplorerEntriesBatchFailedItem[];
+}
+
 export interface BatchUploadResult {
   uploaded_count: number;
   items: ObjectItem[];

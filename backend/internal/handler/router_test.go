@@ -87,6 +87,19 @@ type explorerListResponse struct {
 	NextCursor string                  `json:"next_cursor"`
 }
 
+type deleteExplorerEntriesBatchFailedItemResponse struct {
+	Type    string `json:"type"`
+	Path    string `json:"path"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type deleteExplorerEntriesBatchResponse struct {
+	DeletedCount int                                            `json:"deleted_count"`
+	FailedCount  int                                            `json:"failed_count"`
+	FailedItems  []deleteExplorerEntriesBatchFailedItemResponse `json:"failed_items"`
+}
+
 type signResponse struct {
 	URL string `json:"url"`
 }
@@ -1830,6 +1843,193 @@ func TestCreateAndDeleteFolder(t *testing.T) {
 	if deleteMissingRec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d, body=%s", deleteMissingRec.Code, deleteMissingRec.Body.String())
 	}
+}
+
+func TestDeleteExplorerEntriesBatch(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "batch-delete-bucket")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-bucket/objects/docs/readme.txt", "hello", "public")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-bucket/objects/docs/nested/guide.txt", "nested", "private")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-bucket/objects/notes.txt", "notes", "public")
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/buckets/batch-delete-bucket/entries/batch-delete",
+		bytes.NewBufferString(`{"items":[{"type":"file","path":"notes.txt"},{"type":"directory","path":"docs/"}]}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[deleteExplorerEntriesBatchResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.DeletedCount != 2 || body.Data.FailedCount != 0 || len(body.Data.FailedItems) != 0 {
+		t.Fatalf("unexpected batch delete response: %+v", body.Data)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/batch-delete-bucket/entries", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 0 {
+		t.Fatalf("expected empty root after batch delete, got %+v", listBody.Data.Items)
+	}
+}
+
+func TestDeleteExplorerEntriesBatchDeletesDescendantsBeforeParents(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "batch-delete-overlap-bucket")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-overlap-bucket/objects/docs/readme.txt", "hello", "public")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-overlap-bucket/objects/docs/nested/guide.txt", "nested", "private")
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/buckets/batch-delete-overlap-bucket/entries/batch-delete",
+		bytes.NewBufferString(`{"items":[{"type":"directory","path":"docs/"},{"type":"directory","path":"docs/nested/"},{"type":"file","path":"docs/nested/guide.txt"}]}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[deleteExplorerEntriesBatchResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.DeletedCount != 3 || body.Data.FailedCount != 0 || len(body.Data.FailedItems) != 0 {
+		t.Fatalf("unexpected batch delete response: %+v", body.Data)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/batch-delete-overlap-bucket/entries", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[explorerListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 0 {
+		t.Fatalf("expected empty root after overlapping batch delete, got %+v", listBody.Data.Items)
+	}
+}
+
+func TestDeleteExplorerEntriesBatchReportsPartialFailures(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "batch-delete-partial-bucket")
+	uploadObject(t, router, "/api/v1/buckets/batch-delete-partial-bucket/objects/keep.txt", "keep", "public")
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/buckets/batch-delete-partial-bucket/entries/batch-delete",
+		bytes.NewBufferString(`{"items":[{"type":"file","path":"missing.txt"},{"type":"file","path":"keep.txt"},{"type":"directory","path":"ghost/"}]}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[deleteExplorerEntriesBatchResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.DeletedCount != 1 || body.Data.FailedCount != 2 {
+		t.Fatalf("unexpected batch delete response: %+v", body.Data)
+	}
+	if len(body.Data.FailedItems) != 2 {
+		t.Fatalf("expected 2 failed items, got %+v", body.Data.FailedItems)
+	}
+	if body.Data.FailedItems[0].Code != "object_not_found" || body.Data.FailedItems[0].Path != "missing.txt" {
+		t.Fatalf("unexpected first failed item: %+v", body.Data.FailedItems[0])
+	}
+	if body.Data.FailedItems[1].Code != "folder_not_found" || body.Data.FailedItems[1].Path != "ghost/" {
+		t.Fatalf("unexpected second failed item: %+v", body.Data.FailedItems[1])
+	}
+}
+
+func TestDeleteExplorerEntriesBatchRejectsInvalidRequests(t *testing.T) {
+	router := newTestRouter(t, 1024)
+	createBucket(t, router, "batch-delete-invalid-bucket")
+
+	testCases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "empty items",
+			body: `{"items":[]}`,
+		},
+		{
+			name: "invalid type",
+			body: `{"items":[{"type":"bucket","path":"docs/"}]}`,
+		},
+		{
+			name: "directory missing trailing slash",
+			body: `{"items":[{"type":"directory","path":"docs"}]}`,
+		},
+		{
+			name: "file path ends with slash",
+			body: `{"items":[{"type":"file","path":"docs/"}]}`,
+		},
+		{
+			name: "too many items",
+			body: `{"items":[` + strings.Repeat(`{"type":"file","path":"docs/readme.txt"},`, 200) + `{"type":"file","path":"docs/final.txt"}]}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/api/v1/buckets/batch-delete-invalid-bucket/entries/batch-delete",
+				bytes.NewBufferString(tc.body),
+			)
+			req.Header.Set("Authorization", "Bearer dev-token")
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d, body=%s", rec.Code, rec.Body.String())
+			}
+
+			assertAPIErrorCode(t, rec.Body.Bytes(), "invalid_request")
+		})
+	}
+}
+
+func TestDeleteExplorerEntriesBatchReturnsBucketNotFound(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/buckets/missing-bucket/entries/batch-delete",
+		bytes.NewBufferString(`{"items":[{"type":"file","path":"docs/readme.txt"}]}`),
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	assertAPIErrorCode(t, rec.Body.Bytes(), "bucket_not_found")
 }
 
 func TestDeleteBucketCascadesAndCleansStorage(t *testing.T) {

@@ -69,6 +69,15 @@ type signDownloadRequest struct {
 	ExpiresInSeconds int64  `json:"expires_in_seconds"`
 }
 
+type deleteExplorerEntriesBatchRequest struct {
+	Items []deleteExplorerEntriesBatchItemRequest `json:"items"`
+}
+
+type deleteExplorerEntriesBatchItemRequest struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
+}
+
 type siteRequest struct {
 	Bucket        string   `json:"bucket"`
 	RootPrefix    string   `json:"root_prefix"`
@@ -118,6 +127,19 @@ type explorerEntryResponse struct {
 	Visibility       *string    `json:"visibility"`
 	CreatedAt        *time.Time `json:"created_at"`
 	UpdatedAt        *time.Time `json:"updated_at"`
+}
+
+type deleteExplorerEntriesBatchFailedItemResponse struct {
+	Type    string `json:"type"`
+	Path    string `json:"path"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type deleteExplorerEntriesBatchResponse struct {
+	DeletedCount int                                            `json:"deleted_count"`
+	FailedCount  int                                            `json:"failed_count"`
+	FailedItems  []deleteExplorerEntriesBatchFailedItemResponse `json:"failed_items"`
 }
 
 type siteResponse struct {
@@ -192,6 +214,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.POST("/buckets/:bucket/folders", handler.createFolder)
 	protected.DELETE("/buckets/:bucket/folders", handler.deleteFolder)
 	protected.GET("/buckets/:bucket/entries", handler.listExplorerEntries)
+	protected.POST("/buckets/:bucket/entries/batch-delete", handler.deleteExplorerEntriesBatch)
 	protected.POST("/buckets/:bucket/objects/batch", middleware.MaxBodySize(deps.Config.MaxUploadSizeBytes), handler.uploadObjectBatch)
 	protected.PUT("/buckets/:bucket/objects/*key", middleware.MaxBodySize(deps.Config.MaxUploadSizeBytes), handler.uploadObject)
 	protected.PATCH("/buckets/:bucket/objects/visibility/*key", handler.updateObjectVisibility)
@@ -528,6 +551,48 @@ func (h *apiHandler) deleteObject(c *gin.Context) {
 	}
 
 	response.NoContent(c, http.StatusNoContent)
+}
+
+func (h *apiHandler) deleteExplorerEntriesBatch(c *gin.Context) {
+	var req deleteExplorerEntriesBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "request body is invalid"))
+		return
+	}
+
+	items := make([]service.DeleteExplorerEntriesBatchItemInput, 0, len(req.Items))
+	for _, item := range req.Items {
+		items = append(items, service.DeleteExplorerEntriesBatchItemInput{
+			Type: item.Type,
+			Path: item.Path,
+		})
+	}
+
+	result, err := h.objectService.DeleteExplorerEntriesBatch(
+		c.Request.Context(),
+		c.Param("bucket"),
+		items,
+	)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	failedItems := make([]deleteExplorerEntriesBatchFailedItemResponse, 0, len(result.FailedItems))
+	for _, item := range result.FailedItems {
+		failedItems = append(failedItems, deleteExplorerEntriesBatchFailedItemResponse{
+			Type:    item.Type,
+			Path:    item.Path,
+			Code:    item.Code,
+			Message: item.Message,
+		})
+	}
+
+	response.JSON(c, http.StatusOK, deleteExplorerEntriesBatchResponse{
+		DeletedCount: result.DeletedCount,
+		FailedCount:  result.FailedCount,
+		FailedItems:  failedItems,
+	})
 }
 
 func (h *apiHandler) headSite(c *gin.Context) {

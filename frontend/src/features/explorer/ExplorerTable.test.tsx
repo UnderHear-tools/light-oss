@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import type {
@@ -164,6 +165,56 @@ describe("ExplorerTable", () => {
     );
   });
 
+  it("routes public and private file download actions through the shared callback", async () => {
+    const onDownloadFile = vi.fn().mockResolvedValue(undefined);
+
+    renderExplorerTable(
+      [
+        createFileEntry({
+          name: "public.txt",
+          object_key: "docs/public.txt",
+          original_filename: "public.txt",
+          path: "docs/public.txt",
+          visibility: "public",
+        }),
+        createFileEntry({
+          name: "private.txt",
+          object_key: "docs/private.txt",
+          original_filename: "private.txt",
+          path: "docs/private.txt",
+          visibility: "private",
+        }),
+      ],
+      {
+        onDownloadFile,
+      },
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Direct download" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Signed download" }),
+    );
+
+    expect(onDownloadFile).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        object_key: "docs/public.txt",
+        path: "docs/public.txt",
+        visibility: "public",
+      }),
+    );
+    expect(onDownloadFile).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        object_key: "docs/private.txt",
+        path: "docs/private.txt",
+        visibility: "private",
+      }),
+    );
+  });
+
   it("keeps file row actions within three visible actions plus an overflow menu", async () => {
     renderExplorerTable(createFileEntry({}));
 
@@ -171,12 +222,14 @@ describe("ExplorerTable", () => {
       screen.getByRole("button", { name: "View details" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Direct download" }),
+      screen.getByRole("button", { name: "Direct download" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Publish site" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More actions" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Delete" }),
     ).not.toBeInTheDocument();
@@ -193,11 +246,15 @@ describe("ExplorerTable", () => {
     expect(
       screen.getByRole("button", { name: "Open folder" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Download ZIP" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Download ZIP" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Publish site" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More actions" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Delete folder" }),
     ).not.toBeInTheDocument();
@@ -233,7 +290,9 @@ describe("ExplorerTable", () => {
     });
 
     expect(title.className).toContain("[overflow-wrap:anywhere]");
-    expect(originalFilenameValue.className).toContain("[overflow-wrap:anywhere]");
+    expect(originalFilenameValue.className).toContain(
+      "[overflow-wrap:anywhere]",
+    );
   });
 
   it("uses shared wrap-anywhere classes for long object keys in delete dialogs", async () => {
@@ -377,14 +436,20 @@ describe("ExplorerTable", () => {
     await userEvent.click(screen.getByRole("button", { name: "avatar.png" }));
 
     const detailsDialog = await screen.findByRole("dialog");
-    const inlinePreviewSurface = within(detailsDialog).getByTestId("inline-preview-surface");
+    const inlinePreviewSurface = within(detailsDialog).getByTestId(
+      "inline-preview-surface",
+    );
 
     expect(
-      within(inlinePreviewSurface).getByRole("button", { name: "Fullscreen preview" }),
+      within(inlinePreviewSurface).getByRole("button", {
+        name: "Fullscreen preview",
+      }),
     ).toBeInTheDocument();
 
     await userEvent.click(
-      within(inlinePreviewSurface).getByRole("button", { name: "Fullscreen preview" }),
+      within(inlinePreviewSurface).getByRole("button", {
+        name: "Fullscreen preview",
+      }),
     );
 
     const fullscreenDialog = await screen.findByRole("dialog", {
@@ -557,6 +622,7 @@ function createDirectoryEntry(
 function renderExplorerTable(
   entry: ExplorerEntry | ExplorerEntry[],
   options?: {
+    onDownloadFile?: (entry: ExplorerFileEntry) => Promise<void>;
     onSortApply?: (
       sortBy: ExplorerSortBy,
       sortOrder: ExplorerSortOrder,
@@ -568,29 +634,75 @@ function renderExplorerTable(
 ) {
   const entries = Array.isArray(entry) ? entry : [entry];
 
-  renderWithApp(
+  renderWithApp(<ExplorerTableHarness entries={entries} options={options} />);
+}
+
+function ExplorerTableHarness({
+  entries,
+  options,
+}: {
+  entries: ExplorerEntry[];
+  options?: {
+    onDownloadFile?: (entry: ExplorerFileEntry) => Promise<void>;
+    onSortApply?: (
+      sortBy: ExplorerSortBy,
+      sortOrder: ExplorerSortOrder,
+    ) => void;
+    onSortClear?: () => void;
+    sortBy?: ExplorerSortBy | null;
+    sortOrder?: ExplorerSortOrder | null;
+  };
+}) {
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  return (
     <ExplorerTable
       bucket="demo"
       buildPublicUrl={(objectKey) =>
         `https://oss.underhear.cn/api/v1/buckets/demo/objects/${objectKey}`
       }
       deletingPath=""
+      downloadingFilePath=""
       downloadingFolderPath=""
       entries={entries}
       onDeleteFile={vi.fn().mockResolvedValue(undefined)}
       onDeleteFolder={vi.fn().mockResolvedValue(undefined)}
+      onDownloadFile={
+        options?.onDownloadFile ?? vi.fn().mockResolvedValue(undefined)
+      }
       onDownloadFolder={vi.fn().mockResolvedValue(undefined)}
       onOpenDirectory={vi.fn()}
       onPublishObjectSite={vi.fn().mockResolvedValue(undefined)}
       onPublishSite={vi.fn().mockResolvedValue(undefined)}
-      onSignDownload={vi.fn().mockResolvedValue(undefined)}
+      onSelectAll={(checked) => {
+        setSelectedPaths(
+          checked === true
+            ? new Set(entries.map((entry) => entry.path))
+            : new Set(),
+        );
+      }}
+      onSelectEntry={(entryPath, checked) => {
+        setSelectedPaths((current) => {
+          const next = new Set(current);
+
+          if (checked === true) {
+            next.add(entryPath);
+          } else {
+            next.delete(entryPath);
+          }
+
+          return next;
+        });
+      }}
       onSortApply={options?.onSortApply ?? vi.fn()}
       onSortClear={options?.onSortClear ?? vi.fn()}
       onUpdateVisibility={vi.fn().mockResolvedValue(undefined)}
       publishingPath=""
+      selectedPaths={selectedPaths}
       sortBy={options?.sortBy ?? null}
       sortOrder={options?.sortOrder ?? null}
-      signingPath=""
-    />,
+    />
   );
 }

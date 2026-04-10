@@ -11,6 +11,7 @@ vi.mock("../api/objects", () => ({
   checkObjectExists: vi.fn(),
   uploadFolder: vi.fn(),
   uploadObject: vi.fn(),
+  deleteExplorerEntriesBatch: vi.fn(),
   deleteObject: vi.fn(),
   deleteFolder: vi.fn(),
   downloadFolderZip: vi.fn(),
@@ -18,6 +19,16 @@ vi.mock("../api/objects", () => ({
   createSignedDownloadURL: vi.fn(),
   buildPublicObjectURL: vi.fn(() => "http://localhost:8080/download"),
 }));
+
+vi.mock("../lib/utils", async () => {
+  const actual =
+    await vi.importActual<typeof import("../lib/utils")>("../lib/utils");
+
+  return {
+    ...actual,
+    downloadFile: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 vi.mock("../api/sites", () => ({
   createSite: vi.fn(),
@@ -29,6 +40,8 @@ vi.mock("../api/sites", () => ({
 import {
   checkObjectExists,
   createFolder,
+  createSignedDownloadURL,
+  deleteExplorerEntriesBatch,
   deleteFolder,
   deleteObject,
   downloadFolderZip,
@@ -37,6 +50,7 @@ import {
   updateObjectVisibility,
   uploadObject,
 } from "../api/objects";
+import { downloadFile } from "../lib/utils";
 import {
   createSite,
   publishObjectSite,
@@ -48,6 +62,16 @@ describe("BucketObjectsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(checkObjectExists).mockResolvedValue(false);
+    vi.mocked(createSignedDownloadURL).mockResolvedValue({
+      url: "http://localhost:8080/signed-download",
+      expires_at: 1,
+    });
+    vi.mocked(downloadFile).mockResolvedValue(undefined);
+    vi.mocked(deleteExplorerEntriesBatch).mockResolvedValue({
+      deleted_count: 0,
+      failed_count: 0,
+      failed_items: [],
+    });
     Object.defineProperty(Element.prototype, "hasPointerCapture", {
       configurable: true,
       value: vi.fn(() => false),
@@ -464,6 +488,302 @@ describe("BucketObjectsPage", () => {
     expect(await screen.findByText("archive failed")).toBeInTheDocument();
   });
 
+  it("downloads private files through a signed URL without opening a new tab", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "file",
+          path: "docs/private.txt",
+          name: "private.txt",
+          is_empty: null,
+          object_key: "docs/private.txt",
+          original_filename: "private-report.txt",
+          size: 7,
+          content_type: "text/plain",
+          etag: "etag",
+          visibility: "private",
+          updated_at: "2026-04-07T01:00:00Z",
+        },
+      ],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Signed download" }),
+    );
+
+    await waitFor(() => {
+      expect(createSignedDownloadURL).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        "docs/private.txt",
+        300,
+      );
+      expect(downloadFile).toHaveBeenCalledWith(
+        "http://localhost:8080/signed-download",
+        "private-report.txt",
+      );
+    });
+  });
+
+  it("bulk downloads mixed selections in table order and keeps the selection", async () => {
+    const events: string[] = [];
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "file",
+          path: "alpha.txt",
+          name: "alpha.txt",
+          is_empty: null,
+          object_key: "alpha.txt",
+          original_filename: "alpha-report.txt",
+          size: 5,
+          content_type: "text/plain",
+          etag: "etag-a",
+          visibility: "public",
+          updated_at: "2026-04-07T01:00:00Z",
+        },
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+    vi.mocked(downloadFile).mockImplementation(async (_url, filename) => {
+      events.push(`file:${filename}`);
+    });
+    vi.mocked(downloadFolderZip).mockImplementation(async () => {
+      events.push("directory:docs/");
+      throw new Error("archive failed");
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select docs" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Download selected" }),
+    );
+
+    await waitFor(() => {
+      expect(events).toEqual(["file:alpha-report.txt", "directory:docs/"]);
+    });
+
+    expect(
+      await screen.findByText("Downloaded 1 items, 1 failed"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 items selected")).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Select alpha.txt" }),
+    ).toHaveAttribute("data-state", "checked");
+    expect(
+      screen.getByRole("checkbox", { name: "Select docs" }),
+    ).toHaveAttribute("data-state", "checked");
+  });
+
+  it("submits mixed selected entries to bulk delete and clears selection after success", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "alpha.txt",
+            name: "alpha.txt",
+            is_empty: null,
+            object_key: "alpha.txt",
+            original_filename: "alpha.txt",
+            size: 5,
+            content_type: "text/plain",
+            etag: "etag-a",
+            visibility: "public",
+            updated_at: "2026-04-07T01:00:00Z",
+          },
+          {
+            type: "directory",
+            path: "docs/",
+            name: "docs",
+            is_empty: false,
+            object_key: null,
+            original_filename: null,
+            size: null,
+            content_type: null,
+            etag: null,
+            visibility: null,
+            updated_at: null,
+          },
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValueOnce({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(deleteExplorerEntriesBatch).mockResolvedValue({
+      deleted_count: 2,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select docs" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete selected" }),
+    );
+    await userEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Delete selected",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(deleteExplorerEntriesBatch).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        "demo",
+        [
+          { type: "file", path: "alpha.txt" },
+          { type: "directory", path: "docs/" },
+        ],
+      );
+    });
+
+    expect(await screen.findByText("2 items deleted")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("2 items selected")).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps only failed entries selected after a partial bulk delete", async () => {
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "alpha.txt",
+            name: "alpha.txt",
+            is_empty: null,
+            object_key: "alpha.txt",
+            original_filename: "alpha.txt",
+            size: 5,
+            content_type: "text/plain",
+            etag: "etag-a",
+            visibility: "public",
+            updated_at: "2026-04-07T01:00:00Z",
+          },
+          {
+            type: "file",
+            path: "beta.txt",
+            name: "beta.txt",
+            is_empty: null,
+            object_key: "beta.txt",
+            original_filename: "beta.txt",
+            size: 4,
+            content_type: "text/plain",
+            etag: "etag-b",
+            visibility: "public",
+            updated_at: "2026-04-07T01:00:00Z",
+          },
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "file",
+            path: "beta.txt",
+            name: "beta.txt",
+            is_empty: null,
+            object_key: "beta.txt",
+            original_filename: "beta.txt",
+            size: 4,
+            content_type: "text/plain",
+            etag: "etag-b",
+            visibility: "public",
+            updated_at: "2026-04-07T01:00:00Z",
+          },
+        ],
+        next_cursor: "",
+      });
+    vi.mocked(deleteExplorerEntriesBatch).mockResolvedValue({
+      deleted_count: 1,
+      failed_count: 1,
+      failed_items: [
+        {
+          type: "file",
+          path: "beta.txt",
+          code: "object_delete_failed",
+          message: "failed to delete",
+        },
+      ],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select beta.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete selected" }),
+    );
+    await userEvent.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Delete selected",
+      }),
+    );
+
+    expect(
+      await screen.findByText("Deleted 1 items, 1 failed"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("1 items selected")).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Select beta.txt" }),
+    ).toHaveAttribute("data-state", "checked");
+  });
+
   it("supports upload flow in the current folder", async () => {
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({ items: [], next_cursor: "" })
@@ -634,7 +954,10 @@ describe("BucketObjectsPage", () => {
   });
 
   it("cancels object upload when preflight conflict prompt is dismissed", async () => {
-    vi.mocked(listExplorerEntries).mockResolvedValue({ items: [], next_cursor: "" });
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
     vi.mocked(checkObjectExists).mockResolvedValueOnce(true);
 
     renderWithApp(
@@ -654,7 +977,9 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start upload" }));
 
     const dialog = await screen.findByRole("alertdialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
 
     await waitFor(() => {
       expect(uploadObject).not.toHaveBeenCalled();
@@ -1278,7 +1603,9 @@ describe("BucketObjectsPage", () => {
     expect(
       await screen.findAllByRole("button", { name: "Publish site" }),
     ).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: "More actions" }),
     ).toHaveLength(2);

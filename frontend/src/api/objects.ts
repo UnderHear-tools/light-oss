@@ -4,6 +4,8 @@ import type { AxiosProgressEvent } from "axios";
 import type { AppSettings } from "../lib/settings";
 import type {
   BatchUploadResult,
+  DeleteExplorerEntriesBatchItem,
+  DeleteExplorerEntriesBatchResult,
   ExplorerEntriesResult,
   ObjectItem,
   ObjectListResult,
@@ -237,6 +239,20 @@ export function deleteObject(
   });
 }
 
+export function deleteExplorerEntriesBatch(
+  settings: AppSettings,
+  bucket: string,
+  items: DeleteExplorerEntriesBatchItem[],
+) {
+  return apiRequest<DeleteExplorerEntriesBatchResult>(settings, {
+    method: "POST",
+    url: `/api/v1/buckets/${encodeURIComponent(bucket)}/entries/batch-delete`,
+    data: {
+      items,
+    },
+  });
+}
+
 export function updateObjectVisibility(
   settings: AppSettings,
   params: UpdateObjectVisibilityParams,
@@ -434,7 +450,9 @@ function normalizeRequestError(error: unknown, fallbackMessage: string) {
     const status = error.response?.status ?? 500;
     const parsed =
       error.response?.data && typeof error.response.data === "object"
-        ? (error.response.data as { error?: { code?: string; message?: string } })
+        ? (error.response.data as {
+            error?: { code?: string; message?: string };
+          })
         : undefined;
 
     return new ApiError(
