@@ -734,7 +734,9 @@ export function BucketObjectsPage() {
   async function downloadExplorerFileEntry(entry: ExplorerFileEntry) {
     const downloadUrl =
       entry.visibility === "public"
-        ? buildPublicObjectURL(settings.apiBaseUrl, bucket, entry.object_key)
+        ? buildPublicObjectURL(settings.apiBaseUrl, bucket, entry.object_key, {
+            download: true,
+          })
         : (
             await createSignedDownloadURL(
               settings,
@@ -744,7 +746,10 @@ export function BucketObjectsPage() {
             )
           ).url;
 
-    await downloadFile(downloadUrl, entry.original_filename || entry.name);
+    await downloadFile(
+      appendDownloadQuery(downloadUrl),
+      entry.original_filename || entry.name,
+    );
   }
 
   async function downloadExplorerDirectoryEntry(entry: ExplorerDirectoryEntry) {
@@ -774,6 +779,16 @@ export function BucketObjectsPage() {
       toast.error(message);
     } finally {
       setDownloadingFolderPath("");
+    }
+  }
+
+  function appendDownloadQuery(url: string) {
+    try {
+      const next = new URL(url);
+      next.searchParams.set("download", "true");
+      return next.toString();
+    } catch {
+      return `${url}${url.includes("?") ? "&" : "?"}download=true`;
     }
   }
 

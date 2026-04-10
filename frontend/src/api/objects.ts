@@ -328,11 +328,20 @@ export function buildPublicObjectURL(
   apiBaseUrl: string,
   bucket: string,
   objectKey: string,
+  options?: {
+    download?: boolean;
+  },
 ) {
   const baseUrl = apiBaseUrl.trim().replace(/\/+$/, "");
-  return `${baseUrl}/api/v1/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKey(
+  const url = `${baseUrl}/api/v1/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKey(
     objectKey,
   )}`;
+
+  if (!options?.download) {
+    return url;
+  }
+
+  return `${url}?download=true`;
 }
 
 function encodeObjectKey(objectKey: string) {

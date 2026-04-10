@@ -5,23 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export async function downloadFile(url: string, filename: string) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Download failed with status ${response.status}`);
-  }
-
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
+export async function downloadFile(url: string, filename?: string) {
   const link = document.createElement("a");
 
   try {
-    link.href = blobUrl;
-    link.download = filename;
+    link.href = url;
+    if (filename) {
+      link.download = filename;
+    }
+    link.rel = "noopener";
     document.body.appendChild(link);
     link.click();
   } finally {
     document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
   }
 }

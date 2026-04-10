@@ -631,6 +631,11 @@ func (h *apiHandler) downloadObject(c *gin.Context) {
 func (h *apiHandler) serveObject(c *gin.Context, headOnly bool) {
 	bucketName := c.Param("bucket")
 	objectKey := normalizeObjectKey(c.Param("key"))
+	forceDownload, err := parseOptionalBoolQuery(c.Query("download"))
+	if err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "download query is invalid"))
+		return
+	}
 
 	object, reader, err := h.objectService.Open(c.Request.Context(), bucketName, objectKey)
 	if err != nil {
@@ -658,7 +663,7 @@ func (h *apiHandler) serveObject(c *gin.Context, headOnly bool) {
 		}
 	}
 
-	setObjectHeaders(c, object)
+	setObjectHeaders(c, object, forceDownload)
 	if headOnly {
 		c.Status(http.StatusOK)
 		return
@@ -705,7 +710,7 @@ func (h *apiHandler) serveSiteContent(c *gin.Context, site *model.Site, requestP
 		}
 	}()
 
-	setObjectHeaders(c, content.Object)
+	setObjectHeaders(c, content.Object, false)
 	c.Status(content.StatusCode)
 	if headOnly {
 		return
@@ -871,13 +876,17 @@ func siteInputFromRequest(req siteRequest) service.SiteInput {
 	}
 }
 
-func setObjectHeaders(c *gin.Context, object *model.Object) {
+func setObjectHeaders(c *gin.Context, object *model.Object, forceDownload bool) {
 	c.Header("Content-Type", service.NormalizeContentType(object.ContentType))
 	c.Header("Content-Length", strconv.FormatInt(object.Size, 10))
 	c.Header("ETag", object.ETag)
 	c.Header("X-Object-Visibility", string(object.Visibility))
 	c.Header("X-Original-Filename", url.PathEscape(object.OriginalFilename))
-	if contentDisposition := mime.FormatMediaType("inline", map[string]string{
+	dispositionType := "inline"
+	if forceDownload {
+		dispositionType = "attachment"
+	}
+	if contentDisposition := mime.FormatMediaType(dispositionType, map[string]string{
 		"filename": object.OriginalFilename,
 	}); contentDisposition != "" {
 		c.Header("Content-Disposition", contentDisposition)

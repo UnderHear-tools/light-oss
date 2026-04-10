@@ -527,7 +527,7 @@ describe("BucketObjectsPage", () => {
         300,
       );
       expect(downloadFile).toHaveBeenCalledWith(
-        "http://localhost:8080/signed-download",
+        "http://localhost:8080/signed-download?download=true",
         "private-report.txt",
       );
     });
@@ -566,8 +566,8 @@ describe("BucketObjectsPage", () => {
       ],
       next_cursor: "",
     });
-    vi.mocked(downloadFile).mockImplementation(async (_url, filename) => {
-      events.push(`file:${filename}`);
+    vi.mocked(downloadFile).mockImplementation(async (url, filename) => {
+      events.push(`file:${filename}:${url}`);
     });
     vi.mocked(downloadFolderZip).mockImplementation(async () => {
       events.push("directory:docs/");
@@ -592,7 +592,10 @@ describe("BucketObjectsPage", () => {
     );
 
     await waitFor(() => {
-      expect(events).toEqual(["file:alpha-report.txt", "directory:docs/"]);
+      expect(events).toEqual([
+        "file:alpha-report.txt:http://localhost:8080/download?download=true",
+        "directory:docs/",
+      ]);
     });
 
     expect(

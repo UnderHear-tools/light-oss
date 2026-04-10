@@ -421,6 +421,33 @@ func TestDownloadObjectEncodesFilenameHeadersAndAddsUTF8Charset(t *testing.T) {
 	if !strings.Contains(contentDisposition, "filename*=") || !strings.Contains(contentDisposition, "%e4%b8%ad%e6%96%87%e6%8a%a5%e5%91%8a.txt") {
 		t.Fatalf("unexpected content disposition %q", contentDisposition)
 	}
+
+	downloadReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/download-bucket/objects/docs/report.txt?download=true", nil)
+	downloadRec := httptest.NewRecorder()
+	router.ServeHTTP(downloadRec, downloadReq)
+	if downloadRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", downloadRec.Code)
+	}
+	downloadDisposition := strings.ToLower(downloadRec.Header().Get("Content-Disposition"))
+	if !strings.Contains(downloadDisposition, "attachment") {
+		t.Fatalf("expected attachment content disposition, got %q", downloadDisposition)
+	}
+}
+
+func TestDownloadObjectRejectsInvalidDownloadQuery(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "download-invalid-query-bucket")
+	uploadObject(t, router, "/api/v1/buckets/download-invalid-query-bucket/objects/docs/report.txt", "hello", "public")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/download-invalid-query-bucket/objects/docs/report.txt?download=maybe", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	assertAPIErrorCode(t, rec.Body.Bytes(), "invalid_request")
 }
 
 func TestDownloadObjectPreservesExplicitCharset(t *testing.T) {

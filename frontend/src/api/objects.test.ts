@@ -200,6 +200,19 @@ describe("objects api helpers", () => {
     );
   });
 
+  it("adds the download query when building a public object download URL", () => {
+    expect(
+      buildPublicObjectURL(
+        "https://oss.underhear.cn/",
+        "demo",
+        "docs/underhear.postgresql.sql",
+        { download: true },
+      ),
+    ).toBe(
+      "https://oss.underhear.cn/api/v1/buckets/demo/objects/docs/underhear%2Epostgresql%2Esql?download=true",
+    );
+  });
+
   it("calls visibility update endpoint with encoded object key", async () => {
     await updateObjectVisibility(settings, {
       bucket: "demo",
