@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .text-sm {
+    line-height: inherit;
+  }
+}

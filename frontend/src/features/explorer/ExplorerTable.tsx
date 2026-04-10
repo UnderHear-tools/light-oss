@@ -226,7 +226,7 @@ export function ExplorerTable({
           </TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
+      <TableBody className="[&_tr:last-child]:border-b">
         {entries.map((entry) => {
           const selected = selectedPaths.has(entry.path);
 
