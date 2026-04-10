@@ -284,6 +284,8 @@ const enUS = {
   "explorer.details.originalFilename": "Original file name",
   "explorer.details.contentType": "Content type",
   "explorer.details.preview": "Preview",
+  "explorer.preview.markdownTooLarge":
+    "This file is too large to preview. Markdown preview is not supported above 100 KB.",
   "explorer.upload.title": "Upload file",
   "explorer.upload.description":
     "Files are uploaded into the currently selected folder.",
@@ -597,6 +599,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.details.originalFilename": "原始文件名",
   "explorer.details.contentType": "内容类型",
   "explorer.details.preview": "预览",
+  "explorer.preview.markdownTooLarge": "文件内容过多，markdown预览目前不支持超过100kb。",
   "explorer.upload.title": "上传文件",
   "explorer.upload.description": "文件会上传到当前选中的目录中。",
   "explorer.upload.objectNameLabel": "对象名称",

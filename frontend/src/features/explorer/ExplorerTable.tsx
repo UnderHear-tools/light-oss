@@ -821,6 +821,8 @@ function FileDetailsButton({
   const publicUrl =
     currentVisibility === "public" ? buildPublicUrl(entry.object_key) : "";
   const previewType = getPreviewType(entry);
+  const markdownPreviewTooLarge =
+    previewType === "markdown" && entry.size > MAX_MARKDOWN_PREVIEW_BYTES;
 
   useEffect(() => {
     setSelectedVisibility(entry.visibility);
@@ -867,6 +869,7 @@ function FileDetailsButton({
                 <FilePreview
                   fileName={entry.original_filename}
                   displayMode="inline"
+                  markdownPreviewTooLarge={markdownPreviewTooLarge}
                   previewType={previewType}
                   publicUrl={publicUrl}
                 />
@@ -1010,6 +1013,7 @@ type PreviewType =
   | "text"
   | null;
 type PreviewDisplayMode = "inline" | "fullscreen";
+const MAX_MARKDOWN_PREVIEW_BYTES = 100 * 1024;
 
 const openXmlOfficeExtensions = new Set([
   ".docx",
@@ -1103,10 +1107,12 @@ const markdownComponents: Components = {
 
 function PreviewFullscreenButton({
   fileName,
+  markdownPreviewTooLarge = false,
   previewType,
   publicUrl,
 }: {
   fileName: string;
+  markdownPreviewTooLarge?: boolean;
   previewType: PreviewType;
   publicUrl: string;
 }) {
@@ -1137,6 +1143,7 @@ function PreviewFullscreenButton({
           <FilePreview
             fileName={fileName}
             displayMode="fullscreen"
+            markdownPreviewTooLarge={markdownPreviewTooLarge}
             previewType={previewType}
             publicUrl={publicUrl}
           />
@@ -1149,20 +1156,25 @@ function PreviewFullscreenButton({
 function FilePreview({
   fileName,
   displayMode = "inline",
+  markdownPreviewTooLarge = false,
   previewType,
   publicUrl,
 }: {
   fileName: string;
   displayMode?: PreviewDisplayMode;
+  markdownPreviewTooLarge?: boolean;
   previewType: PreviewType;
   publicUrl: string;
 }) {
   const { t } = useI18n();
   const isFullscreen = displayMode === "fullscreen";
   const inlineAction =
-    !isFullscreen && previewType !== "audio" ? (
+    !isFullscreen &&
+    previewType !== "audio" &&
+    !(previewType === "markdown" && markdownPreviewTooLarge) ? (
       <PreviewFullscreenButton
         fileName={fileName}
+        markdownPreviewTooLarge={markdownPreviewTooLarge}
         previewType={previewType}
         publicUrl={publicUrl}
       />
@@ -1231,6 +1243,7 @@ function FilePreview({
       <RemoteTextPreview
         action={inlineAction}
         displayMode={displayMode}
+        markdownPreviewTooLarge={markdownPreviewTooLarge}
         mode="markdown"
         publicUrl={publicUrl}
       />
@@ -1285,11 +1298,13 @@ function buildPdfPreviewUrl(
 function RemoteTextPreview({
   action,
   displayMode,
+  markdownPreviewTooLarge = false,
   mode,
   publicUrl,
 }: {
   action?: React.ReactNode;
   displayMode: PreviewDisplayMode;
+  markdownPreviewTooLarge?: boolean;
   mode: "markdown" | "text";
   publicUrl: string;
 }) {
@@ -1300,6 +1315,12 @@ function RemoteTextPreview({
   );
 
   useEffect(() => {
+    if (mode === "markdown" && markdownPreviewTooLarge) {
+      setPreviewText("");
+      setStatus("ready");
+      return;
+    }
+
     const controller = new AbortController();
 
     setPreviewText("");
@@ -1330,7 +1351,27 @@ function RemoteTextPreview({
     return () => {
       controller.abort();
     };
-  }, [publicUrl]);
+  }, [markdownPreviewTooLarge, mode, publicUrl]);
+
+  if (mode === "markdown" && markdownPreviewTooLarge) {
+    const tooLargeMessage = t("explorer.preview.markdownTooLarge");
+
+    if (displayMode === "inline") {
+      return (
+        <div
+          className="relative min-w-0 max-w-full rounded-md border border-border/70 bg-background p-4"
+          data-testid="inline-preview-surface"
+        >
+          {action ? (
+            <div className="absolute top-3 right-5 z-10">{action}</div>
+          ) : null}
+          <span className="text-muted-foreground">{tooLargeMessage}</span>
+        </div>
+      );
+    }
+
+    return <span className="text-muted-foreground">{tooLargeMessage}</span>;
+  }
 
   if (status === "loading") {
     if (displayMode === "inline") {

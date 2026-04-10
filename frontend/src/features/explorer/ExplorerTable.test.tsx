@@ -389,6 +389,34 @@ describe("ExplorerTable", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not preview markdown files larger than 100 KB", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderExplorerTable(
+      createFileEntry({
+        content_type: "text/markdown",
+        name: "large.md",
+        object_key: "docs/large.md",
+        original_filename: "large.md",
+        path: "docs/large.md",
+        size: 100 * 1024 + 1,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "large.md" }));
+
+    const dialog = await screen.findByRole("dialog");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      within(dialog).getByText("This file is too large to preview. Markdown preview is not supported above 100 KB."),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Fullscreen preview" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps plain text previews as raw text", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
