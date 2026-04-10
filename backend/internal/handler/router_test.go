@@ -789,6 +789,83 @@ func TestPublishSiteUploadSuccess(t *testing.T) {
 	}
 }
 
+func TestPublishSiteUploadOverwritesExistingObjects(t *testing.T) {
+	router := newTestRouter(t, 8*1024)
+
+	createBucket(t, router, "websites")
+	uploadObjectWithContentType(
+		t,
+		router,
+		"/api/v1/buckets/websites/objects/deployments/dist/index.html",
+		"<html>old</html>",
+		"private",
+		"text/html",
+	)
+
+	req := newMultipartBatchUploadRequest(
+		t,
+		"/api/v1/sites/publish",
+		map[string]string{
+			"bucket":        "websites",
+			"parent_prefix": "deployments/",
+			"domains": mustMarshalJSON(t, []string{
+				"overwrite.underhear.cn",
+			}),
+			"manifest": mustMarshalJSON(t, []map[string]string{
+				{"file_field": "file_0", "relative_path": "dist/index.html"},
+			}),
+		},
+		map[string]multipartUploadFile{
+			"file_0": {Filename: "index.html", Content: "<html>new</html>", ContentType: "text/html"},
+		},
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[publishSiteResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if body.Data.UploadedCount != 1 {
+		t.Fatalf("expected uploaded_count 1, got %d", body.Data.UploadedCount)
+	}
+	if body.Data.Site.RootPrefix != "deployments/dist/" {
+		t.Fatalf("expected root prefix deployments/dist/, got %q", body.Data.Site.RootPrefix)
+	}
+
+	indexReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/sites/%d", body.Data.Site.ID), nil)
+	indexRec := httptest.NewRecorder()
+	router.ServeHTTP(indexRec, indexReq)
+	if indexRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", indexRec.Code, indexRec.Body.String())
+	}
+	if indexRec.Body.String() != "<html>new</html>" {
+		t.Fatalf("expected overwritten content, got %q", indexRec.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/websites/objects?prefix=deployments/dist/", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[objectListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 object after overwrite, got %d", len(listBody.Data.Items))
+	}
+	if listBody.Data.Items[0].ObjectKey != "deployments/dist/index.html" {
+		t.Fatalf("unexpected object key %q", listBody.Data.Items[0].ObjectKey)
+	}
+	if listBody.Data.Items[0].Visibility != "public" {
+		t.Fatalf("expected public visibility after publish, got %q", listBody.Data.Items[0].Visibility)
+	}
+}
+
 func TestPublishSiteFileSuccess(t *testing.T) {
 	router := newTestRouter(t, 8*1024)
 

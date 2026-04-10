@@ -107,22 +107,15 @@ import {
   type ExplorerSortBy,
   type ExplorerSortOrder,
 } from "@/lib/explorer";
-import { buildFolderUploadManifest } from "@/lib/folder-upload";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
 import { downloadFile } from "@/lib/utils";
 
-type PendingOverwriteUpload =
-  | {
-      kind: "object";
-      value: UploadDialogValue;
-      target?: string;
-    }
-  | {
-      kind: "folder";
-      value: UploadFolderDialogValue;
-      target?: string;
-    };
+type PendingOverwriteUpload = {
+  kind: "object";
+  value: UploadDialogValue;
+  target?: string;
+};
 
 export function BucketObjectsPage() {
   const { bucket = "" } = useParams();
@@ -135,8 +128,6 @@ export function BucketObjectsPage() {
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadDialogResetSignal, setUploadDialogResetSignal] = useState(0);
-  const [uploadFolderDialogResetSignal, setUploadFolderDialogResetSignal] =
-    useState(0);
   const [isCheckingOverwrite, setIsCheckingOverwrite] = useState(false);
   const [pendingOverwriteUpload, setPendingOverwriteUpload] =
     useState<PendingOverwriteUpload | null>(null);
@@ -268,24 +259,6 @@ export function BucketObjectsPage() {
     return exists ? objectKey : null;
   }
 
-  async function findFolderConflictTarget(value: UploadFolderDialogValue) {
-    const manifest = buildFolderUploadManifest(value.files);
-    const objectKeys = Array.from(
-      new Set(
-        manifest.map((item) => joinExplorerPath(prefix, item.relative_path)),
-      ),
-    );
-
-    for (const objectKey of objectKeys) {
-      const exists = await checkObjectExists(settings, bucket, objectKey);
-      if (exists) {
-        return objectKey;
-      }
-    }
-
-    return null;
-  }
-
   const uploadMutation = useMutation({
     mutationFn: (value: UploadDialogValue) => uploadObjectRequest(value, false),
     onSuccess: async () => {
@@ -312,19 +285,14 @@ export function BucketObjectsPage() {
 
   const uploadFolderMutation = useMutation({
     mutationFn: (value: UploadFolderDialogValue) =>
-      uploadFolderRequest(value, false),
+      uploadFolderRequest(value, true),
     onSuccess: async () => {
       setUploadProgress(0);
       toast.success(t("toast.folderUploaded"));
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     },
-    onError: (error, value) => {
+    onError: (error) => {
       setUploadProgress(0);
-      if (isObjectExistsError(error)) {
-        setPendingOverwriteUpload({ kind: "folder", value });
-        return;
-      }
-
       const message =
         error instanceof Error ? error.message : t("errors.uploadFolder");
       toast.error(message);
@@ -523,15 +491,14 @@ export function BucketObjectsPage() {
     isCheckingOverwrite ||
     isRetryingOverwrite;
   const bucketMissing = isBucketNotFoundError(entriesQuery.error);
-  const overwriteTarget =
-    pendingOverwriteUpload?.target ??
-    (pendingOverwriteUpload?.kind === "object"
-      ? joinExplorerPath(
-          prefix,
-          pendingOverwriteUpload.value.objectKey ||
-            pendingOverwriteUpload.value.file.name,
-        )
-      : prefix || t("explorer.rootFolder"));
+  const overwriteTarget = pendingOverwriteUpload
+    ? pendingOverwriteUpload.target ??
+      joinExplorerPath(
+        prefix,
+        pendingOverwriteUpload.value.objectKey ||
+          pendingOverwriteUpload.value.file.name,
+      )
+    : "";
   const bulkDeletePreviewEntries = selectedEntries.slice(0, 3);
   const remainingBulkDeletePreviewCount =
     selectedCount - bulkDeletePreviewEntries.length;
@@ -617,29 +584,6 @@ export function BucketObjectsPage() {
 
   async function handleUploadFolder(value: UploadFolderDialogValue) {
     setUploadProgress(0);
-
-    let conflictTarget: string | null = null;
-    setIsCheckingOverwrite(true);
-    try {
-      conflictTarget = await findFolderConflictTarget(value);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : t("errors.uploadFolder");
-      toast.error(message);
-      return;
-    } finally {
-      setIsCheckingOverwrite(false);
-    }
-
-    if (conflictTarget) {
-      setPendingOverwriteUpload({
-        kind: "folder",
-        value,
-        target: conflictTarget,
-      });
-      throw new Error("overwrite_confirmation_required");
-    }
-
     await uploadFolderMutation.mutateAsync(value);
   }
 
@@ -652,15 +596,9 @@ export function BucketObjectsPage() {
     setPendingOverwriteUpload(null);
     setIsRetryingOverwrite(true);
     try {
-      if (overwriteUpload.kind === "object") {
-        await uploadObjectRequest(overwriteUpload.value, true);
-        setUploadDialogResetSignal((value) => value + 1);
-        toast.success(t("toast.objectUploaded"));
-      } else {
-        await uploadFolderRequest(overwriteUpload.value, true);
-        setUploadFolderDialogResetSignal((value) => value + 1);
-        toast.success(t("toast.folderUploaded"));
-      }
+      await uploadObjectRequest(overwriteUpload.value, true);
+      setUploadDialogResetSignal((value) => value + 1);
+      toast.success(t("toast.objectUploaded"));
 
       await queryClient.invalidateQueries({ queryKey: entriesBaseQueryKey });
     } catch (error) {
@@ -1097,7 +1035,6 @@ export function BucketObjectsPage() {
                     onSubmit={handleUploadFolder}
                     pending={uploadPending}
                     progress={uploadProgress}
-                    resetSignal={uploadFolderDialogResetSignal}
                   />
 
                   <Separator
