@@ -59,11 +59,11 @@ export function BucketList({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-semibold tracking-tight">
             {t("buckets.list.title")}
           </h2>
-          <Badge className="w-fit" variant="secondary">
+          <Badge variant="secondary">
             {t("buckets.list.total", { count: buckets.length })}
           </Badge>
         </div>
@@ -214,13 +214,13 @@ function DeleteBucketButton({
                   <div className="grid gap-1 text-sm" key={site.id}>
                     <div>
                       {t("sites.table.rootPrefix")}:{" "}
-                      <span className="[overflow-wrap:anywhere]">
+                      <span className="wrap-anywhere">
                         {site.root_prefix || t("explorer.rootFolder")}
                       </span>
                     </div>
                     <div>
                       {t("sites.table.domains")}:{" "}
-                      <span className="[overflow-wrap:anywhere]">
+                      <span className="wrap-anywhere">
                         {site.domains.join(", ") || t("common.noData")}
                       </span>
                     </div>

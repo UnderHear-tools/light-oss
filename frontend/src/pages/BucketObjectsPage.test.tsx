@@ -692,6 +692,116 @@ describe("BucketObjectsPage", () => {
     });
   });
 
+  it("shows every selected entry in the bulk delete dialog with constrained names and truncated paths", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "file",
+          path: "alpha.txt",
+          name: "alpha.txt",
+          is_empty: null,
+          object_key: "alpha.txt",
+          original_filename: "alpha.txt",
+          size: 5,
+          content_type: "text/plain",
+          etag: "etag-a",
+          visibility: "public",
+          updated_at: "2026-04-07T01:00:00Z",
+        },
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+        {
+          type: "file",
+          path: "articles/2026/meeting.md",
+          name: "meeting.md",
+          is_empty: null,
+          object_key: "articles/2026/meeting.md",
+          original_filename: "meeting.md",
+          size: 48,
+          content_type: "text/markdown",
+          etag: "etag-m",
+          visibility: "private",
+          updated_at: "2026-04-07T01:00:00Z",
+        },
+        {
+          type: "directory",
+          path: "assets/icons/",
+          name: "icons",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
+    );
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select docs" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select meeting.md" }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select icons" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete selected" }),
+    );
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveClass("overflow-hidden");
+    expect(dialog).toHaveClass("data-[size=sm]:max-w-[calc(100vw-1.5rem)]");
+    expect(dialog).toHaveClass("sm:data-[size=sm]:max-w-md");
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(dialog).getAllByRole("listitem")[1]).toHaveClass(
+      "grid-cols-[auto_minmax(0,1fr)]",
+    );
+    expect(within(dialog).getAllByText("alpha.txt")).toHaveLength(2);
+    expect(within(dialog).getByText("docs")).toBeInTheDocument();
+    expect(within(dialog).getByText("docs/")).toBeInTheDocument();
+    const meetingName = within(dialog).getByText("meeting.md");
+    expect(meetingName).toHaveClass("min-w-0");
+    expect(meetingName).toHaveClass("max-w-full");
+    expect(meetingName).toHaveClass("break-all");
+    expect(meetingName).toHaveClass("[display:-webkit-box]");
+    expect(meetingName).toHaveClass("[-webkit-line-clamp:3]");
+    expect(
+      within(dialog).getByText("articles/2026/meeting.md"),
+    ).toHaveClass("min-w-0");
+    expect(
+      within(dialog).getByText("articles/2026/meeting.md"),
+    ).toHaveClass("truncate");
+    expect(within(dialog).getByText("icons")).toBeInTheDocument();
+    expect(within(dialog).getByText("assets/icons/")).toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("And 1 more selected items."),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps only failed entries selected after a partial bulk delete", async () => {
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({
