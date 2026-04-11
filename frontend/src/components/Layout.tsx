@@ -76,7 +76,7 @@ export function Layout() {
               >
                 <a
                   aria-label="Open GitHub repository"
-                  href="https://github.com/UnderHear/light-oss"
+                  href="https://github.com/UnderHear-tools/light-oss"
                   rel="noopener noreferrer"
                   target="_blank"
                 >
