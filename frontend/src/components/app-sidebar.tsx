@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/sidebar"
 import {
   LayoutDashboardIcon,
-  DatabaseZapIcon,
   GlobeIcon,
   HardDriveIcon,
   Settings2Icon,
@@ -33,7 +32,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const data = {
     workspace: {
       name: t("app.name"),
-      logo: <DatabaseZapIcon />,
+      logo: (
+        <img
+          alt={t("app.name")}
+          className="size-8 object-contain"
+          src="/LOGO.png"
+        />
+      ),
       meta: getApiHostLabel(settings.apiBaseUrl),
     },
     navMain: [
