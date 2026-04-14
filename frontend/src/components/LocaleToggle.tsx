@@ -1,50 +1,57 @@
-import { LanguagesIcon } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { GlobeIcon } from "@primer/octicons-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  preferenceToggleTriggerClassName,
+  type PreferenceToggleSize,
+} from "@/components/preference-toggle";
 import { cn } from "@/lib/utils";
 import { useAppPreferences, type AppLocale } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
+
+const localeOptions: Array<{ value: AppLocale; label: string }> = [
+  { value: "zh-CN", label: "简体中文" },
+  { value: "en-US", label: "English" },
+];
 
 export function LocaleToggle({
   className,
   size = "sm",
 }: {
   className?: string;
-  size?: "sm" | "default";
+  size?: PreferenceToggleSize;
 }) {
   const {
     preferences: { locale },
     setLocale,
   } = useAppPreferences();
   const { t } = useI18n();
-  const buttonSize = size === "default" ? "icon" : "icon-sm";
+  const currentLocaleLabel = locale === "zh-CN" ? t("locale.zh") : t("locale.en");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t("header.compactLanguageSwitch")}
         className={cn(
-          buttonVariants({ size: buttonSize, variant: "outline" }),
+          preferenceToggleTriggerClassName(size),
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
           className,
         )}
         type="button"
       >
-        <LanguagesIcon />
+        <GlobeIcon className="size-4 shrink-0" />
+        <span className="leading-none">{currentLocaleLabel}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-28" sideOffset={8}>
-        {[
-          { value: "zh-CN", label: "简体中文" },
-          { value: "en-US", label: "English" },
-        ].map((option) => (
+        {localeOptions.map((option) => (
           <DropdownMenuItem
             className="cursor-pointer"
             key={option.value}
-            onSelect={() => setLocale(option.value as AppLocale)}
+            onSelect={() => setLocale(option.value)}
           >
             <span
               className={cn(
