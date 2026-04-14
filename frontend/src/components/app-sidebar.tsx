@@ -19,7 +19,7 @@ import {
   DatabaseZapIcon,
   GlobeIcon,
   HardDriveIcon,
-  Settings2Icon,
+  SettingsIcon,
 } from "lucide-react"
 import { getApiHostLabel, hasBearerToken } from "@/lib/connection"
 import { useI18n } from "@/lib/i18n"
@@ -58,7 +58,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       {
         title: t("nav.settings"),
         url: "/settings",
-        icon: <Settings2Icon />,
+        icon: <SettingsIcon />,
         isActive: pathname.startsWith("/settings"),
       },
     ],

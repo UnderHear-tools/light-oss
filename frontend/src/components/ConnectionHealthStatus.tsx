@@ -42,13 +42,13 @@ export function ConnectionHealthStatus({
     <div className={cn("flex flex-wrap items-center gap-4 text-sm font-medium", className)}>
       <div className={cn("flex items-center gap-1.5", getStatusTextClassName(resolvedStates.service))}>
         <HealthStatusDot state={resolvedStates.service} />
-        <span>
+        <span className="whitespace-nowrap">
           {t("health.service")} {getHealthStateLabel(t, resolvedStates.service)}
         </span>
       </div>
       <div className={cn("flex items-center gap-1.5", getStatusTextClassName(resolvedStates.database))}>
         <HealthStatusDot state={resolvedStates.database} />
-        <span>
+        <span className="whitespace-nowrap">
           {t("health.database")} {getHealthStateLabel(t, resolvedStates.database)}
         </span>
       </div>

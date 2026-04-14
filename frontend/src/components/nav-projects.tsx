@@ -44,7 +44,7 @@ export function NavProjects({
           </div>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <ConnectionHealthStatus className="px-2 py-1" />
+          <ConnectionHealthStatus className="px-2.5 py-1 grid gap-2" />
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
