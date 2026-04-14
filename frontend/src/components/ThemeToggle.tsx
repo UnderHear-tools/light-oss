@@ -1,5 +1,8 @@
-import { MoonStarIcon, SunMediumIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MoonIcon, SunIcon } from "@primer/octicons-react";
+import {
+  preferenceToggleTriggerClassName,
+  type PreferenceToggleSize,
+} from "@/components/preference-toggle";
 import { cn } from "@/lib/utils";
 import { useAppPreferences } from "@/lib/preferences";
 import { useI18n } from "@/lib/i18n";
@@ -9,25 +12,28 @@ export function ThemeToggle({
   size = "sm",
 }: {
   className?: string;
-  size?: "sm" | "default";
+  size?: PreferenceToggleSize;
 }) {
   const {
     preferences: { theme },
     setTheme,
   } = useAppPreferences();
   const { t } = useI18n();
-  const buttonSize = size === "default" ? "icon" : "icon-sm";
+  const currentThemeLabel = theme === "light" ? t("theme.light") : t("theme.dark");
+  const Icon = theme === "light" ? SunIcon : MoonIcon;
 
   return (
-    <Button
+    <button
       aria-label={t("header.compactThemeSwitch")}
-      className={cn(className)}
+      className={cn(
+        preferenceToggleTriggerClassName(size),
+        className,
+      )}
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      size={buttonSize}
       type="button"
-      variant="outline"
     >
-      {theme === "light" ? <SunMediumIcon /> : <MoonStarIcon />}
-    </Button>
+      <Icon className="size-4 shrink-0" />
+      <span className="leading-none">{currentThemeLabel}</span>
+    </button>
   );
 }
