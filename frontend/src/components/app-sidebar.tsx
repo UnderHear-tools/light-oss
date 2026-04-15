@@ -15,7 +15,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import {
-  LayoutDashboardIcon,
+  LayoutPanelLeftIcon,
   GlobeIcon,
   HardDriveIcon,
   SettingsIcon,
@@ -45,7 +45,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       {
         title: t("nav.dashboard"),
         url: "/dashboard",
-        icon: <LayoutDashboardIcon />,
+        icon: <LayoutPanelLeftIcon />,
         isActive: pathname === "/" || pathname.startsWith("/dashboard"),
       },
       {

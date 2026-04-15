@@ -1,5 +1,6 @@
 "use client"
 
+import { Link } from "react-router-dom"
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -19,16 +20,19 @@ export function TeamSwitcher({
     <SidebarMenu>
       <SidebarMenuItem>
         <SidebarMenuButton
+          asChild
           size="lg"
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
-          <div className="flex aspect-square size-8 items-center justify-center">
-            {workspace.logo}
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{workspace.name}</span>
-            <span className="truncate text-xs">{workspace.meta}</span>
-          </div>
+          <Link to="/dashboard">
+            <div className="flex aspect-square size-8 items-center justify-center">
+              {workspace.logo}
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-medium">{workspace.name}</span>
+              <span className="truncate text-xs">{workspace.meta}</span>
+            </div>
+          </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  BoxesIcon,
+  HardDriveIcon,
   CircleAlertIcon,
   Clock3Icon,
-  ServerCogIcon,
+  ServerIcon,
   ShieldCheckIcon,
 } from "lucide-react";
 import { listBuckets } from "@/api/buckets";
@@ -56,15 +56,15 @@ export function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge className="gap-1.5" variant="secondary">
-            <ServerCogIcon className="size-3.5" />
+          <Badge className="h-6 gap-2 px-2.5 text-sm [&>svg]:size-4!" variant="secondary">
+            <ServerIcon className="size-4" />
             {host}
           </Badge>
           <Badge
-            className="gap-1.5"
+            className="h-6 gap-2 px-2.5 text-sm [&>svg]:size-4!"
             variant={tokenConfigured ? "secondary" : "outline"}
           >
-            <ShieldCheckIcon className="size-3.5" />
+            <ShieldCheckIcon className="size-4" />
             {tokenConfigured
               ? t("header.authConfigured")
               : t("header.authMissing")}
@@ -83,13 +83,13 @@ export function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <StatCard
           description={t("buckets.list.total", { count: buckets.length })}
-          icon={BoxesIcon}
+          icon={HardDriveIcon}
           title={t("buckets.overview.totalBuckets")}
           value={String(buckets.length)}
         />
         <StatCard
           description={settings.apiBaseUrl.trim() || t("common.notAvailable")}
-          icon={ServerCogIcon}
+          icon={ServerIcon}
           title={t("buckets.overview.apiHost")}
           value={host}
         />
