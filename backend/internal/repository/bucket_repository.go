@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -12,6 +13,8 @@ import (
 type BucketRepository struct {
 	db *gorm.DB
 }
+
+const bucketNameSearchLikeClause = "LOWER(name) LIKE ? ESCAPE '!'"
 
 func NewBucketRepository(db *gorm.DB) *BucketRepository {
 	return &BucketRepository{db: db}
@@ -29,9 +32,13 @@ func (r *BucketRepository) Create(ctx context.Context, bucket *model.Bucket) err
 	return r.db.WithContext(ctx).Create(bucket).Error
 }
 
-func (r *BucketRepository) List(ctx context.Context) ([]model.Bucket, error) {
+func (r *BucketRepository) List(ctx context.Context, search string) ([]model.Bucket, error) {
 	var buckets []model.Bucket
-	err := r.db.WithContext(ctx).Order("created_at DESC").Find(&buckets).Error
+
+	query := r.db.WithContext(ctx).Model(&model.Bucket{})
+	query = applyBucketSearchFilter(query, search)
+
+	err := query.Order("created_at DESC").Find(&buckets).Error
 	return buckets, err
 }
 
@@ -57,4 +64,17 @@ func (r *BucketRepository) LockByName(ctx context.Context, name string) (*model.
 func (r *BucketRepository) DeleteByName(ctx context.Context, name string) (bool, error) {
 	result := r.db.WithContext(ctx).Where("name = ?", name).Delete(&model.Bucket{})
 	return result.RowsAffected > 0, result.Error
+}
+
+func applyBucketSearchFilter(query *gorm.DB, search string) *gorm.DB {
+	normalizedSearch := strings.ToLower(strings.TrimSpace(search))
+	if normalizedSearch == "" {
+		return query
+	}
+
+	return query.Where(bucketNameSearchLikeClause, likeContainsPattern(normalizedSearch))
+}
+
+func likeContainsPattern(value string) string {
+	return "%" + escapeLikeValue(value) + "%"
 }

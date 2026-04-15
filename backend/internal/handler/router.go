@@ -239,7 +239,7 @@ func (h *apiHandler) healthz(c *gin.Context) {
 
 	dbStatus := "ok"
 	statusCode := http.StatusOK
-	if _, err := h.bucketService.List(ctx); err != nil {
+	if _, err := h.bucketService.List(ctx, ""); err != nil {
 		dbStatus = "error"
 		statusCode = http.StatusServiceUnavailable
 		h.logger.Error("healthz bucket query failed", zap.Error(err))
@@ -271,7 +271,7 @@ func (h *apiHandler) createBucket(c *gin.Context) {
 }
 
 func (h *apiHandler) listBuckets(c *gin.Context) {
-	buckets, err := h.bucketService.List(c.Request.Context())
+	buckets, err := h.bucketService.List(c.Request.Context(), c.Query("search"))
 	if err != nil {
 		response.Error(c, err)
 		return

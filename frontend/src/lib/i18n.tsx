@@ -135,6 +135,11 @@ const enUS = {
   "buckets.list.description":
     "{count} bucket available in the current connection.",
   "buckets.list.total": "{count} total",
+  "buckets.search.label": "Search bucket",
+  "buckets.search.placeholder": "Search by bucket name",
+  "buckets.search.emptyTitle": "No matching bucket",
+  "buckets.search.emptyDescription":
+    "Try another keyword or create a new bucket.",
   "buckets.list.openHint": "Open bucket",
   "buckets.delete.title": "Delete bucket?",
   "buckets.delete.description":
@@ -461,6 +466,10 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "buckets.list.title": "bucket 列表",
   "buckets.list.description": "当前连接下共有 {count} 个 bucket。",
   "buckets.list.total": "共 {count} 个",
+  "buckets.search.label": "搜索 bucket",
+  "buckets.search.placeholder": "按 bucket 名称搜索",
+  "buckets.search.emptyTitle": "没有匹配的 bucket",
+  "buckets.search.emptyDescription": "换个关键词，或直接创建一个新的 bucket。",
   "buckets.list.openHint": "打开 bucket",
   "buckets.delete.title": "删除 bucket？",
   "buckets.delete.description":
@@ -601,7 +610,8 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.details.originalFilename": "原始文件名",
   "explorer.details.contentType": "内容类型",
   "explorer.details.preview": "预览",
-  "explorer.preview.markdownTooLarge": "文件内容过多，markdown预览目前不支持超过100kb。",
+  "explorer.preview.markdownTooLarge":
+    "文件内容过多，markdown预览目前不支持超过100kb。",
   "explorer.upload.title": "上传文件",
   "explorer.upload.description": "文件会上传到当前选中的目录中。",
   "explorer.upload.objectNameLabel": "对象名称",

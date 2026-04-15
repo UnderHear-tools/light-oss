@@ -38,9 +38,7 @@
   "paths": {
     "/healthz": {
       "get": {
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "operationId": "getHealthz",
         "summary": "Unauthenticated health check",
         "description": "Returns service and database health without authentication.",
@@ -70,9 +68,7 @@
     },
     "/api/v1/healthz": {
       "get": {
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "operationId": "getProtectedHealthz",
         "summary": "Authenticated health check",
         "description": "Same payload as /healthz, but requires a Bearer token.",
@@ -117,14 +113,17 @@
     },
     "/api/v1/buckets": {
       "get": {
-        "tags": [
-          "Buckets"
-        ],
+        "tags": ["Buckets"],
         "operationId": "listBuckets",
         "summary": "List buckets",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BucketSearchQuery"
           }
         ],
         "responses": {
@@ -161,9 +160,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Buckets"
-        ],
+        "tags": ["Buckets"],
         "operationId": "createBucket",
         "summary": "Create a bucket",
         "security": [
@@ -235,9 +232,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Buckets"
-        ],
+        "tags": ["Buckets"],
         "operationId": "deleteBucket",
         "summary": "Delete a bucket",
         "description": "Deletes the bucket together with all objects, folder markers, linked sites, and bound domains. Storage file cleanup runs after metadata deletion succeeds.",
@@ -305,9 +300,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Folders"
-        ],
+        "tags": ["Folders"],
         "operationId": "listFolders",
         "summary": "List the full folder tree",
         "description": "Returns all known folder nodes for a bucket, including empty folders created through the folder marker object.",
@@ -370,9 +363,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Folders"
-        ],
+        "tags": ["Folders"],
         "operationId": "createFolder",
         "summary": "Create an empty folder",
         "security": [
@@ -454,9 +445,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Folders"
-        ],
+        "tags": ["Folders"],
         "operationId": "deleteFolder",
         "summary": "Delete a folder",
         "description": "When recursive is omitted or false, only empty folders can be deleted. When recursive is true, the folder and all nested files/subfolders are soft-deleted.",
@@ -537,9 +526,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Folders"
-        ],
+        "tags": ["Folders"],
         "operationId": "downloadFolderArchive",
         "summary": "Download a folder as a ZIP archive",
         "description": "Streams a ZIP archive for the requested non-root folder path. The archive keeps the current folder name as the top-level directory, includes nested files, preserves empty subfolders created by the folder marker object, and excludes the internal .light-oss-folder marker file.",
@@ -615,9 +602,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Folders"
-        ],
+        "tags": ["Folders"],
         "operationId": "listExplorerEntries",
         "summary": "List direct entries under a folder prefix",
         "description": "Entries are ordered with directories first, then files, both sorted by name. next_cursor is an opaque cursor for the same prefix/search combination.",
@@ -701,9 +686,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "listObjects",
         "summary": "List objects",
         "description": "Objects are returned newest first. next_cursor is an opaque cursor for the same prefix filter.",
@@ -784,9 +767,7 @@
         }
       ],
       "post": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "uploadObjectBatch",
         "summary": "Batch upload files with multipart/form-data",
         "description": "manifest is a JSON string array. Each item declares file_field and relative_path. Additional file parts must use the exact field names referenced by manifest[].file_field.",
@@ -894,9 +875,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "downloadObject",
         "summary": "Download an object",
         "description": "Public objects can be downloaded anonymously. Private objects require either Authorization: Bearer <token> or a signed URL using expires and signature query parameters.",
@@ -983,9 +962,7 @@
         }
       },
       "head": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "headObject",
         "summary": "Get object headers",
         "description": "Returns metadata headers without a body. Public objects can be inspected anonymously. Private objects require Authorization: Bearer <token>; signed URLs are not accepted for HEAD.",
@@ -1058,9 +1035,7 @@
         }
       },
       "put": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "uploadObject",
         "summary": "Upload an object",
         "description": "The request body is streamed directly into storage. X-Object-Visibility defaults to private when omitted. X-Allow-Overwrite defaults to false when omitted.",
@@ -1165,9 +1140,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "deleteObject",
         "summary": "Soft delete an object",
         "security": [
@@ -1232,9 +1205,7 @@
         }
       ],
       "patch": {
-        "tags": [
-          "Objects"
-        ],
+        "tags": ["Objects"],
         "operationId": "updateObjectVisibility",
         "summary": "Update object visibility",
         "security": [
@@ -1308,9 +1279,7 @@
     },
     "/api/v1/sites": {
       "get": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "listSites",
         "summary": "List site bindings",
         "security": [
@@ -1352,9 +1321,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "createSite",
         "summary": "Create a site binding",
         "description": "Site domains must match *.underhear.cn. root_prefix is normalized to end with a trailing slash. index_document defaults to index.html when omitted or empty. enabled defaults to true. spa_fallback defaults to false.",
@@ -1439,9 +1406,7 @@
     },
     "/api/v1/sites/publish": {
       "post": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "publishSiteUpload",
         "summary": "Upload a folder and publish a site",
         "description": "Accepts a browser folder upload, preserves the selected top-level folder name, stores every object as public, and creates a site binding in one request.",
@@ -1536,9 +1501,7 @@
     },
     "/api/v1/sites/publish/file": {
       "post": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "publishSiteFile",
         "summary": "Upload a file and publish a site",
         "description": "Accepts one uploaded file, stores it as a public object, and creates a site whose index document is the uploaded file name.",
@@ -1638,9 +1601,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "getSite",
         "summary": "Get a site binding",
         "security": [
@@ -1702,9 +1663,7 @@
         }
       },
       "put": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "updateSite",
         "summary": "Update a site binding",
         "description": "The same validation rules and defaults as createSite apply to the incoming body.",
@@ -1787,9 +1746,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Sites"
-        ],
+        "tags": ["Sites"],
         "operationId": "deleteSite",
         "summary": "Delete a site binding",
         "security": [
@@ -1846,9 +1803,7 @@
     },
     "/api/v1/sign/download": {
       "post": {
-        "tags": [
-          "Signing"
-        ],
+        "tags": ["Signing"],
         "operationId": "signDownload",
         "summary": "Generate a signed download URL",
         "description": "Creates a temporary signed URL for GET object downloads. The current environment defaults expires_in_seconds to 300 when the client sends 0 or a negative value, and rejects values above 86400.",
@@ -1966,6 +1921,15 @@
           "type": "string"
         }
       },
+      "BucketSearchQuery": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "description": "Case-insensitive substring filter applied to bucket names.",
+        "schema": {
+          "type": "string"
+        }
+      },
       "ObjectListLimitQuery": {
         "name": "limit",
         "in": "query",
@@ -2038,10 +2002,7 @@
         "description": "Object visibility. Defaults to private when omitted.",
         "schema": {
           "type": "string",
-          "enum": [
-            "public",
-            "private"
-          ]
+          "enum": ["public", "private"]
         }
       },
       "AllowOverwriteHeader": {
@@ -2051,10 +2012,7 @@
         "description": "Whether to allow replacing existing objects with the same key. Defaults to false when omitted.",
         "schema": {
           "type": "string",
-          "enum": [
-            "true",
-            "false"
-          ]
+          "enum": ["true", "false"]
         }
       },
       "OriginalFilenameHeader": {
@@ -2112,10 +2070,7 @@
         "description": "Stored object visibility.",
         "schema": {
           "type": "string",
-          "enum": [
-            "public",
-            "private"
-          ]
+          "enum": ["public", "private"]
         }
       },
       "OriginalFilenameHeader": {
@@ -2128,10 +2083,7 @@
     "schemas": {
       "SuccessEnvelope": {
         "type": "object",
-        "required": [
-          "request_id",
-          "data"
-        ],
+        "required": ["request_id", "data"],
         "properties": {
           "request_id": {
             "type": "string",
@@ -2145,10 +2097,7 @@
       },
       "ErrorBody": {
         "type": "object",
-        "required": [
-          "code",
-          "message"
-        ],
+        "required": ["code", "message"],
         "properties": {
           "code": {
             "type": "string"
@@ -2160,10 +2109,7 @@
       },
       "ErrorEnvelope": {
         "type": "object",
-        "required": [
-          "request_id",
-          "error"
-        ],
+        "required": ["request_id", "error"],
         "properties": {
           "request_id": {
             "type": "string"
@@ -2175,32 +2121,21 @@
       },
       "HealthStatus": {
         "type": "object",
-        "required": [
-          "service",
-          "db"
-        ],
+        "required": ["service", "db"],
         "properties": {
           "service": {
             "type": "string",
-            "enum": [
-              "ok"
-            ]
+            "enum": ["ok"]
           },
           "db": {
             "type": "string",
-            "enum": [
-              "ok",
-              "error"
-            ]
+            "enum": ["ok", "error"]
           }
         }
       },
       "HealthzResult": {
         "type": "object",
-        "required": [
-          "status",
-          "version"
-        ],
+        "required": ["status", "version"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/HealthStatus"
@@ -2213,9 +2148,7 @@
       },
       "BucketCreateRequest": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
@@ -2228,12 +2161,7 @@
       },
       "Bucket": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["id", "name", "created_at", "updated_at"],
         "properties": {
           "id": {
             "type": "integer",
@@ -2255,9 +2183,7 @@
       },
       "BucketList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2269,10 +2195,7 @@
       },
       "FolderCreateRequest": {
         "type": "object",
-        "required": [
-          "prefix",
-          "name"
-        ],
+        "required": ["prefix", "name"],
         "properties": {
           "prefix": {
             "type": "string",
@@ -2288,11 +2211,7 @@
       },
       "FolderNode": {
         "type": "object",
-        "required": [
-          "path",
-          "name",
-          "parent_path"
-        ],
+        "required": ["path", "name", "parent_path"],
         "properties": {
           "path": {
             "type": "string"
@@ -2307,9 +2226,7 @@
       },
       "FolderNodeList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2363,10 +2280,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           },
           "created_at": {
             "type": "string",
@@ -2380,10 +2294,7 @@
       },
       "ObjectList": {
         "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "properties": {
           "items": {
             "type": "array",
@@ -2399,18 +2310,11 @@
       },
       "ExplorerEntry": {
         "type": "object",
-        "required": [
-          "type",
-          "path",
-          "name"
-        ],
+        "required": ["type", "path", "name"],
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "directory",
-              "file"
-            ]
+            "enum": ["directory", "file"]
           },
           "path": {
             "type": "string"
@@ -2447,10 +2351,7 @@
           "visibility": {
             "type": "string",
             "nullable": true,
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           },
           "created_at": {
             "type": "string",
@@ -2466,10 +2367,7 @@
       },
       "ExplorerEntryList": {
         "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "properties": {
           "items": {
             "type": "array",
@@ -2485,10 +2383,7 @@
       },
       "UploadBatchManifestItem": {
         "type": "object",
-        "required": [
-          "file_field",
-          "relative_path"
-        ],
+        "required": ["file_field", "relative_path"],
         "properties": {
           "file_field": {
             "type": "string",
@@ -2502,9 +2397,7 @@
       },
       "UploadBatchForm": {
         "type": "object",
-        "required": [
-          "manifest"
-        ],
+        "required": ["manifest"],
         "properties": {
           "prefix": {
             "type": "string",
@@ -2513,10 +2406,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ],
+            "enum": ["public", "private"],
             "description": "Visibility applied to every uploaded object. Defaults to private when omitted."
           },
           "manifest": {
@@ -2533,10 +2423,7 @@
       },
       "UploadBatchResult": {
         "type": "object",
-        "required": [
-          "uploaded_count",
-          "items"
-        ],
+        "required": ["uploaded_count", "items"],
         "properties": {
           "uploaded_count": {
             "type": "integer",
@@ -2553,26 +2440,17 @@
       },
       "UpdateObjectVisibilityRequest": {
         "type": "object",
-        "required": [
-          "visibility"
-        ],
+        "required": ["visibility"],
         "properties": {
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           }
         }
       },
       "SignDownloadRequest": {
         "type": "object",
-        "required": [
-          "bucket",
-          "object_key",
-          "expires_in_seconds"
-        ],
+        "required": ["bucket", "object_key", "expires_in_seconds"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2596,10 +2474,7 @@
       },
       "SignedDownloadResult": {
         "type": "object",
-        "required": [
-          "url",
-          "expires_at"
-        ],
+        "required": ["url", "expires_at"],
         "properties": {
           "url": {
             "type": "string",
@@ -2614,9 +2489,7 @@
       },
       "SiteRequest": {
         "type": "object",
-        "required": [
-          "bucket"
-        ],
+        "required": ["bucket"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2662,11 +2535,7 @@
       },
       "PublishSiteForm": {
         "type": "object",
-        "required": [
-          "bucket",
-          "domains",
-          "manifest"
-        ],
+        "required": ["bucket", "domains", "manifest"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2687,10 +2556,7 @@
           },
           "enabled": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "index_document": {
@@ -2705,10 +2571,7 @@
           },
           "spa_fallback": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "manifest": {
@@ -2725,11 +2588,7 @@
       },
       "PublishSiteFileForm": {
         "type": "object",
-        "required": [
-          "bucket",
-          "domains",
-          "file"
-        ],
+        "required": ["bucket", "domains", "file"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2750,10 +2609,7 @@
           },
           "enabled": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "error_document": {
@@ -2763,10 +2619,7 @@
           },
           "spa_fallback": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "file": {
@@ -2832,9 +2685,7 @@
       },
       "SiteList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2846,10 +2697,7 @@
       },
       "PublishSiteResult": {
         "type": "object",
-        "required": [
-          "uploaded_count",
-          "site"
-        ],
+        "required": ["uploaded_count", "site"],
         "properties": {
           "uploaded_count": {
             "type": "integer",
@@ -2868,10 +2716,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2890,10 +2735,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2912,10 +2754,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2934,10 +2773,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2956,10 +2792,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2978,10 +2811,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3000,10 +2830,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3022,10 +2849,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3044,10 +2868,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3066,10 +2887,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3088,10 +2906,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3110,10 +2925,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3132,10 +2944,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"

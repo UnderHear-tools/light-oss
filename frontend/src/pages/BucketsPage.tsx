@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
-import { useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import type { Site } from "@/api/types";
 import { createBucket, deleteBucket, listBuckets } from "@/api/buckets";
@@ -14,21 +15,29 @@ export function BucketsPage() {
   const { settings } = useAppSettings();
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [deletingBucketName, setDeletingBucketName] = useState("");
-  const bucketsQueryKey = [
+  const [searchInput, setSearchInput] = useState("");
+  const search = normalizeBucketSearch(searchParams.get("search"));
+  const bucketsBaseQueryKey = [
     "buckets",
     settings.apiBaseUrl,
     settings.bearerToken,
   ] as const;
+  const bucketsQueryKey = [...bucketsBaseQueryKey, search] as const;
   const sitesQueryKey = [
     "sites",
     settings.apiBaseUrl,
     settings.bearerToken,
   ] as const;
 
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
   const bucketsQuery = useQuery({
     queryKey: bucketsQueryKey,
-    queryFn: () => listBuckets(settings),
+    queryFn: () => listBuckets(settings, { search }),
     enabled: settings.apiBaseUrl.trim() !== "",
   });
 
@@ -42,7 +51,7 @@ export function BucketsPage() {
     mutationFn: (name: string) => createBucket(settings, name),
     onSuccess: async () => {
       toast.success(t("toast.bucketCreated"));
-      await queryClient.invalidateQueries({ queryKey: bucketsQueryKey });
+      await queryClient.invalidateQueries({ queryKey: bucketsBaseQueryKey });
     },
     onError: (error) => {
       const message =
@@ -67,7 +76,7 @@ export function BucketsPage() {
       });
       toast.success(t("toast.bucketDeleted"));
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: bucketsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: bucketsBaseQueryKey }),
         queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
       ]);
     },
@@ -87,6 +96,23 @@ export function BucketsPage() {
 
   async function handleDeleteBucket(bucketName: string) {
     await deleteBucketMutation.mutateAsync(bucketName);
+  }
+
+  function updateSearchParams(nextSearch: string) {
+    const next = new URLSearchParams(searchParams);
+
+    if (!nextSearch) {
+      next.delete("search");
+    } else {
+      next.set("search", nextSearch);
+    }
+
+    setSearchParams(next, { replace: false });
+  }
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateSearchParams(searchInput.trim());
   }
 
   const buckets = bucketsQuery.data?.items ?? [];
@@ -137,8 +163,16 @@ export function BucketsPage() {
         loading={bucketsQuery.isLoading}
         onCreateBucket={handleCreateBucket}
         onDeleteBucket={handleDeleteBucket}
+        onSearchInputChange={setSearchInput}
+        onSearchSubmit={handleSearchSubmit}
+        search={search}
+        searchInput={searchInput}
         sitesByBucket={sitesByBucket}
       />
     </section>
   );
+}
+
+function normalizeBucketSearch(value: string | null | undefined) {
+  return (value ?? "").trim();
 }

@@ -141,6 +141,58 @@ func TestProtectedRoutesRequireAuth(t *testing.T) {
 	}
 }
 
+func TestListBucketsSupportsSearch(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "alpha")
+	createBucket(t, router, "beta")
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets?search="+url.QueryEscape("alp"),
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[bucketListResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if len(body.Data.Items) != 1 || body.Data.Items[0].Name != "alpha" {
+		t.Fatalf("expected only alpha bucket, got %+v", body.Data.Items)
+	}
+}
+
+func TestListBucketsTreatsSearchWildcardsAsLiterals(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "alpha")
+	createBucket(t, router, "beta")
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/buckets?search="+url.QueryEscape("%"),
+		nil,
+	)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body apiEnvelope[bucketListResponse]
+	decodeJSON(t, rec.Body.Bytes(), &body)
+	if len(body.Data.Items) != 0 {
+		t.Fatalf("expected wildcard search to return no buckets, got %+v", body.Data.Items)
+	}
+}
+
 func TestProtectedHealthzRequiresAuthAndReturnsHealthState(t *testing.T) {
 	router := newTestRouter(t, 1024)
 

@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import {
   ArrowUpRightIcon,
   HardDriveIcon,
   LoaderCircleIcon,
+  SearchIcon,
   ShieldAlertIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -29,6 +30,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateBucketDialog } from "@/features/buckets/CreateBucketForm";
@@ -43,6 +52,10 @@ export function BucketList({
   loading = false,
   onCreateBucket,
   onDeleteBucket,
+  onSearchInputChange,
+  onSearchSubmit,
+  search,
+  searchInput,
   sitesByBucket,
 }: {
   buckets: Bucket[];
@@ -52,27 +65,61 @@ export function BucketList({
   loading?: boolean;
   onCreateBucket: (name: string) => Promise<void>;
   onDeleteBucket: (bucketName: string) => Promise<void>;
+  onSearchInputChange: (value: string) => void;
+  onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  search: string;
+  searchInput: string;
   sitesByBucket: Record<string, Site[]>;
 }) {
   const { locale, t } = useI18n();
+  const hasActiveSearch = search !== "";
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-xl font-semibold tracking-tight">
-            {t("buckets.list.title")}
-          </h2>
-          <Badge variant="secondary">
-            {t("buckets.list.total", { count: buckets.length })}
-          </Badge>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-semibold tracking-tight">
+              {t("buckets.list.title")}
+            </h2>
+            <Badge variant="secondary">
+              {t("buckets.list.total", { count: buckets.length })}
+            </Badge>
+          </div>
         </div>
+
+        <form
+          className="flex w-full min-w-0 items-center gap-2 lg:max-w-sm"
+          onSubmit={onSearchSubmit}
+        >
+          <FieldGroup className="min-w-0 flex-1">
+            <Field className="min-w-0" orientation="responsive">
+              <FieldLabel className="sr-only" htmlFor="bucket-search">
+                {t("buckets.search.label")}
+              </FieldLabel>
+              <Input
+                className="min-w-0"
+                id="bucket-search"
+                onChange={(event) => onSearchInputChange(event.target.value)}
+                placeholder={t("buckets.search.placeholder")}
+                value={searchInput}
+              />
+            </Field>
+          </FieldGroup>
+          <Button
+            className="shrink-0"
+            size="icon"
+            type="submit"
+            variant="outline"
+          >
+            <SearchIcon />
+            <span className="sr-only">{t("common.apply")}</span>
+          </Button>
+        </form>
       </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-5">
-        <CreateBucketDialog
-          onSubmit={onCreateBucket}
-          pending={createPending}
-        />
+        <CreateBucketDialog onSubmit={onCreateBucket} pending={createPending} />
         {buckets.map((bucket) => (
           <Card
             className="relative overflow-hidden border-border/70 bg-card"
@@ -84,7 +131,10 @@ export function BucketList({
             />
             <CardHeader className="flex flex-col gap-3">
               <CardTitle className="text-2xl leading-tight break-all">
-                <Link className="hover:underline" to={`/buckets/${bucket.name}`}>
+                <Link
+                  className="hover:underline"
+                  to={`/buckets/${bucket.name}`}
+                >
                   {bucket.name}
                 </Link>
               </CardTitle>
@@ -95,13 +145,17 @@ export function BucketList({
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {t("buckets.table.createdAt")}
                 </span>
-                <span className="text-sm">{formatDate(bucket.created_at, locale)}</span>
+                <span className="text-sm">
+                  {formatDate(bucket.created_at, locale)}
+                </span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {t("buckets.table.updatedAt")}
                 </span>
-                <span className="text-sm">{formatDate(bucket.updated_at, locale)}</span>
+                <span className="text-sm">
+                  {formatDate(bucket.updated_at, locale)}
+                </span>
               </div>
             </CardContent>
             <CardFooter className="justify-end gap-2">
@@ -123,7 +177,10 @@ export function BucketList({
         ))}
         {loading
           ? Array.from({ length: 5 }).map((_, index) => (
-              <Card className="border-border/70 bg-card" key={`skeleton-${index}`}>
+              <Card
+                className="border-border/70 bg-card"
+                key={`skeleton-${index}`}
+              >
                 <CardContent className="flex flex-col gap-4 p-6">
                   <div className="flex flex-col gap-2">
                     <Skeleton className="h-7 w-36" />
@@ -145,6 +202,20 @@ export function BucketList({
             ))
           : null}
       </div>
+
+      {!loading && buckets.length === 0 && hasActiveSearch ? (
+        <Empty className="min-h-48 border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchIcon />
+            </EmptyMedia>
+            <EmptyTitle>{t("buckets.search.emptyTitle")}</EmptyTitle>
+            <EmptyDescription>
+              {t("buckets.search.emptyDescription")}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : null}
     </div>
   );
 }
@@ -207,7 +278,9 @@ function DeleteBucketButton({
 
         {sites.length > 0 ? (
           <div className="grid gap-2">
-            <div className="text-sm font-medium">{t("buckets.delete.sitesTitle")}</div>
+            <div className="text-sm font-medium">
+              {t("buckets.delete.sitesTitle")}
+            </div>
             <div className="max-h-40 overflow-y-auto rounded-lg border border-border/70 bg-muted/30 p-3">
               <div className="grid gap-3">
                 {sites.map((site) => (

@@ -41,6 +41,10 @@ describe("BucketList", () => {
         deletePendingBucket=""
         onCreateBucket={vi.fn().mockResolvedValue(undefined)}
         onDeleteBucket={vi.fn().mockResolvedValue(undefined)}
+        onSearchInputChange={vi.fn()}
+        onSearchSubmit={vi.fn()}
+        search=""
+        searchInput=""
         sitesByBucket={{
           demo: [createSite({ domains, root_prefix: rootPrefix })],
         }}

@@ -74,12 +74,12 @@ Light OSS 由四部分组成：
 
 同一个根目录 `.env` 同时服务于本地开发和 Docker Compose，但以下变量在两种模式下的推荐值不同：
 
-| 变量 | 本地开发建议 | Docker 网关建议 | 说明 |
-| --- | --- | --- | --- |
-| `APP_PUBLIC_BASE_URL` | `http://localhost:8080` | `http://api.underhear.cn` | 影响签名下载链接生成。 |
-| `APP_STORAGE_ROOT` | `./light-oss-data/storage` 或 Windows 下 `.\light-oss-data\storage` | `/data/storage` | Compose 中后端卷挂载在 `/data/storage`。 |
-| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | `http://console.underhear.cn` | 浏览器跨域访问后端时必须允许控制台来源。 |
-| `VITE_DEFAULT_API_BASE_URL` | `http://localhost:8080` | `http://api.underhear.cn` | 前端首次加载时默认使用的 API 地址。 |
+| 变量                        | 本地开发建议                                                        | Docker 网关建议               | 说明                                     |
+| --------------------------- | ------------------------------------------------------------------- | ----------------------------- | ---------------------------------------- |
+| `APP_PUBLIC_BASE_URL`       | `http://localhost:8080`                                             | `http://api.underhear.cn`     | 影响签名下载链接生成。                   |
+| `APP_STORAGE_ROOT`          | `./light-oss-data/storage` 或 Windows 下 `.\light-oss-data\storage` | `/data/storage`               | Compose 中后端卷挂载在 `/data/storage`。 |
+| `APP_CORS_ALLOWED_ORIGINS`  | `http://localhost:3000`                                             | `http://console.underhear.cn` | 浏览器跨域访问后端时必须允许控制台来源。 |
+| `VITE_DEFAULT_API_BASE_URL` | `http://localhost:8080`                                             | `http://api.underhear.cn`     | 前端首次加载时默认使用的 API 地址。      |
 
 ### 本地运行
 
@@ -218,43 +218,43 @@ make up
 
 ### MySQL
 
-| 变量 | 示例值 | 说明 |
-| --- | --- | --- |
-| `MYSQL_DATABASE` | `light-oss` | MySQL 初始化时创建的数据库名。 |
-| `MYSQL_USER` | `root` | 应用连接数据库时使用的用户名。 |
-| `MYSQL_PASSWORD` | `112233ss` | `MYSQL_USER` 对应的密码。 |
-| `MYSQL_ROOT_PASSWORD` | `112233ss` | MySQL root 账户密码。 |
+| 变量                  | 示例值      | 说明                           |
+| --------------------- | ----------- | ------------------------------ |
+| `MYSQL_DATABASE`      | `light-oss` | MySQL 初始化时创建的数据库名。 |
+| `MYSQL_USER`          | `root`      | 应用连接数据库时使用的用户名。 |
+| `MYSQL_PASSWORD`      | `112233ss`  | `MYSQL_USER` 对应的密码。      |
+| `MYSQL_ROOT_PASSWORD` | `112233ss`  | MySQL root 账户密码。          |
 
 ### 后端
 
-| 变量 | 示例值 | 说明 |
-| --- | --- | --- |
-| `APP_ENV` | `development` | 后端运行环境，常见值为 `development` 或 `production`。 |
-| `APP_ADDR` | `:8080` | 后端 HTTP 服务监听地址。 |
-| `APP_PUBLIC_BASE_URL` | `http://localhost:8080` | 生成签名下载链接等场景使用的对外基础地址。 |
-| `APP_STORAGE_ROOT` | `./light-oss-data/storage` | 对象内容存储根目录；Compose 模式建议改为 `/data/storage`。 |
-| `APP_MAX_UPLOAD_SIZE_BYTES` | `1073741824` | 单次上传请求允许的最大体积，单位字节。 |
-| `APP_MAX_MULTIPART_MEMORY_BYTES` | `8388608` | 处理 `multipart/form-data` 时允许驻留内存的大小。 |
-| `APP_RATE_LIMIT_RPS` | `5` | 每秒允许的请求速率。 |
-| `APP_RATE_LIMIT_BURST` | `10` | 突发请求桶容量。 |
-| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | 允许访问后端的前端来源，多个值用逗号分隔。 |
-| `APP_BEARER_TOKENS` | `light-oss` | 后端允许的 Bearer Token 列表，多个值用逗号分隔。 |
-| `APP_SIGNING_SECRET` | `change-me-in-local-dev` | 私有对象签名下载链接使用的密钥。 |
-| `APP_DEFAULT_SIGNED_URL_TTL_SECONDS` | `300` | 默认签名下载链接有效期，单位秒。 |
-| `APP_MAX_SIGNED_URL_TTL_SECONDS` | `86400` | 签名下载链接允许设置的最大有效期。 |
-| `APP_READ_HEADER_TIMEOUT_SECONDS` | `10` | HTTP 请求头读取超时时间。 |
-| `APP_SHUTDOWN_TIMEOUT_SECONDS` | `10` | 优雅关闭时允许等待的最长时间。 |
-| `DB_DSN` | `root:112233ss@tcp(localhost:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true` | 本地运行后端时使用的 MySQL DSN。 |
-| `DB_MAX_OPEN_CONNS` | `10` | 数据库连接池最大打开连接数。 |
-| `DB_MAX_IDLE_CONNS` | `5` | 数据库连接池最大空闲连接数。 |
-| `DB_CONN_MAX_LIFETIME_MINUTES` | `30` | 单个数据库连接的最长复用时间。 |
+| 变量                                 | 示例值                                                                                                    | 说明                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `APP_ENV`                            | `development`                                                                                             | 后端运行环境，常见值为 `development` 或 `production`。     |
+| `APP_ADDR`                           | `:8080`                                                                                                   | 后端 HTTP 服务监听地址。                                   |
+| `APP_PUBLIC_BASE_URL`                | `http://localhost:8080`                                                                                   | 生成签名下载链接等场景使用的对外基础地址。                 |
+| `APP_STORAGE_ROOT`                   | `./light-oss-data/storage`                                                                                | 对象内容存储根目录；Compose 模式建议改为 `/data/storage`。 |
+| `APP_MAX_UPLOAD_SIZE_BYTES`          | `1073741824`                                                                                              | 单次上传请求允许的最大体积，单位字节。                     |
+| `APP_MAX_MULTIPART_MEMORY_BYTES`     | `8388608`                                                                                                 | 处理 `multipart/form-data` 时允许驻留内存的大小。          |
+| `APP_RATE_LIMIT_RPS`                 | `5`                                                                                                       | 每秒允许的请求速率。                                       |
+| `APP_RATE_LIMIT_BURST`               | `10`                                                                                                      | 突发请求桶容量。                                           |
+| `APP_CORS_ALLOWED_ORIGINS`           | `http://localhost:3000`                                                                                   | 允许访问后端的前端来源，多个值用逗号分隔。                 |
+| `APP_BEARER_TOKENS`                  | `light-oss`                                                                                               | 后端允许的 Bearer Token 列表，多个值用逗号分隔。           |
+| `APP_SIGNING_SECRET`                 | `change-me-in-local-dev`                                                                                  | 私有对象签名下载链接使用的密钥。                           |
+| `APP_DEFAULT_SIGNED_URL_TTL_SECONDS` | `300`                                                                                                     | 默认签名下载链接有效期，单位秒。                           |
+| `APP_MAX_SIGNED_URL_TTL_SECONDS`     | `86400`                                                                                                   | 签名下载链接允许设置的最大有效期。                         |
+| `APP_READ_HEADER_TIMEOUT_SECONDS`    | `10`                                                                                                      | HTTP 请求头读取超时时间。                                  |
+| `APP_SHUTDOWN_TIMEOUT_SECONDS`       | `10`                                                                                                      | 优雅关闭时允许等待的最长时间。                             |
+| `DB_DSN`                             | `root:112233ss@tcp(localhost:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true` | 本地运行后端时使用的 MySQL DSN。                           |
+| `DB_MAX_OPEN_CONNS`                  | `10`                                                                                                      | 数据库连接池最大打开连接数。                               |
+| `DB_MAX_IDLE_CONNS`                  | `5`                                                                                                       | 数据库连接池最大空闲连接数。                               |
+| `DB_CONN_MAX_LIFETIME_MINUTES`       | `30`                                                                                                      | 单个数据库连接的最长复用时间。                             |
 
 ### 前端
 
-| 变量 | 示例值 | 说明 |
-| --- | --- | --- |
+| 变量                        | 示例值                  | 说明                                    |
+| --------------------------- | ----------------------- | --------------------------------------- |
 | `VITE_DEFAULT_API_BASE_URL` | `http://localhost:8080` | 前端首次加载时默认填入的 API Base URL。 |
-| `VITE_DEFAULT_BEARER_TOKEN` | `light-oss` | 前端首次加载时默认填入的 Bearer Token。 |
+| `VITE_DEFAULT_BEARER_TOKEN` | `light-oss`             | 前端首次加载时默认填入的 Bearer Token。 |
 
 ## curl 示例
 
@@ -569,6 +569,7 @@ curl -H "Host: $SITE_DOMAIN" http://127.0.0.1/
 
 - 创建新的 Bucket
 - 查看已有 Bucket 列表
+- 按 Bucket 名称搜索已有 Bucket
 - 删除整个 Bucket（会级联删除其中的文件与关联站点）
 
 ### `/buckets/:bucket`

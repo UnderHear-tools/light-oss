@@ -58,8 +58,8 @@ func (s *BucketService) Create(ctx context.Context, name string) (*model.Bucket,
 	return bucket, nil
 }
 
-func (s *BucketService) List(ctx context.Context) ([]model.Bucket, error) {
-	buckets, err := s.bucketRepo.List(ctx)
+func (s *BucketService) List(ctx context.Context, search string) ([]model.Bucket, error) {
+	buckets, err := s.bucketRepo.List(ctx, search)
 	if err != nil {
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "bucket_list_failed", "failed to list buckets", err)
 	}

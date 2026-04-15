@@ -38,9 +38,7 @@
   "paths": {
     "/healthz": {
       "get": {
-        "tags": [
-          "健康检查"
-        ],
+        "tags": ["健康检查"],
         "operationId": "getHealthz",
         "summary": "无需认证的健康检查",
         "description": "返回服务和数据库的健康状态，无需认证。",
@@ -70,9 +68,7 @@
     },
     "/api/v1/healthz": {
       "get": {
-        "tags": [
-          "健康检查"
-        ],
+        "tags": ["健康检查"],
         "operationId": "getProtectedHealthz",
         "summary": "需要认证的健康检查",
         "description": "返回与 /healthz 相同的响应体，但需要 Bearer Token。",
@@ -117,14 +113,17 @@
     },
     "/api/v1/buckets": {
       "get": {
-        "tags": [
-          "存储桶"
-        ],
+        "tags": ["存储桶"],
         "operationId": "listBuckets",
         "summary": "列出存储桶",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BucketSearchQuery"
           }
         ],
         "responses": {
@@ -161,9 +160,7 @@
         }
       },
       "post": {
-        "tags": [
-          "存储桶"
-        ],
+        "tags": ["存储桶"],
         "operationId": "createBucket",
         "summary": "创建存储桶",
         "security": [
@@ -242,9 +239,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "文件夹"
-        ],
+        "tags": ["文件夹"],
         "operationId": "listFolders",
         "summary": "列出完整的文件夹树",
         "description": "返回存储桶的所有已知文件夹节点，包括通过文件夹标记对象创建的空文件夹。",
@@ -297,9 +292,7 @@
         }
       },
       "post": {
-        "tags": [
-          "文件夹"
-        ],
+        "tags": ["文件夹"],
         "operationId": "createFolder",
         "summary": "创建空文件夹",
         "security": [
@@ -381,9 +374,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "文件夹"
-        ],
+        "tags": ["文件夹"],
         "operationId": "deleteFolder",
         "summary": "删除文件夹。",
         "description": "当 `recursive` 省略或为 `false` 时，只能删除空文件夹。当 `recursive` 为 `true` 时，文件夹以及其所有嵌套文件和子文件夹都会被软删除。",
@@ -464,9 +455,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "文件夹"
-        ],
+        "tags": ["文件夹"],
         "operationId": "downloadFolderArchive",
         "summary": "将文件夹下载为 ZIP 压缩包",
         "description": "为指定的非根目录文件夹路径流式返回 ZIP 压缩包。压缩包会保留当前文件夹名称作为顶层目录，包含所有嵌套文件，保留通过文件夹标记对象创建的空子文件夹，并排除内部 .light-oss-folder 标记文件。",
@@ -542,9 +531,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "文件夹"
-        ],
+        "tags": ["文件夹"],
         "operationId": "listExplorerEntries",
         "summary": "在文件夹前缀下列出直接条目",
         "description": "条目先按目录排序，然后按文件名排序。next_cursor是相同前缀/search组合的不透明光标。",
@@ -618,9 +605,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "listObjects",
         "summary": "列表对象",
         "description": "对象首先返回最新。next_cursor是相同前缀过滤器的不透明光标。",
@@ -691,9 +676,7 @@
         }
       ],
       "post": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "uploadObjectBatch",
         "summary": "使用 multipart/form-data 批量上传文件",
         "description": "`manifest` 是 JSON 字符串数组。每个项目都声明 `file_field` 与 `relative_path`。其他文件分段必须使用 `manifest[].file_field` 中引用的精确字段名。",
@@ -801,9 +784,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "downloadObject",
         "summary": "下载对象",
         "description": "公开对象可匿名下载。私有对象需要 `Authorization: Bearer <token>`，或使用 `expires` 与 `signature` 查询参数的签名 URL。",
@@ -890,9 +871,7 @@
         }
       },
       "head": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "headObject",
         "summary": "获取对象标头",
         "description": "仅返回元数据响应头，不返回响应体。公开对象可匿名访问；私有对象需要 `Authorization: Bearer <token>`；HEAD 请求不接受签名 URL。",
@@ -965,9 +944,7 @@
         }
       },
       "put": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "uploadObject",
         "summary": "上传对象",
         "description": "请求体会直接以流式方式写入存储。省略时，`X-Object-Visibility` 默认为 `private`，`X-Allow-Overwrite` 默认为 `false`。",
@@ -1072,9 +1049,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "deleteObject",
         "summary": "软删除对象",
         "security": [
@@ -1139,9 +1114,7 @@
         }
       ],
       "patch": {
-        "tags": [
-          "对象"
-        ],
+        "tags": ["对象"],
         "operationId": "updateObjectVisibility",
         "summary": "更新对象可见性",
         "security": [
@@ -1215,9 +1188,7 @@
     },
     "/api/v1/sites": {
       "get": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "listSites",
         "summary": "列出站点绑定",
         "security": [
@@ -1259,9 +1230,7 @@
         }
       },
       "post": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "createSite",
         "summary": "创建网站绑定",
         "description": "站点域名必须匹配 `*.underhear.cn`。`root_prefix` 会被规范化为以斜杠结尾；`index_document` 在省略或为空时默认为 `index.html`；`enabled` 默认为 `true`；`spa_fallback` 默认为 `false`。",
@@ -1346,9 +1315,7 @@
     },
     "/api/v1/sites/publish": {
       "post": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "publishSiteUpload",
         "summary": "上传文件夹并发布站点",
         "description": "接收浏览器文件夹上传，保留所选的最外层目录名，将所有对象强制保存为 public，并在一次请求中创建站点绑定。",
@@ -1443,9 +1410,7 @@
     },
     "/api/v1/sites/publish/file": {
       "post": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "publishSiteFile",
         "summary": "上传文件并发布站点",
         "description": "接收一个上传文件，将其强制保存为 public 对象，并创建一个以该文件名作为首页文档的站点。",
@@ -1545,9 +1510,7 @@
         }
       ],
       "get": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "getSite",
         "summary": "获取网站绑定",
         "security": [
@@ -1609,9 +1572,7 @@
         }
       },
       "put": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "updateSite",
         "summary": "更新网站绑定",
         "description": "与 `createSite` 相同的校验规则和默认值同样适用于传入的请求体。",
@@ -1694,9 +1655,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "站点"
-        ],
+        "tags": ["站点"],
         "operationId": "deleteSite",
         "summary": "删除网站绑定",
         "security": [
@@ -1753,9 +1712,7 @@
     },
     "/api/v1/sign/download": {
       "post": {
-        "tags": [
-          "签名"
-        ],
+        "tags": ["签名"],
         "operationId": "signDownload",
         "summary": "生成签名下载 URL",
         "description": "为 GET 对象下载创建临时签名 URL。当客户端传入 0 或负值时，`expires_in_seconds` 默认为 `300`，且拒绝大于 `86400` 的值。",
@@ -1873,6 +1830,15 @@
           "type": "string"
         }
       },
+      "BucketSearchQuery": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "description": "应用于 bucket 名称的不区分大小写的子字符串筛选器。",
+        "schema": {
+          "type": "string"
+        }
+      },
       "ObjectListLimitQuery": {
         "name": "limit",
         "in": "query",
@@ -1945,10 +1911,7 @@
         "description": "对象可见性。省略时默认为 `private`。",
         "schema": {
           "type": "string",
-          "enum": [
-            "public",
-            "private"
-          ]
+          "enum": ["public", "private"]
         }
       },
       "AllowOverwriteHeader": {
@@ -1958,10 +1921,7 @@
         "description": "是否允许覆盖同对象键的已存在对象。省略时默认为 `false`。",
         "schema": {
           "type": "string",
-          "enum": [
-            "true",
-            "false"
-          ]
+          "enum": ["true", "false"]
         }
       },
       "OriginalFilenameHeader": {
@@ -2019,10 +1979,7 @@
         "description": "存储的对象可见性。",
         "schema": {
           "type": "string",
-          "enum": [
-            "public",
-            "private"
-          ]
+          "enum": ["public", "private"]
         }
       },
       "OriginalFilenameHeader": {
@@ -2035,10 +1992,7 @@
     "schemas": {
       "SuccessEnvelope": {
         "type": "object",
-        "required": [
-          "request_id",
-          "data"
-        ],
+        "required": ["request_id", "data"],
         "properties": {
           "request_id": {
             "type": "string",
@@ -2052,10 +2006,7 @@
       },
       "ErrorBody": {
         "type": "object",
-        "required": [
-          "code",
-          "message"
-        ],
+        "required": ["code", "message"],
         "properties": {
           "code": {
             "type": "string"
@@ -2067,10 +2018,7 @@
       },
       "ErrorEnvelope": {
         "type": "object",
-        "required": [
-          "request_id",
-          "error"
-        ],
+        "required": ["request_id", "error"],
         "properties": {
           "request_id": {
             "type": "string"
@@ -2082,32 +2030,21 @@
       },
       "HealthStatus": {
         "type": "object",
-        "required": [
-          "service",
-          "db"
-        ],
+        "required": ["service", "db"],
         "properties": {
           "service": {
             "type": "string",
-            "enum": [
-              "ok"
-            ]
+            "enum": ["ok"]
           },
           "db": {
             "type": "string",
-            "enum": [
-              "ok",
-              "error"
-            ]
+            "enum": ["ok", "error"]
           }
         }
       },
       "HealthzResult": {
         "type": "object",
-        "required": [
-          "status",
-          "version"
-        ],
+        "required": ["status", "version"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/HealthStatus"
@@ -2120,9 +2057,7 @@
       },
       "BucketCreateRequest": {
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "properties": {
           "name": {
             "type": "string",
@@ -2135,12 +2070,7 @@
       },
       "Bucket": {
         "type": "object",
-        "required": [
-          "id",
-          "name",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["id", "name", "created_at", "updated_at"],
         "properties": {
           "id": {
             "type": "integer",
@@ -2162,9 +2092,7 @@
       },
       "BucketList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2176,10 +2104,7 @@
       },
       "FolderCreateRequest": {
         "type": "object",
-        "required": [
-          "prefix",
-          "name"
-        ],
+        "required": ["prefix", "name"],
         "properties": {
           "prefix": {
             "type": "string",
@@ -2195,11 +2120,7 @@
       },
       "FolderNode": {
         "type": "object",
-        "required": [
-          "path",
-          "name",
-          "parent_path"
-        ],
+        "required": ["path", "name", "parent_path"],
         "properties": {
           "path": {
             "type": "string"
@@ -2214,9 +2135,7 @@
       },
       "FolderNodeList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2270,10 +2189,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           },
           "created_at": {
             "type": "string",
@@ -2287,10 +2203,7 @@
       },
       "ObjectList": {
         "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "properties": {
           "items": {
             "type": "array",
@@ -2306,18 +2219,11 @@
       },
       "ExplorerEntry": {
         "type": "object",
-        "required": [
-          "type",
-          "path",
-          "name"
-        ],
+        "required": ["type", "path", "name"],
         "properties": {
           "type": {
             "type": "string",
-            "enum": [
-              "directory",
-              "file"
-            ]
+            "enum": ["directory", "file"]
           },
           "path": {
             "type": "string"
@@ -2354,10 +2260,7 @@
           "visibility": {
             "type": "string",
             "nullable": true,
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           },
           "created_at": {
             "type": "string",
@@ -2373,10 +2276,7 @@
       },
       "ExplorerEntryList": {
         "type": "object",
-        "required": [
-          "items",
-          "next_cursor"
-        ],
+        "required": ["items", "next_cursor"],
         "properties": {
           "items": {
             "type": "array",
@@ -2392,10 +2292,7 @@
       },
       "UploadBatchManifestItem": {
         "type": "object",
-        "required": [
-          "file_field",
-          "relative_path"
-        ],
+        "required": ["file_field", "relative_path"],
         "properties": {
           "file_field": {
             "type": "string",
@@ -2409,9 +2306,7 @@
       },
       "UploadBatchForm": {
         "type": "object",
-        "required": [
-          "manifest"
-        ],
+        "required": ["manifest"],
         "properties": {
           "prefix": {
             "type": "string",
@@ -2420,10 +2315,7 @@
           },
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ],
+            "enum": ["public", "private"],
             "description": "可见性应用于每个上传的对象。省略时默认为private。"
           },
           "manifest": {
@@ -2440,10 +2332,7 @@
       },
       "UploadBatchResult": {
         "type": "object",
-        "required": [
-          "uploaded_count",
-          "items"
-        ],
+        "required": ["uploaded_count", "items"],
         "properties": {
           "uploaded_count": {
             "type": "integer",
@@ -2460,26 +2349,17 @@
       },
       "UpdateObjectVisibilityRequest": {
         "type": "object",
-        "required": [
-          "visibility"
-        ],
+        "required": ["visibility"],
         "properties": {
           "visibility": {
             "type": "string",
-            "enum": [
-              "public",
-              "private"
-            ]
+            "enum": ["public", "private"]
           }
         }
       },
       "SignDownloadRequest": {
         "type": "object",
-        "required": [
-          "bucket",
-          "object_key",
-          "expires_in_seconds"
-        ],
+        "required": ["bucket", "object_key", "expires_in_seconds"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2503,10 +2383,7 @@
       },
       "SignedDownloadResult": {
         "type": "object",
-        "required": [
-          "url",
-          "expires_at"
-        ],
+        "required": ["url", "expires_at"],
         "properties": {
           "url": {
             "type": "string",
@@ -2521,9 +2398,7 @@
       },
       "SiteRequest": {
         "type": "object",
-        "required": [
-          "bucket"
-        ],
+        "required": ["bucket"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2569,11 +2444,7 @@
       },
       "PublishSiteForm": {
         "type": "object",
-        "required": [
-          "bucket",
-          "domains",
-          "manifest"
-        ],
+        "required": ["bucket", "domains", "manifest"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2594,10 +2465,7 @@
           },
           "enabled": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "index_document": {
@@ -2612,10 +2480,7 @@
           },
           "spa_fallback": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "manifest": {
@@ -2632,11 +2497,7 @@
       },
       "PublishSiteFileForm": {
         "type": "object",
-        "required": [
-          "bucket",
-          "domains",
-          "file"
-        ],
+        "required": ["bucket", "domains", "file"],
         "properties": {
           "bucket": {
             "type": "string",
@@ -2657,10 +2518,7 @@
           },
           "enabled": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "error_document": {
@@ -2670,10 +2528,7 @@
           },
           "spa_fallback": {
             "type": "string",
-            "enum": [
-              "true",
-              "false"
-            ],
+            "enum": ["true", "false"],
             "default": "true"
           },
           "file": {
@@ -2739,9 +2594,7 @@
       },
       "SiteList": {
         "type": "object",
-        "required": [
-          "items"
-        ],
+        "required": ["items"],
         "properties": {
           "items": {
             "type": "array",
@@ -2753,10 +2606,7 @@
       },
       "PublishSiteResult": {
         "type": "object",
-        "required": [
-          "uploaded_count",
-          "site"
-        ],
+        "required": ["uploaded_count", "site"],
         "properties": {
           "uploaded_count": {
             "type": "integer",
@@ -2775,10 +2625,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2797,10 +2644,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2819,10 +2663,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2841,10 +2682,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2863,10 +2701,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2885,10 +2720,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2907,10 +2739,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2929,10 +2758,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2951,10 +2777,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2973,10 +2796,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -2995,10 +2815,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3017,10 +2834,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
@@ -3039,10 +2853,7 @@
           },
           {
             "type": "object",
-            "required": [
-              "request_id",
-              "data"
-            ],
+            "required": ["request_id", "data"],
             "properties": {
               "request_id": {
                 "type": "string"
