@@ -74,10 +74,10 @@ function HealthStatusDot({ state }: { state: ConnectionHealthBadgeState }) {
   return (
     <svg
       aria-hidden="true"
-      className={cn("size-2.5 shrink-0", getDotClassName(state))}
-      viewBox="0 0 12 12"
+      className={cn("size-4 shrink-0", getDotClassName(state))}
+      viewBox="0 0 16 16"
     >
-      <circle cx="6" cy="6" fill="currentColor" r="5" />
+      <circle cx="8" cy="8" fill="currentColor" r="5" />
     </svg>
   );
 }
