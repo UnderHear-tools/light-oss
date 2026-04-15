@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
@@ -58,7 +58,7 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("renders health status before the local storage badge", async () => {
+  it("renders connection settings before preferences and keeps security notice inside the connection card", async () => {
     renderWithApp(
       <Routes>
         <Route path="/settings" element={<SettingsPage />} />
@@ -66,14 +66,25 @@ describe("SettingsPage", () => {
       { route: "/settings" },
     );
 
-    const serviceStatus = await screen.findByText("Service OK");
-    const localStorageBadge = screen.getByText("Stored locally");
+    const connectionTitle = screen.getByText("Connection settings");
+    const preferencesTitle = screen.getByText("Interface preferences");
+    const connectionCard = connectionTitle.closest("[data-slot='card']");
+    const preferencesCard = preferencesTitle.closest("[data-slot='card']");
 
-    expect(screen.getByText("DB OK")).toBeInTheDocument();
+    expect(connectionCard).not.toBeNull();
+    expect(preferencesCard).not.toBeNull();
+    expect(await screen.findByText("Database OK")).toBeInTheDocument();
     expect(
-      serviceStatus.compareDocumentPosition(localStorageBadge) &
+      connectionTitle.compareDocumentPosition(preferencesTitle) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
+    expect(
+      within(connectionCard as HTMLElement).getByText("Security notice"),
+    ).toBeInTheDocument();
+    expect(
+      within(preferencesCard as HTMLElement).queryByText("Security notice"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Current")).not.toBeInTheDocument();
   });
 
   it("renders a test connection button to the left of save", async () => {
@@ -194,7 +205,7 @@ describe("SettingsPage", () => {
     });
 
     expect(await screen.findByText("Service Token error")).toBeInTheDocument();
-    expect(screen.getByText("DB Token error")).toBeInTheDocument();
+    expect(screen.getByText("Database Token error")).toBeInTheDocument();
     expect(window.localStorage.getItem("light-oss-settings")).toContain(
       "\"apiBaseUrl\":\"http://localhost:8080\"",
     );
@@ -215,7 +226,7 @@ describe("SettingsPage", () => {
     );
 
     expect(await screen.findByText("Service Unconfigured")).toBeInTheDocument();
-    expect(screen.getByText("DB Unconfigured")).toBeInTheDocument();
+    expect(screen.getByText("Database Unconfigured")).toBeInTheDocument();
     expect(getHealthStatus).not.toHaveBeenCalled();
     expect(
       screen.getByRole("button", { name: "Test connection" }),
@@ -238,7 +249,7 @@ describe("SettingsPage", () => {
     );
 
     expect(await screen.findByText("Service Token error")).toBeInTheDocument();
-    expect(screen.getByText("DB Token error")).toBeInTheDocument();
+    expect(screen.getByText("Database Token error")).toBeInTheDocument();
   });
 
   it("clears manual test status after the draft changes", async () => {
@@ -281,7 +292,7 @@ describe("SettingsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Service OK")).toBeInTheDocument();
-      expect(screen.getByText("DB OK")).toBeInTheDocument();
+      expect(screen.getByText("Database OK")).toBeInTheDocument();
     });
   });
 });

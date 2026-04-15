@@ -20,9 +20,11 @@ const localeOptions: Array<{ value: AppLocale; label: string }> = [
 
 export function LocaleToggle({
   className,
+  dropdownClassName,
   size = "sm",
 }: {
   className?: string;
+  dropdownClassName?: string;
   size?: PreferenceToggleSize;
 }) {
   const {
@@ -46,7 +48,11 @@ export function LocaleToggle({
         <GlobeIcon className="size-4 shrink-0" />
         <span className="leading-none">{currentLocaleLabel}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-28" sideOffset={8}>
+      <DropdownMenuContent
+        align="end"
+        className={cn("min-w-28", dropdownClassName)}
+        sideOffset={8}
+      >
         {localeOptions.map((option) => (
           <DropdownMenuItem
             className="cursor-pointer"

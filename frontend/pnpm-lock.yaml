@@ -17,6 +17,9 @@ importers:
       '@fontsource/fira-sans':
         specifier: ^5.2.7
         version: 5.2.7
+      '@primer/octicons-react':
+        specifier: ^19.24.0
+        version: 19.24.0(react@18.3.1)
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.2.2(vite@5.4.21(@types/node@25.5.0)(lightningcss@1.32.0))
@@ -608,6 +611,12 @@ packages:
 
   '@open-draft/until@2.1.0':
     resolution: {integrity: sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg==}
+
+  '@primer/octicons-react@19.24.0':
+    resolution: {integrity: sha512-a+3vZ87MXz7FGC2vfuzgDwDAKYv3ecMvPw01VtAQgvbf9qeRLizQ5EJBiIagMA6nJnuaeRAiEtaFj9ryWlimMQ==}
+    engines: {node: '>=8'}
+    peerDependencies:
+      react: '>=16.3'
 
   '@radix-ui/number@1.1.1':
     resolution: {integrity: sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==}
@@ -4446,6 +4455,10 @@ snapshots:
       outvariant: 1.4.3
 
   '@open-draft/until@2.1.0': {}
+
+  '@primer/octicons-react@19.24.0(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
 
   '@radix-ui/number@1.1.1': {}
 
