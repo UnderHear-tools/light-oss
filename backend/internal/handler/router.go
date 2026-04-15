@@ -35,6 +35,7 @@ type Dependencies struct {
 	SiteService        *service.SiteService
 	SitePublishService *service.SitePublishService
 	SignService        *service.SignService
+	SystemStatsService *service.SystemStatsService
 }
 
 type apiHandler struct {
@@ -48,6 +49,7 @@ type apiHandler struct {
 	siteService        *service.SiteService
 	sitePublishService *service.SitePublishService
 	signService        *service.SignService
+	systemStatsService *service.SystemStatsService
 }
 
 type createBucketRequest struct {
@@ -160,6 +162,41 @@ type sitePublishResponse struct {
 	Site          siteResponse `json:"site"`
 }
 
+type systemStatsResponse struct {
+	OS      string                `json:"os"`
+	CPU     systemCPUResponse     `json:"cpu"`
+	Memory  systemMemoryResponse  `json:"memory"`
+	Disks   []systemDiskResponse  `json:"disks"`
+	Storage systemStorageResponse `json:"storage"`
+}
+
+type systemCPUResponse struct {
+	UsedPercent float64 `json:"used_percent"`
+}
+
+type systemMemoryResponse struct {
+	TotalBytes     uint64  `json:"total_bytes"`
+	UsedBytes      uint64  `json:"used_bytes"`
+	AvailableBytes uint64  `json:"available_bytes"`
+	UsedPercent    float64 `json:"used_percent"`
+}
+
+type systemDiskResponse struct {
+	Label               string  `json:"label"`
+	MountPoint          string  `json:"mount_point"`
+	Filesystem          string  `json:"filesystem"`
+	TotalBytes          uint64  `json:"total_bytes"`
+	UsedBytes           uint64  `json:"used_bytes"`
+	FreeBytes           uint64  `json:"free_bytes"`
+	UsedPercent         float64 `json:"used_percent"`
+	ContainsStorageRoot bool    `json:"contains_storage_root"`
+}
+
+type systemStorageResponse struct {
+	RootPath  string `json:"root_path"`
+	UsedBytes uint64 `json:"used_bytes"`
+}
+
 func NewRouter(deps Dependencies) *gin.Engine {
 	router := gin.New()
 	router.MaxMultipartMemory = deps.Config.MaxMultipartMemoryBytes
@@ -175,6 +212,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		siteService:        deps.SiteService,
 		sitePublishService: deps.SitePublishService,
 		signService:        deps.SignService,
+		systemStatsService: deps.SystemStatsService,
 	}
 
 	rateLimiter := middleware.NewRateLimiter(deps.Config.RateLimitRPS, deps.Config.RateLimitBurst)
@@ -206,6 +244,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected := api.Group("")
 	protected.Use(deps.AuthValidator.RequireBearer())
 	protected.GET("/healthz", handler.healthz)
+	protected.GET("/system/stats", handler.systemStats)
 	protected.POST("/buckets", handler.createBucket)
 	protected.GET("/buckets", handler.listBuckets)
 	protected.DELETE("/buckets/:bucket", handler.deleteBucket)
@@ -252,6 +291,16 @@ func (h *apiHandler) healthz(c *gin.Context) {
 		},
 		"version": "mvp",
 	})
+}
+
+func (h *apiHandler) systemStats(c *gin.Context) {
+	stats, err := h.systemStatsService.Collect(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.JSON(c, http.StatusOK, systemStatsToResponse(*stats))
 }
 
 func (h *apiHandler) createBucket(c *gin.Context) {
@@ -836,6 +885,40 @@ func explorerEntryToResponse(entry service.ExplorerEntry) explorerEntryResponse 
 	response.UpdatedAt = &updatedAt
 
 	return response
+}
+
+func systemStatsToResponse(stats service.SystemStats) systemStatsResponse {
+	disks := make([]systemDiskResponse, 0, len(stats.Disks))
+	for _, item := range stats.Disks {
+		disks = append(disks, systemDiskResponse{
+			Label:               item.Label,
+			MountPoint:          item.MountPoint,
+			Filesystem:          item.Filesystem,
+			TotalBytes:          item.TotalBytes,
+			UsedBytes:           item.UsedBytes,
+			FreeBytes:           item.FreeBytes,
+			UsedPercent:         item.UsedPercent,
+			ContainsStorageRoot: item.ContainsStorageRoot,
+		})
+	}
+
+	return systemStatsResponse{
+		OS: stats.OS,
+		CPU: systemCPUResponse{
+			UsedPercent: stats.CPU.UsedPercent,
+		},
+		Memory: systemMemoryResponse{
+			TotalBytes:     stats.Memory.TotalBytes,
+			UsedBytes:      stats.Memory.UsedBytes,
+			AvailableBytes: stats.Memory.AvailableBytes,
+			UsedPercent:    stats.Memory.UsedPercent,
+		},
+		Disks: disks,
+		Storage: systemStorageResponse{
+			RootPath:  stats.Storage.RootPath,
+			UsedBytes: stats.Storage.UsedBytes,
+		},
+	}
 }
 
 func normalizeObjectKey(raw string) string {

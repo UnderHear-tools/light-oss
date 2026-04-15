@@ -92,6 +92,7 @@ func main() {
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, siteService)
 	signService := service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds)
+	systemStatsService := service.NewSystemStatsService(logger, cfg.StorageRoot)
 
 	router := handler.NewRouter(handler.Dependencies{
 		Config:             cfg,
@@ -104,6 +105,7 @@ func main() {
 		SiteService:        siteService,
 		SitePublishService: sitePublishService,
 		SignService:        signService,
+		SystemStatsService: systemStatsService,
 	})
 
 	server := &http.Server{

@@ -2923,6 +2923,7 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		SiteService:        siteService,
 		SitePublishService: service.NewSitePublishService(db, objectRepo, siteRepo, localStorage, siteService),
 		SignService:        service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds),
+		SystemStatsService: service.NewSystemStatsService(zap.NewNop(), root),
 	}), root
 }
 

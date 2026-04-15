@@ -146,3 +146,40 @@ export interface HealthStatusResult {
   };
   version: string;
 }
+
+export type ApiHostOS = "windows" | "linux" | "macos" | "other";
+
+export interface SystemCPUStats {
+  used_percent: number;
+}
+
+export interface SystemMemoryStats {
+  total_bytes: number;
+  used_bytes: number;
+  available_bytes: number;
+  used_percent: number;
+}
+
+export interface SystemDiskStats {
+  label: string;
+  mount_point: string;
+  filesystem: string;
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+  used_percent: number;
+  contains_storage_root: boolean;
+}
+
+export interface SystemStorageStats {
+  root_path: string;
+  used_bytes: number;
+}
+
+export interface SystemStatsResult {
+  os: ApiHostOS;
+  cpu: SystemCPUStats;
+  memory: SystemMemoryStats;
+  disks: SystemDiskStats[];
+  storage: SystemStorageStats;
+}

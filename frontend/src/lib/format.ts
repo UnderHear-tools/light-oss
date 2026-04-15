@@ -20,3 +20,7 @@ export function formatDate(value: string, locale: AppLocale) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+
+export function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
