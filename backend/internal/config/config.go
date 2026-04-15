@@ -45,11 +45,11 @@ func Load() (Config, error) {
 	v.SetDefault("APP_ENV", "development")
 	v.SetDefault("APP_ADDR", ":8080")
 	v.SetDefault("APP_PUBLIC_BASE_URL", "http://localhost:8080")
-	v.SetDefault("DB_DSN", "root:112233ss@tcp(localhost:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true")
+	v.SetDefault("DB_DSN", "root:123456@tcp(localhost:3306)/light-oss?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 10)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 5)
 	v.SetDefault("DB_CONN_MAX_LIFETIME_MINUTES", 30)
-	v.SetDefault("APP_STORAGE_ROOT", `\light-oss-data\storage`)
+	v.SetDefault("APP_STORAGE_ROOT", `.\light-oss-data\storage`)
 	v.SetDefault("APP_MAX_UPLOAD_SIZE_BYTES", int64(50*1024*1024))
 	v.SetDefault("APP_MAX_MULTIPART_MEMORY_BYTES", int64(8*1024*1024))
 	v.SetDefault("APP_MULTIPART_THRESHOLD_BYTES", int64(16*1024*1024))
@@ -123,7 +123,7 @@ func Load() (Config, error) {
 }
 
 func loadLocalEnv(v *viper.Viper) error {
-	for _, path := range []string{".env", "../.env"} {
+	for _, path := range []string{".env.personal", "../.env.personal", ".env", "../.env"} {
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
 				continue

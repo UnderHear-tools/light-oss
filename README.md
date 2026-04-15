@@ -65,14 +65,15 @@ Light OSS 由四部分组成：
 
 ### 先看这几个关键事实
 
-- 后端启动时会自动加载根目录 `.env`、创建对象存储目录、等待数据库就绪并执行 migration。
+- 后端本地启动会优先加载根目录 `.env.personal`，不存在时再加载 `.env`；命中 `.env.personal` 后不会再回退 `.env` 补齐缺失项。
+- 前端本地 `npm run dev` / `npm run build` 也会优先读取根目录 `.env.personal` 里的默认连接配置；如果浏览器 `localStorage` 里已经保存过设置，则仍以浏览器已保存值为准。
 - 前端是 Vite 应用，本地开发默认地址是 `http://localhost:3000`。
 - 如果你走 Docker Compose + 网关模式，对外唯一公开入口是 `gateway:80`。
 - Compose 下 `backend` 和 `frontend` 默认不直接暴露宿主机端口；API 和控制台都应该通过网关域名访问。
 
 ### 模式差异：本地开发 vs Docker 网关
 
-同一个根目录 `.env` 同时服务于本地开发和 Docker Compose，但以下变量在两种模式下的推荐值不同：
+本地直跑优先读取根目录 `.env.personal`，不存在时再读取 `.env`；Docker Compose 仍按根目录 `.env` 工作。以下变量在两种模式下的推荐值不同：
 
 | 变量                        | 本地开发建议                                                        | Docker 网关建议               | 说明                                     |
 | --------------------------- | ------------------------------------------------------------------- | ----------------------------- | ---------------------------------------- |
@@ -85,9 +86,11 @@ Light OSS 由四部分组成：
 
 如果你想本机直接跑前后端，最省事的方式是只用 Docker 提供 MySQL，然后本地运行后端和前端。
 
-#### 1. 准备根目录 `.env`
+#### 1. 准备根目录 `.env` 或 `.env.personal`
 
-直接编辑根目录 `.env`，至少确认下面这些值符合本地开发场景：
+如果你需要保留一份不提交的本地专用配置，直接新建根目录 `.env.personal` 即可。本地直跑会优先读取 `.env.personal`，并完全替代 `.env`；缺失的键不会再从 `.env` 补齐，所以 `.env.personal` 应包含一份完整的本地配置。
+
+直接编辑根目录 `.env` 或 `.env.personal`，至少确认下面这些值符合本地开发场景：
 
 ```env
 APP_ENV=development
@@ -153,7 +156,7 @@ npm run dev
 
 #### 1. 调整根目录 `.env`
 
-如果你要走网关域名模式，建议至少改成下面这些值：
+Docker Compose 仍默认读取根目录 `.env`，不会自动采用 `.env.personal`。如果你要走网关域名模式，建议至少改成下面这些值：
 
 ```env
 APP_PUBLIC_BASE_URL=http://api.underhear.cn
@@ -210,9 +213,11 @@ make up
 - 真正的 `Host -> site -> bucket + root_prefix` 解析发生在后端。
 - 网关当前只处理 HTTP；HTTPS 证书、TLS 终止和正式 DNS 管理不在这个 MVP 内。
 
-## `.env` 配置说明
+## `.env` / `.env.personal` 配置说明
 
-根目录 `.env` 用于本地开发和 Compose 启动。建议按下面的分类理解这些变量，并根据运行模式调整“模式敏感”的值。
+根目录 `.env` 用于 Compose 启动；本地直跑时会优先读取根目录 `.env.personal`，不存在时再读取 `.env`。一旦命中 `.env.personal`，不会再从 `.env` 补齐缺失项。
+
+前端设置页若已在浏览器 `localStorage` 保存过 `API Base URL` 或 `Bearer Token`，仍以浏览器已保存值为准；这里的 `VITE_*` 变量只影响首次加载时的默认值。
 
 > 不要把真实生产密码、签名密钥、域名配置直接提交到公开仓库。
 

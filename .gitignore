@@ -18,3 +18,5 @@ Thumbs.db
 /.codex/
 /.trae/
 skills-lock.json
+
+/.env.personal
