@@ -1,11 +1,11 @@
-import { FormEvent, useRef, useState } from "react";
-import { ShieldAlertIcon, SlidersHorizontalIcon } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
+import { ShieldAlertIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getHealthStatus } from "@/api/health";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardDescription,
   CardContent,
   CardFooter,
   CardHeader,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { ConnectionHealthStatus } from "@/components/ConnectionHealthStatus";
 import {
   createCheckingConnectionHealthStates,
@@ -33,26 +34,27 @@ import { useAppSettings } from "@/lib/settings";
 export function SettingsPage() {
   const { settings, saveSettings } = useAppSettings();
   const { t } = useI18n();
-  const formRef = useRef<HTMLFormElement | null>(null);
   const [isBearerTokenVisible, setIsBearerTokenVisible] = useState(false);
+  const [draftSettings, setDraftSettings] = useState(() => ({
+    apiBaseUrl: settings.apiBaseUrl,
+    bearerToken: settings.bearerToken,
+  }));
   const [manualHealthStates, setManualHealthStates] =
     useState<ConnectionHealthStates | null>(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const testRequestRef = useRef(0);
 
+  useEffect(() => {
+    setDraftSettings({
+      apiBaseUrl: settings.apiBaseUrl,
+      bearerToken: settings.bearerToken,
+    });
+  }, [settings.apiBaseUrl, settings.bearerToken]);
+
   function readDraftSettings() {
-    if (formRef.current === null) {
-      return {
-        apiBaseUrl: settings.apiBaseUrl.trim(),
-        bearerToken: settings.bearerToken.trim(),
-      };
-    }
-
-    const formData = new FormData(formRef.current);
-
     return {
-      apiBaseUrl: String(formData.get("apiBaseUrl") ?? "").trim(),
-      bearerToken: String(formData.get("bearerToken") ?? "").trim(),
+      apiBaseUrl: draftSettings.apiBaseUrl.trim(),
+      bearerToken: draftSettings.bearerToken.trim(),
     };
   }
 
@@ -60,6 +62,16 @@ export function SettingsPage() {
     testRequestRef.current += 1;
     setManualHealthStates(null);
     setIsTestingConnection(false);
+  }
+
+  function updateDraftSettings(
+    nextDraftSettings: Partial<typeof draftSettings>,
+  ) {
+    clearManualHealthStates();
+    setDraftSettings((current) => ({
+      ...current,
+      ...nextDraftSettings,
+    }));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -119,7 +131,7 @@ export function SettingsPage() {
   }
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">
           {t("settings.title")}
@@ -129,33 +141,39 @@ export function SettingsPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+      <div className="space-y-6">
         <Card className="border-border/70 bg-card">
-          <CardHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>{t("settings.connection.title")}</CardTitle>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <ConnectionHealthStatus
-                  states={manualHealthStates ?? undefined}
-                />
+          <CardHeader className="gap-3 border-b">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-1">
+                <CardTitle>{t("settings.connection.title")}</CardTitle>
+                <CardDescription>
+                  {t("settings.connection.description")}
+                </CardDescription>
               </div>
+              <ConnectionHealthStatus
+                className="justify-start lg:justify-end"
+                states={manualHealthStates ?? undefined}
+              />
             </div>
-            <p className="text-sm text-muted-foreground">
-              {t("settings.connection.description")}
-            </p>
           </CardHeader>
-          <form onSubmit={handleSubmit} ref={formRef}>
-            <CardContent>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-5 pb-4">
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="api-base-url">
                     {t("settings.connection.apiBaseUrl")}
                   </FieldLabel>
                   <Input
-                    defaultValue={settings.apiBaseUrl}
                     id="api-base-url"
                     name="apiBaseUrl"
+                    onChange={(event) =>
+                      updateDraftSettings({
+                        apiBaseUrl: event.currentTarget.value,
+                      })
+                    }
                     placeholder="http://localhost:8080"
+                    value={draftSettings.apiBaseUrl}
                   />
                   <FieldDescription>
                     {t("settings.connection.apiBaseUrlDescription")}
@@ -169,11 +187,16 @@ export function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <Input
-                        defaultValue={settings.bearerToken}
                         id="bearer-token"
                         name="bearerToken"
+                        onChange={(event) =>
+                          updateDraftSettings({
+                            bearerToken: event.currentTarget.value,
+                          })
+                        }
                         placeholder="dev-token"
                         type={isBearerTokenVisible ? "text" : "password"}
+                        value={draftSettings.bearerToken}
                       />
                     </div>
                     <Button
@@ -193,10 +216,21 @@ export function SettingsPage() {
                   </FieldDescription>
                 </Field>
               </FieldGroup>
+
+              <Alert>
+                <ShieldAlertIcon />
+                <AlertTitle>{t("settings.security.title")}</AlertTitle>
+                <AlertDescription>
+                  {t("settings.security.description")}
+                </AlertDescription>
+              </Alert>
             </CardContent>
-            <CardFooter className="flex flex-wrap justify-end gap-2">
+            <CardFooter className="flex flex-col gap-2 py-3 sm:flex-row sm:justify-end">
               <Button
-                disabled={isTestingConnection}
+                className="w-full sm:w-auto"
+                disabled={
+                  isTestingConnection || readDraftSettings().apiBaseUrl === ""
+                }
                 onClick={handleTestConnection}
                 type="button"
                 variant="outline"
@@ -205,59 +239,66 @@ export function SettingsPage() {
                   ? t("settings.connection.testingConnection")
                   : t("settings.connection.testConnection")}
               </Button>
-              <Button type="submit">{t("common.save")}</Button>
+              <Button className="w-full sm:w-auto" type="submit">
+                {t("common.save")}
+              </Button>
             </CardFooter>
           </form>
         </Card>
 
-        <div className="grid gap-4 xl:sticky xl:top-20">
-          <Card className="border-border/70 bg-card">
-            <CardHeader>
-              <CardTitle>{t("settings.preferences.title")}</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {t("settings.preferences.description")}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel>
-                    {t("settings.preferences.localeLabel")}
-                  </FieldLabel>
-                  <LocaleToggle />
-                  <FieldDescription>
-                    {t("settings.preferences.localeDescription")}
-                  </FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel>
-                    {t("settings.preferences.themeLabel")}
-                  </FieldLabel>
-                  <ThemeToggle />
-                  <FieldDescription>
-                    {t("settings.preferences.themeDescription")}
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-            </CardContent>
-            <CardFooter className="justify-start">
-              <Badge className="gap-1.5" variant="outline">
-                <SlidersHorizontalIcon className="size-3.5" />
-                {t("common.current")}
-              </Badge>
-            </CardFooter>
-          </Card>
-
-          <Alert>
-            <ShieldAlertIcon />
-            <AlertTitle>{t("settings.security.title")}</AlertTitle>
-            <AlertDescription>
-              {t("settings.security.description")}
-            </AlertDescription>
-          </Alert>
-        </div>
+        <Card className="gap-0 border-border/70 bg-card py-4">
+          <CardHeader className="border-b">
+            <CardTitle>{t("settings.preferences.title")}</CardTitle>
+            <CardDescription>
+              {t("settings.preferences.description")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-0 py-0">
+            <SettingsPreferenceRow
+              control={
+                <LocaleToggle
+                  className="min-w-20 justify-between self-start"
+                  dropdownClassName="min-w-30"
+                  size="default"
+                />
+              }
+              description={t("settings.preferences.localeDescription")}
+              label={t("settings.preferences.localeLabel")}
+            />
+            <Separator />
+            <SettingsPreferenceRow
+              control={
+                <ThemeToggle
+                  className="min-w-20 justify-between self-start"
+                  size="default"
+                />
+              }
+              description={t("settings.preferences.themeDescription")}
+              label={t("settings.preferences.themeLabel")}
+            />
+          </CardContent>
+        </Card>
       </div>
     </section>
+  );
+}
+
+function SettingsPreferenceRow({
+  control,
+  description,
+  label,
+}: {
+  control: ReactNode;
+  description: string;
+  label: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-2.5 first:pt-2.5 last:pb-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="self-start">{control}</div>
+    </div>
   );
 }
