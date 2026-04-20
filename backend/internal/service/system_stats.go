@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -21,16 +20,9 @@ import (
 )
 
 type SystemStatsService struct {
-	logger            *zap.Logger
-	storageRoot       string
-	cpuSampleInterval time.Duration
-	storageUsageTTL   time.Duration
-	now               func() time.Time
-
-	storageUsageMu         sync.Mutex
-	cachedStorageRoot      string
-	cachedStorageUsedBytes uint64
-	cachedStorageAt        time.Time
+	logger              *zap.Logger
+	storageQuotaService *StorageQuotaService
+	cpuSampleInterval   time.Duration
 }
 
 type SystemStats struct {
@@ -64,8 +56,12 @@ type SystemDiskStats struct {
 }
 
 type SystemStorageStats struct {
-	RootPath  string
-	UsedBytes uint64
+	RootPath       string
+	UsedBytes      uint64
+	MaxBytes       uint64
+	RemainingBytes uint64
+	UsedPercent    float64
+	LimitStatus    StorageLimitStatus
 }
 
 type diskSnapshot struct {
@@ -79,13 +75,11 @@ type diskSnapshot struct {
 	containsStorageRoot bool
 }
 
-func NewSystemStatsService(logger *zap.Logger, storageRoot string) *SystemStatsService {
+func NewSystemStatsService(logger *zap.Logger, storageQuotaService *StorageQuotaService) *SystemStatsService {
 	return &SystemStatsService{
-		logger:            logger,
-		storageRoot:       storageRoot,
-		cpuSampleInterval: 200 * time.Millisecond,
-		storageUsageTTL:   time.Minute,
-		now:               time.Now,
+		logger:              logger,
+		storageQuotaService: storageQuotaService,
+		cpuSampleInterval:   200 * time.Millisecond,
 	}
 }
 
@@ -103,12 +97,7 @@ func (s *SystemStatsService) Collect(ctx context.Context) (*SystemStats, error) 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "system_metrics_unavailable", "failed to collect system metrics", err)
 	}
 
-	absStorageRoot, err := filepath.Abs(s.storageRoot)
-	if err != nil {
-		return nil, apperrors.Wrap(http.StatusInternalServerError, "system_metrics_unavailable", "failed to collect system metrics", err)
-	}
-
-	storageUsedBytes, err := s.storageUsage(absStorageRoot)
+	storageSnapshot, err := s.storageQuotaService.Snapshot(ctx)
 	if err != nil {
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "system_metrics_unavailable", "failed to collect system metrics", err)
 	}
@@ -140,7 +129,7 @@ func (s *SystemStatsService) Collect(ctx context.Context) (*SystemStats, error) 
 		})
 	}
 
-	markStorageRootDisk(absStorageRoot, disks)
+	markStorageRootDisk(storageSnapshot.RootPath, disks)
 	sortDiskSnapshots(disks)
 
 	resultDisks := make([]SystemDiskStats, 0, len(disks))
@@ -170,8 +159,12 @@ func (s *SystemStatsService) Collect(ctx context.Context) (*SystemStats, error) 
 		},
 		Disks: resultDisks,
 		Storage: SystemStorageStats{
-			RootPath:  absStorageRoot,
-			UsedBytes: storageUsedBytes,
+			RootPath:       storageSnapshot.RootPath,
+			UsedBytes:      storageSnapshot.UsedBytes,
+			MaxBytes:       storageSnapshot.MaxBytes,
+			RemainingBytes: storageSnapshot.RemainingBytes,
+			UsedPercent:    storageSnapshot.UsedPercent,
+			LimitStatus:    storageSnapshot.LimitStatus,
 		},
 	}, nil
 }
@@ -216,29 +209,6 @@ func directorySize(root string) (uint64, error) {
 	}
 
 	return total, nil
-}
-
-func (s *SystemStatsService) storageUsage(absStorageRoot string) (uint64, error) {
-	s.storageUsageMu.Lock()
-	defer s.storageUsageMu.Unlock()
-
-	now := s.now()
-	if s.cachedStorageRoot == absStorageRoot &&
-		!s.cachedStorageAt.IsZero() &&
-		now.Sub(s.cachedStorageAt) < s.storageUsageTTL {
-		return s.cachedStorageUsedBytes, nil
-	}
-
-	usedBytes, err := directorySize(absStorageRoot)
-	if err != nil {
-		return 0, err
-	}
-
-	s.cachedStorageRoot = absStorageRoot
-	s.cachedStorageUsedBytes = usedBytes
-	s.cachedStorageAt = now
-
-	return usedBytes, nil
 }
 
 func dedupePartitions(partitions []disk.PartitionStat) []disk.PartitionStat {

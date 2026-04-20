@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 )
 
 func TestMapRuntimeOS(t *testing.T) {
@@ -93,50 +92,23 @@ func TestSortDiskSnapshotsPrioritizesStorageRoot(t *testing.T) {
 	}
 }
 
-func TestStorageUsageCachesDirectorySize(t *testing.T) {
+func TestDirectorySize(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "alpha.txt"), []byte("1234"), 0o644); err != nil {
 		t.Fatalf("write alpha file: %v", err)
 	}
-
-	current := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	service := &SystemStatsService{
-		storageUsageTTL: time.Minute,
-		now: func() time.Time {
-			return current
-		},
-	}
-
-	first, err := service.storageUsage(root)
-	if err != nil {
-		t.Fatalf("first storage usage: %v", err)
-	}
-	if first != 4 {
-		t.Fatalf("expected first usage to be 4, got %d", first)
-	}
-
 	if err := os.WriteFile(filepath.Join(root, "beta.txt"), []byte("123456"), 0o644); err != nil {
 		t.Fatalf("write beta file: %v", err)
 	}
 
-	second, err := service.storageUsage(root)
+	size, err := directorySize(root)
 	if err != nil {
-		t.Fatalf("second storage usage: %v", err)
+		t.Fatalf("directory size: %v", err)
 	}
-	if second != first {
-		t.Fatalf("expected cached usage %d, got %d", first, second)
-	}
-
-	current = current.Add(time.Minute)
-
-	third, err := service.storageUsage(root)
-	if err != nil {
-		t.Fatalf("third storage usage: %v", err)
-	}
-	if third != 10 {
-		t.Fatalf("expected refreshed usage to be 10, got %d", third)
+	if size != 10 {
+		t.Fatalf("expected usage to be 10, got %d", size)
 	}
 }
 

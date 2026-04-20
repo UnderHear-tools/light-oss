@@ -38,8 +38,12 @@ type systemDiskResponse struct {
 }
 
 type systemStorageResponse struct {
-	RootPath  string `json:"root_path"`
-	UsedBytes uint64 `json:"used_bytes"`
+	RootPath       string  `json:"root_path"`
+	UsedBytes      uint64  `json:"used_bytes"`
+	MaxBytes       uint64  `json:"max_bytes"`
+	RemainingBytes uint64  `json:"remaining_bytes"`
+	UsedPercent    float64 `json:"used_percent"`
+	LimitStatus    string  `json:"limit_status"`
 }
 
 func TestProtectedSystemStatsRequireAuth(t *testing.T) {
@@ -84,8 +88,14 @@ func TestProtectedSystemStatsReturnsMetrics(t *testing.T) {
 	if body.Data.Storage.UsedBytes == 0 {
 		t.Fatalf("expected storage used bytes > 0")
 	}
+	if body.Data.Storage.MaxBytes != 10*1024*1024*1024 {
+		t.Fatalf("expected default max bytes, got %d", body.Data.Storage.MaxBytes)
+	}
 	if body.Data.Storage.RootPath == "" {
 		t.Fatalf("expected storage root path")
+	}
+	if body.Data.Storage.LimitStatus != "ok" {
+		t.Fatalf("expected storage limit status ok, got %q", body.Data.Storage.LimitStatus)
 	}
 
 	storageRootMatched := false

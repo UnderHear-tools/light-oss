@@ -66,6 +66,12 @@ const enUS = {
   "dashboard.system.memoryDescription": "{available} available",
   "dashboard.system.storageUsed": "OSS storage used",
   "dashboard.system.storageDescription": "{path}",
+  "dashboard.system.storageAlertWarningTitle": "Storage limit warning",
+  "dashboard.system.storageAlertWarningDescription":
+    "OSS storage is using {used} of {max}. Increase the limit before uploads start failing.",
+  "dashboard.system.storageAlertExceededTitle": "Storage limit exceeded",
+  "dashboard.system.storageAlertExceededDescription":
+    "OSS storage is using {used} of {max}. New writes are blocked until you raise the limit or free space.",
   "dashboard.system.disksTitle": "Disk usage",
   "dashboard.system.disksDescription":
     "Usage is grouped by the disks or mount points visible to the API host.",
@@ -353,7 +359,7 @@ const enUS = {
   "explorer.pagination.summary": "Showing {count} items / Page {page}",
   "settings.title": "Settings",
   "settings.description":
-    "Manage API connection details, language, and theme preferences.",
+    "Manage API connection details, the global storage limit, language, and theme preferences.",
   "settings.connection.title": "Connection settings",
   "settings.connection.description":
     "These values are stored in localStorage for this browser only.",
@@ -366,6 +372,26 @@ const enUS = {
   "settings.connection.hideToken": "Hide",
   "settings.connection.testConnection": "Test connection",
   "settings.connection.testingConnection": "Testing",
+  "settings.storage.title": "Storage limit",
+  "settings.storage.description":
+    "Review current OSS usage and update the persisted global hard limit.",
+  "settings.storage.currentUsage": "Current usage",
+  "settings.storage.currentLimit": "Current limit",
+  "settings.storage.remaining": "Remaining capacity",
+  "settings.storage.usagePercent": "Usage percent",
+  "settings.storage.status": "Status",
+  "settings.storage.rootPath": "Storage root path",
+  "settings.storage.limitGiB": "Storage limit (GiB)",
+  "settings.storage.limitGiBDescription":
+    "The value is saved on the backend and applied to all new writes.",
+  "settings.storage.saveLimit": "Save storage limit",
+  "settings.storage.savingLimit": "Saving limit",
+  "settings.storage.unavailable":
+    "Save the connection settings with a valid bearer token before changing the storage limit.",
+  "settings.storage.invalidLimit": "Storage limit must be greater than 0 GiB.",
+  "settings.storage.status.ok": "OK",
+  "settings.storage.status.warning": "Warning",
+  "settings.storage.status.exceeded": "Exceeded",
   "settings.preferences.title": "Interface preferences",
   "settings.preferences.description":
     "Quick controls for locale and light/dark appearance.",
@@ -399,6 +425,7 @@ const enUS = {
   "toast.siteDeleted": "Site deleted",
   "toast.urlCopied": "URL copied",
   "toast.settingsSaved": "Settings saved",
+  "toast.storageQuotaSaved": "Storage limit saved",
   "errors.loadBuckets": "Failed to load bucket",
   "errors.loadSystemStats": "Failed to load system stats",
   "errors.deleteBucket": "Failed to delete bucket",
@@ -422,6 +449,7 @@ const enUS = {
   "errors.signObject": "Failed to create a signed download URL",
   "errors.publishSite": "Failed to publish site",
   "errors.copyUrl": "Failed to copy URL",
+  "errors.updateStorageQuota": "Failed to update storage limit",
   "errors.bucketNotFound": "Open this page again from the bucket list.",
 } as const;
 
@@ -485,6 +513,12 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "dashboard.system.memoryDescription": "可用 {available}",
   "dashboard.system.storageUsed": "OSS 存储占用",
   "dashboard.system.storageDescription": "{path}",
+  "dashboard.system.storageAlertWarningTitle": "存储上限预警",
+  "dashboard.system.storageAlertWarningDescription":
+    "OSS 存储已使用 {used} / {max}，建议在上传失败前尽快提高上限。",
+  "dashboard.system.storageAlertExceededTitle": "存储上限已超出",
+  "dashboard.system.storageAlertExceededDescription":
+    "OSS 存储已使用 {used} / {max}。在提高上限或释放空间前，新的写入会被阻止。",
   "dashboard.system.disksTitle": "磁盘占用",
   "dashboard.system.disksDescription":
     "按 API 主机当前可见的盘符或挂载点显示使用情况。",
@@ -694,7 +728,8 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.limit.option": "每页 {count} 项",
   "explorer.pagination.summary": "当前显示 {count} 项 / 第 {page} 页",
   "settings.title": "设置",
-  "settings.description": "管理 API 连接信息、界面语言和主题偏好。",
+  "settings.description":
+    "管理 API 连接信息、全局存储上限、界面语言和主题偏好。",
   "settings.connection.title": "连接设置",
   "settings.connection.description":
     "这些值只会保存在当前浏览器的 localStorage 中。",
@@ -706,6 +741,26 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "settings.connection.hideToken": "隐藏",
   "settings.connection.testConnection": "测试连接",
   "settings.connection.testingConnection": "测试中",
+  "settings.storage.title": "存储上限",
+  "settings.storage.description":
+    "查看当前 OSS 使用量，并修改后端持久化的全局硬上限。",
+  "settings.storage.currentUsage": "当前已用",
+  "settings.storage.currentLimit": "当前上限",
+  "settings.storage.remaining": "剩余额度",
+  "settings.storage.usagePercent": "使用率",
+  "settings.storage.status": "状态",
+  "settings.storage.rootPath": "存储根目录",
+  "settings.storage.limitGiB": "存储上限（GiB）",
+  "settings.storage.limitGiBDescription":
+    "该值会保存在后端，并对后续所有新写入生效。",
+  "settings.storage.saveLimit": "保存存储上限",
+  "settings.storage.savingLimit": "保存中",
+  "settings.storage.unavailable":
+    "请先保存连接设置，并确保 Bearer Token 有效后再修改存储上限。",
+  "settings.storage.invalidLimit": "存储上限必须大于 0 GiB。",
+  "settings.storage.status.ok": "正常",
+  "settings.storage.status.warning": "预警",
+  "settings.storage.status.exceeded": "已超限",
   "settings.preferences.title": "界面偏好",
   "settings.preferences.description": "快速切换语言以及浅色/深色外观。",
   "settings.preferences.localeLabel": "界面语言",
@@ -731,6 +786,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "toast.sitePublished": "站点已发布",
   "toast.urlCopied": "URL 已复制",
   "toast.settingsSaved": "设置已保存",
+  "toast.storageQuotaSaved": "存储上限已保存",
   "errors.loadBuckets": "加载 bucket 失败",
   "errors.loadSystemStats": "加载系统信息失败",
   "errors.deleteBucket": "删除 bucket 失败",
@@ -750,6 +806,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "errors.signObject": "生成签名下载链接失败",
   "errors.publishSite": "发布站点失败",
   "errors.copyUrl": "复制 URL 失败",
+  "errors.updateStorageQuota": "更新存储上限失败",
   "errors.bucketNotFound": "请从 bucket 列表重新打开这个页面。",
   "nav.sites": "站点管理",
   "common.create": "创建",

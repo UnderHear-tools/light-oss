@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	"light-oss/backend/internal/model"
 	apperrors "light-oss/backend/internal/pkg/errors"
 )
@@ -313,6 +315,14 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 	}
 
 	if recursive {
+		objects, err := s.objectRepo.ListActiveByPrefixOrdered(ctx, bucketName, folderPath)
+		if err != nil {
+			return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
+		}
+
+		writeSession := s.quota.BeginWrite()
+		defer writeSession.Close()
+
 		deleted, err := s.objectRepo.SoftDeleteByPrefix(ctx, bucketName, folderPath)
 		if err != nil {
 			return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
@@ -320,6 +330,8 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 		if deleted == 0 {
 			return apperrors.New(404, "folder_not_found", "folder not found")
 		}
+
+		writeSession.CleanupUnreferencedPaths(ctx, storagePathsFromObjects(objects))
 
 		return nil
 	}
@@ -333,6 +345,18 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 		return apperrors.New(409, "folder_not_empty", "folder is not empty")
 	}
 
+	marker, err := s.objectRepo.FindActive(ctx, bucketName, markerKey)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.New(404, "folder_not_found", "folder not found")
+		}
+
+		return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
+	}
+
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
+
 	deleted, err := s.objectRepo.SoftDelete(ctx, bucketName, markerKey)
 	if err != nil {
 		return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
@@ -340,6 +364,8 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 	if !deleted {
 		return apperrors.New(404, "folder_not_found", "folder not found")
 	}
+
+	writeSession.CleanupUnreferencedPaths(ctx, []string{marker.StoragePath})
 
 	return nil
 }
@@ -353,8 +379,15 @@ type internalObjectInput struct {
 }
 
 func (s *ObjectService) createInternalObject(ctx context.Context, input internalObjectInput) (*model.Object, error) {
-	stored, err := s.storage.Save(ctx, strings.NewReader(""))
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
+
+	stored, err := writeSession.Save(ctx, strings.NewReader(""))
 	if err != nil {
+		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+			return nil, err
+		}
+
 		return nil, apperrors.Wrap(500, "object_store_failed", "failed to store object", err)
 	}
 
@@ -372,7 +405,7 @@ func (s *ObjectService) createInternalObject(ctx context.Context, input internal
 
 	saved, err := s.objectRepo.Upsert(ctx, object)
 	if err != nil {
-		_ = s.storage.Delete(stored.RelativePath)
+		writeSession.DeletePaths([]string{stored.RelativePath})
 		if isForeignKeyError(err) {
 			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
 		}

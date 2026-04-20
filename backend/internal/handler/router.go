@@ -25,31 +25,33 @@ import (
 )
 
 type Dependencies struct {
-	Config             config.Config
-	Logger             *zap.Logger
-	DB                 *sql.DB
-	GormDB             *gorm.DB
-	AuthValidator      *middleware.TokenValidator
-	BucketService      *service.BucketService
-	ObjectService      *service.ObjectService
-	SiteService        *service.SiteService
-	SitePublishService *service.SitePublishService
-	SignService        *service.SignService
-	SystemStatsService *service.SystemStatsService
+	Config              config.Config
+	Logger              *zap.Logger
+	DB                  *sql.DB
+	GormDB              *gorm.DB
+	AuthValidator       *middleware.TokenValidator
+	BucketService       *service.BucketService
+	ObjectService       *service.ObjectService
+	SiteService         *service.SiteService
+	SitePublishService  *service.SitePublishService
+	SignService         *service.SignService
+	SystemStatsService  *service.SystemStatsService
+	StorageQuotaService *service.StorageQuotaService
 }
 
 type apiHandler struct {
-	cfg                config.Config
-	logger             *zap.Logger
-	db                 *sql.DB
-	gormDB             *gorm.DB
-	authValidator      *middleware.TokenValidator
-	bucketService      *service.BucketService
-	objectService      *service.ObjectService
-	siteService        *service.SiteService
-	sitePublishService *service.SitePublishService
-	signService        *service.SignService
-	systemStatsService *service.SystemStatsService
+	cfg                 config.Config
+	logger              *zap.Logger
+	db                  *sql.DB
+	gormDB              *gorm.DB
+	authValidator       *middleware.TokenValidator
+	bucketService       *service.BucketService
+	objectService       *service.ObjectService
+	siteService         *service.SiteService
+	sitePublishService  *service.SitePublishService
+	signService         *service.SignService
+	systemStatsService  *service.SystemStatsService
+	storageQuotaService *service.StorageQuotaService
 }
 
 type createBucketRequest struct {
@@ -63,6 +65,10 @@ type createFolderRequest struct {
 
 type updateObjectVisibilityRequest struct {
 	Visibility string `json:"visibility"`
+}
+
+type updateStorageQuotaRequest struct {
+	MaxBytes *int64 `json:"max_bytes"`
 }
 
 type signDownloadRequest struct {
@@ -193,8 +199,12 @@ type systemDiskResponse struct {
 }
 
 type systemStorageResponse struct {
-	RootPath  string `json:"root_path"`
-	UsedBytes uint64 `json:"used_bytes"`
+	RootPath       string  `json:"root_path"`
+	UsedBytes      uint64  `json:"used_bytes"`
+	MaxBytes       uint64  `json:"max_bytes"`
+	RemainingBytes uint64  `json:"remaining_bytes"`
+	UsedPercent    float64 `json:"used_percent"`
+	LimitStatus    string  `json:"limit_status"`
 }
 
 func NewRouter(deps Dependencies) *gin.Engine {
@@ -202,17 +212,18 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	router.MaxMultipartMemory = deps.Config.MaxMultipartMemoryBytes
 
 	handler := &apiHandler{
-		cfg:                deps.Config,
-		logger:             deps.Logger,
-		db:                 deps.DB,
-		gormDB:             deps.GormDB,
-		authValidator:      deps.AuthValidator,
-		bucketService:      deps.BucketService,
-		objectService:      deps.ObjectService,
-		siteService:        deps.SiteService,
-		sitePublishService: deps.SitePublishService,
-		signService:        deps.SignService,
-		systemStatsService: deps.SystemStatsService,
+		cfg:                 deps.Config,
+		logger:              deps.Logger,
+		db:                  deps.DB,
+		gormDB:              deps.GormDB,
+		authValidator:       deps.AuthValidator,
+		bucketService:       deps.BucketService,
+		objectService:       deps.ObjectService,
+		siteService:         deps.SiteService,
+		sitePublishService:  deps.SitePublishService,
+		signService:         deps.SignService,
+		systemStatsService:  deps.SystemStatsService,
+		storageQuotaService: deps.StorageQuotaService,
 	}
 
 	rateLimiter := middleware.NewRateLimiter(deps.Config.RateLimitRPS, deps.Config.RateLimitBurst)
@@ -245,6 +256,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.Use(deps.AuthValidator.RequireBearer())
 	protected.GET("/healthz", handler.healthz)
 	protected.GET("/system/stats", handler.systemStats)
+	protected.PUT("/system/storage/quota", handler.updateStorageQuota)
 	protected.POST("/buckets", handler.createBucket)
 	protected.GET("/buckets", handler.listBuckets)
 	protected.DELETE("/buckets/:bucket", handler.deleteBucket)
@@ -301,6 +313,26 @@ func (h *apiHandler) systemStats(c *gin.Context) {
 	}
 
 	response.JSON(c, http.StatusOK, systemStatsToResponse(*stats))
+}
+
+func (h *apiHandler) updateStorageQuota(c *gin.Context) {
+	var req updateStorageQuotaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "request body is invalid"))
+		return
+	}
+	if req.MaxBytes == nil || *req.MaxBytes <= 0 {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "max_bytes must be greater than zero"))
+		return
+	}
+
+	quota, err := h.storageQuotaService.UpdateMaxBytes(c.Request.Context(), uint64(*req.MaxBytes))
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.JSON(c, http.StatusOK, storageQuotaToResponse(*quota))
 }
 
 func (h *apiHandler) createBucket(c *gin.Context) {
@@ -915,9 +947,24 @@ func systemStatsToResponse(stats service.SystemStats) systemStatsResponse {
 		},
 		Disks: disks,
 		Storage: systemStorageResponse{
-			RootPath:  stats.Storage.RootPath,
-			UsedBytes: stats.Storage.UsedBytes,
+			RootPath:       stats.Storage.RootPath,
+			UsedBytes:      stats.Storage.UsedBytes,
+			MaxBytes:       stats.Storage.MaxBytes,
+			RemainingBytes: stats.Storage.RemainingBytes,
+			UsedPercent:    stats.Storage.UsedPercent,
+			LimitStatus:    string(stats.Storage.LimitStatus),
 		},
+	}
+}
+
+func storageQuotaToResponse(stats service.StorageQuotaSnapshot) systemStorageResponse {
+	return systemStorageResponse{
+		RootPath:       stats.RootPath,
+		UsedBytes:      stats.UsedBytes,
+		MaxBytes:       stats.MaxBytes,
+		RemainingBytes: stats.RemainingBytes,
+		UsedPercent:    stats.UsedPercent,
+		LimitStatus:    string(stats.LimitStatus),
 	}
 }
 

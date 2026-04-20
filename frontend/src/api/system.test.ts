@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "../lib/settings";
-import { getSystemStats } from "./system";
+import { getSystemStats, updateStorageQuota } from "./system";
 
 const apiEnvelopeRequestMock = vi.fn();
 
@@ -47,6 +47,10 @@ describe("system api helper", () => {
         storage: {
           root_path: "/data/storage",
           used_bytes: 512,
+          max_bytes: 1024,
+          remaining_bytes: 512,
+          used_percent: 50,
+          limit_status: "ok",
         },
       },
     });
@@ -77,6 +81,10 @@ describe("system api helper", () => {
       storage: {
         root_path: "/data/storage",
         used_bytes: 512,
+        max_bytes: 1024,
+        remaining_bytes: 512,
+        used_percent: 50,
+        limit_status: "ok",
       },
     });
 
@@ -102,5 +110,39 @@ describe("system api helper", () => {
       status: 500,
       code: "system_metrics_unavailable",
     });
+  });
+
+  it("updates the persisted storage quota", async () => {
+    apiEnvelopeRequestMock.mockResolvedValueOnce({
+      request_id: "req_2",
+      data: {
+        root_path: "/data/storage",
+        used_bytes: 512,
+        max_bytes: 2048,
+        remaining_bytes: 1536,
+        used_percent: 25,
+        limit_status: "ok",
+      },
+    });
+
+    await expect(updateStorageQuota(settings, 2048)).resolves.toEqual({
+      root_path: "/data/storage",
+      used_bytes: 512,
+      max_bytes: 2048,
+      remaining_bytes: 1536,
+      used_percent: 25,
+      limit_status: "ok",
+    });
+
+    expect(apiEnvelopeRequestMock).toHaveBeenCalledWith(
+      settings,
+      expect.objectContaining({
+        method: "PUT",
+        url: "/api/v1/system/storage/quota",
+        data: {
+          max_bytes: 2048,
+        },
+      }),
+    );
   });
 });

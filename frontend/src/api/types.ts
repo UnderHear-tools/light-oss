@@ -171,9 +171,15 @@ export interface SystemDiskStats {
   contains_storage_root: boolean;
 }
 
+export type StorageLimitStatus = "ok" | "warning" | "exceeded";
+
 export interface SystemStorageStats {
   root_path: string;
   used_bytes: number;
+  max_bytes: number;
+  remaining_bytes: number;
+  used_percent: number;
+  limit_status: StorageLimitStatus;
 }
 
 export interface SystemStatsResult {

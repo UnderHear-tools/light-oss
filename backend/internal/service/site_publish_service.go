@@ -36,6 +36,7 @@ type SitePublishService struct {
 	siteRepo    *repository.SiteRepository
 	storage     *storage.LocalStorage
 	siteService *SiteService
+	quota       *StorageQuotaService
 }
 
 func NewSitePublishService(
@@ -43,6 +44,7 @@ func NewSitePublishService(
 	objectRepo *repository.ObjectRepository,
 	siteRepo *repository.SiteRepository,
 	localStorage *storage.LocalStorage,
+	quotaService *StorageQuotaService,
 	siteService *SiteService,
 ) *SitePublishService {
 	return &SitePublishService{
@@ -50,6 +52,7 @@ func NewSitePublishService(
 		objectRepo:  objectRepo,
 		siteRepo:    siteRepo,
 		storage:     localStorage,
+		quota:       quotaService,
 		siteService: siteService,
 	}
 }
@@ -91,6 +94,19 @@ func (s *SitePublishService) Publish(
 	storedPaths := make([]string, 0, len(input.Items))
 	uploadedCount := 0
 	var createdSite *model.Site
+	objectKeys := make([]string, 0, len(input.Items))
+	for _, item := range input.Items {
+		objectKeys = append(objectKeys, parentPrefix+item.RelativePath)
+	}
+
+	existingObjectsByKey, err := s.siteService.objectService.loadActiveObjectsByKeys(ctx, input.BucketName, objectKeys)
+	if err != nil {
+		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up objects", err)
+	}
+	replacedPaths := make([]string, 0, len(existingObjectsByKey))
+
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
 
 	err = s.gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		objectRepo := s.objectRepo.WithDB(tx)
@@ -116,13 +132,17 @@ func (s *SitePublishService) Publish(
 				return apperrors.Wrap(http.StatusInternalServerError, "batch_file_open_failed", "failed to open uploaded file", err)
 			}
 
-			stored, err := s.storage.Save(ctx, reader)
+			stored, err := writeSession.Save(ctx, reader)
 			closeErr := reader.Close()
 			if err != nil {
+				if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+					return err
+				}
+
 				return apperrors.Wrap(http.StatusInternalServerError, "object_store_failed", "failed to store object", err)
 			}
 			if closeErr != nil {
-				_ = s.storage.Delete(stored.RelativePath)
+				writeSession.DeletePaths([]string{stored.RelativePath})
 				return apperrors.Wrap(http.StatusInternalServerError, "batch_file_open_failed", "failed to close uploaded file", closeErr)
 			}
 
@@ -149,6 +169,9 @@ func (s *SitePublishService) Publish(
 			}
 
 			uploadedCount++
+			if existingObject, exists := existingObjectsByKey[objectKey]; exists {
+				replacedPaths = append(replacedPaths, existingObject.StoragePath)
+			}
 		}
 
 		createdSite, err = siteRepo.Create(ctx, site, domains)
@@ -159,9 +182,7 @@ func (s *SitePublishService) Publish(
 		return nil
 	})
 	if err != nil {
-		for _, storedPath := range storedPaths {
-			_ = s.storage.Delete(storedPath)
-		}
+		writeSession.DeletePaths(storedPaths)
 
 		if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
 			return nil, apperrors.New(http.StatusConflict, "domain_conflict", "domain is already bound to another site")
@@ -176,6 +197,8 @@ func (s *SitePublishService) Publish(
 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "site_create_failed", "failed to create site", err)
 	}
+
+	writeSession.CleanupUnreferencedPaths(ctx, replacedPaths)
 
 	return &PublishSiteUploadOutput{
 		UploadedCount: uploadedCount,

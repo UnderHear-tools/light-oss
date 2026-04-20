@@ -16,6 +16,17 @@ type Bucket struct {
 	UpdatedAt time.Time `gorm:"not null"`
 }
 
+type SystemStorageQuota struct {
+	ID        uint64    `gorm:"primaryKey"`
+	MaxBytes  uint64    `gorm:"not null"`
+	CreatedAt time.Time `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"not null"`
+}
+
+func (SystemStorageQuota) TableName() string {
+	return "system_storage_quotas"
+}
+
 type Site struct {
 	ID            uint64       `gorm:"primaryKey"`
 	BucketName    string       `gorm:"size:128;not null;index:idx_sites_bucket_name"`

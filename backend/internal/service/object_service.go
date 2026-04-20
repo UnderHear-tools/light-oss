@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -50,13 +51,20 @@ type ObjectService struct {
 	bucketRepo *repository.BucketRepository
 	objectRepo *repository.ObjectRepository
 	storage    *storage.LocalStorage
+	quota      *StorageQuotaService
 }
 
-func NewObjectService(bucketRepo *repository.BucketRepository, objectRepo *repository.ObjectRepository, localStorage *storage.LocalStorage) *ObjectService {
+func NewObjectService(
+	bucketRepo *repository.BucketRepository,
+	objectRepo *repository.ObjectRepository,
+	localStorage *storage.LocalStorage,
+	quotaService *StorageQuotaService,
+) *ObjectService {
 	return &ObjectService{
 		bucketRepo: bucketRepo,
 		objectRepo: objectRepo,
 		storage:    localStorage,
+		quota:      quotaService,
 	}
 }
 
@@ -77,6 +85,7 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 		return nil, err
 	}
 
+	var existing *model.Object
 	if !input.AllowOverwrite {
 		exists, err := s.objectRepo.ExistsActive(ctx, input.BucketName, input.ObjectKey)
 		if err != nil {
@@ -85,10 +94,22 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 		if exists {
 			return nil, apperrors.New(http.StatusConflict, "object_exists", "object already exists; set X-Allow-Overwrite=true to overwrite")
 		}
+	} else {
+		existing, err = s.findActiveObject(ctx, input.BucketName, input.ObjectKey)
+		if err != nil {
+			return nil, apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
+		}
 	}
 
-	stored, err := s.storage.Save(ctx, input.Body)
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
+
+	stored, err := writeSession.Save(ctx, input.Body)
 	if err != nil {
+		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+			return nil, err
+		}
+
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_store_failed", "failed to store object", err)
 	}
 
@@ -106,12 +127,16 @@ func (s *ObjectService) Upload(ctx context.Context, input UploadObjectInput) (*m
 
 	saved, err := s.objectRepo.Upsert(ctx, object)
 	if err != nil {
-		_ = s.storage.Delete(stored.RelativePath)
+		writeSession.DeletePaths([]string{stored.RelativePath})
 		if isForeignKeyError(err) {
 			return nil, apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
 		}
 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_metadata_failed", "failed to save object metadata", err)
+	}
+
+	if existing != nil {
+		writeSession.CleanupUnreferencedPaths(ctx, []string{existing.StoragePath})
 	}
 
 	return saved, nil
@@ -206,6 +231,18 @@ func (s *ObjectService) Delete(ctx context.Context, bucketName string, objectKey
 		return err
 	}
 
+	object, err := s.objectRepo.FindActive(ctx, bucketName, objectKey)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.New(http.StatusNotFound, "object_not_found", "object not found")
+		}
+
+		return apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
+	}
+
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
+
 	deleted, err := s.objectRepo.SoftDelete(ctx, bucketName, objectKey)
 	if err != nil {
 		return apperrors.Wrap(http.StatusInternalServerError, "object_delete_failed", "failed to delete object", err)
@@ -213,6 +250,8 @@ func (s *ObjectService) Delete(ctx context.Context, bucketName string, objectKey
 	if !deleted {
 		return apperrors.New(http.StatusNotFound, "object_not_found", "object not found")
 	}
+
+	writeSession.CleanupUnreferencedPaths(ctx, []string{object.StoragePath})
 
 	return nil
 }
@@ -332,4 +371,48 @@ func (s *ObjectService) ensureBucketExists(ctx context.Context, bucketName strin
 	}
 
 	return nil
+}
+
+func (s *ObjectService) findActiveObject(ctx context.Context, bucketName string, objectKey string) (*model.Object, error) {
+	object, err := s.objectRepo.FindActive(ctx, bucketName, objectKey)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (s *ObjectService) loadActiveObjectsByKeys(
+	ctx context.Context,
+	bucketName string,
+	objectKeys []string,
+) (map[string]model.Object, error) {
+	objects, err := s.objectRepo.FindActiveByKeys(ctx, bucketName, objectKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]model.Object, len(objects))
+	for _, object := range objects {
+		result[object.ObjectKey] = object
+	}
+
+	return result, nil
+}
+
+func storagePathsFromObjects(objects []model.Object) []string {
+	paths := make([]string, 0, len(objects))
+	for _, object := range objects {
+		if object.StoragePath == "" {
+			continue
+		}
+
+		paths = append(paths, object.StoragePath)
+	}
+
+	return paths
 }

@@ -67,6 +67,10 @@ describe("DashboardPage", () => {
       storage: {
         root_path: "C:\\light-oss-data\\storage",
         used_bytes: 512 * 1024 * 1024,
+        max_bytes: 10 * 1024 * 1024 * 1024,
+        remaining_bytes: 9.5 * 1024 * 1024 * 1024,
+        used_percent: 5,
+        limit_status: "ok",
       },
     });
 
@@ -88,11 +92,14 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("27.3%")).toBeInTheDocument();
     expect(screen.getByText("Memory usage")).toBeInTheDocument();
     expect(await screen.findByText("50.0%")).toBeInTheDocument();
-    expect(screen.getByText("OSS storage used")).toBeInTheDocument();
-    expect(await screen.findByText("512.0 MB")).toBeInTheDocument();
+    expect(screen.getAllByText("OSS storage used").length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText("512.0 MB / 10.0 GB")).length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText("Disk usage")).toBeInTheDocument();
     expect(await screen.findByText("C:")).toBeInTheDocument();
     expect(screen.getAllByText("Storage root").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Storage limit warning")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create bucket" }),
     ).not.toBeInTheDocument();
@@ -129,5 +136,77 @@ describe("DashboardPage", () => {
     expect(screen.getByText("system metrics unavailable")).toBeInTheDocument();
     expect(screen.getByText("Total bucket")).toBeInTheDocument();
     expect(screen.getByText("API host overview")).toBeInTheDocument();
+  });
+
+  it("shows a warning alert when storage usage reaches the warning threshold", async () => {
+    vi.mocked(listBuckets).mockResolvedValueOnce({ items: [] });
+    vi.mocked(getSystemStats).mockResolvedValueOnce({
+      os: "linux",
+      cpu: {
+        used_percent: 27.3,
+      },
+      memory: {
+        total_bytes: 8 * 1024 * 1024 * 1024,
+        used_bytes: 4 * 1024 * 1024 * 1024,
+        available_bytes: 4 * 1024 * 1024 * 1024,
+        used_percent: 50,
+      },
+      disks: [],
+      storage: {
+        root_path: "/data/storage",
+        used_bytes: 8 * 1024 * 1024 * 1024,
+        max_bytes: 10 * 1024 * 1024 * 1024,
+        remaining_bytes: 2 * 1024 * 1024 * 1024,
+        used_percent: 80,
+        limit_status: "warning",
+      },
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/dashboard" element={<DashboardPage />} />
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    expect(
+      await screen.findByText("Storage limit warning"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a destructive alert when storage usage exceeds the limit", async () => {
+    vi.mocked(listBuckets).mockResolvedValueOnce({ items: [] });
+    vi.mocked(getSystemStats).mockResolvedValueOnce({
+      os: "linux",
+      cpu: {
+        used_percent: 27.3,
+      },
+      memory: {
+        total_bytes: 8 * 1024 * 1024 * 1024,
+        used_bytes: 4 * 1024 * 1024 * 1024,
+        available_bytes: 4 * 1024 * 1024 * 1024,
+        used_percent: 50,
+      },
+      disks: [],
+      storage: {
+        root_path: "/data/storage",
+        used_bytes: 12 * 1024 * 1024 * 1024,
+        max_bytes: 10 * 1024 * 1024 * 1024,
+        remaining_bytes: 0,
+        used_percent: 120,
+        limit_status: "exceeded",
+      },
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/dashboard" element={<DashboardPage />} />
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    expect(
+      await screen.findByText("Storage limit exceeded"),
+    ).toBeInTheDocument();
   });
 });

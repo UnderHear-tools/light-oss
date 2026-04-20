@@ -183,6 +183,23 @@ func (r *ObjectRepository) ListActiveKeys(ctx context.Context, bucketName string
 	return keys, err
 }
 
+func (r *ObjectRepository) FindActiveByKeys(ctx context.Context, bucketName string, objectKeys []string) ([]model.Object, error) {
+	if len(objectKeys) == 0 {
+		return []model.Object{}, nil
+	}
+
+	var objects []model.Object
+	err := r.db.WithContext(ctx).
+		Where("bucket_name = ? AND is_deleted = ?", bucketName, false).
+		Where("object_key IN ?", objectKeys).
+		Find(&objects).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return objects, nil
+}
+
 func (r *ObjectRepository) ListAllByBucket(ctx context.Context, bucketName string) ([]model.Object, error) {
 	var objects []model.Object
 
@@ -222,6 +239,20 @@ func (r *ObjectRepository) ExistsActiveWithPrefixExceptKey(ctx context.Context, 
 	}
 
 	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (r *ObjectRepository) ExistsActiveByStoragePath(ctx context.Context, storagePath string) (bool, error) {
+	var count int64
+
+	err := r.db.WithContext(ctx).
+		Model(&model.Object{}).
+		Where("storage_path = ? AND is_deleted = ?", storagePath, false).
+		Count(&count).Error
+	if err != nil {
 		return false, err
 	}
 

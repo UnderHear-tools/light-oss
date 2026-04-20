@@ -87,25 +87,28 @@ func main() {
 	objectRepo := repository.NewObjectRepository(gormDB)
 	siteRepo := repository.NewSiteRepository(gormDB)
 	localStorage := storage.NewLocalStorage(cfg.StorageRoot)
+	storageQuotaRepo := repository.NewStorageQuotaRepository(gormDB)
+	storageQuotaService := service.NewStorageQuotaService(logger, cfg.StorageRoot, localStorage, objectRepo, storageQuotaRepo)
 	bucketService := service.NewBucketService(logger, gormDB, bucketRepo, objectRepo, siteRepo, localStorage)
-	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage)
+	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage, storageQuotaService)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
-	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, siteService)
+	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, storageQuotaService, siteService)
 	signService := service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds)
-	systemStatsService := service.NewSystemStatsService(logger, cfg.StorageRoot)
+	systemStatsService := service.NewSystemStatsService(logger, storageQuotaService)
 
 	router := handler.NewRouter(handler.Dependencies{
-		Config:             cfg,
-		Logger:             logger,
-		DB:                 runtimeDB,
-		GormDB:             gormDB,
-		AuthValidator:      tokenValidator,
-		BucketService:      bucketService,
-		ObjectService:      objectService,
-		SiteService:        siteService,
-		SitePublishService: sitePublishService,
-		SignService:        signService,
-		SystemStatsService: systemStatsService,
+		Config:              cfg,
+		Logger:              logger,
+		DB:                  runtimeDB,
+		GormDB:              gormDB,
+		AuthValidator:       tokenValidator,
+		BucketService:       bucketService,
+		ObjectService:       objectService,
+		SiteService:         siteService,
+		SitePublishService:  sitePublishService,
+		SignService:         signService,
+		SystemStatsService:  systemStatsService,
+		StorageQuotaService: storageQuotaService,
 	})
 
 	server := &http.Server{

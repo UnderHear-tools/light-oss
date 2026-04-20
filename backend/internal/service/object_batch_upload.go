@@ -90,8 +90,17 @@ func (s *ObjectService) UploadBatch(
 		}
 	}
 
+	existingObjectsByKey, err := s.loadActiveObjectsByKeys(ctx, input.BucketName, collectPreparedObjectKeys(preparedItems))
+	if err != nil {
+		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up objects", err)
+	}
+
 	uploadedItems := make([]model.Object, 0, len(input.Items))
 	storedPaths := make([]string, 0, len(input.Items))
+	replacedPaths := make([]string, 0, len(existingObjectsByKey))
+
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
 
 	err = s.objectRepo.Transaction(ctx, func(repo *repository.ObjectRepository) error {
 		for _, prepared := range preparedItems {
@@ -100,13 +109,17 @@ func (s *ObjectService) UploadBatch(
 				return apperrors.Wrap(http.StatusInternalServerError, "batch_file_open_failed", "failed to open uploaded file", err)
 			}
 
-			stored, err := s.storage.Save(ctx, reader)
+			stored, err := writeSession.Save(ctx, reader)
 			closeErr := reader.Close()
 			if err != nil {
+				if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+					return err
+				}
+
 				return apperrors.Wrap(http.StatusInternalServerError, "object_store_failed", "failed to store object", err)
 			}
 			if closeErr != nil {
-				_ = s.storage.Delete(stored.RelativePath)
+				writeSession.DeletePaths([]string{stored.RelativePath})
 				return apperrors.Wrap(http.StatusInternalServerError, "batch_file_open_failed", "failed to close uploaded file", closeErr)
 			}
 
@@ -134,17 +147,20 @@ func (s *ObjectService) UploadBatch(
 			}
 
 			uploadedItems = append(uploadedItems, *saved)
+			if existingObject, exists := existingObjectsByKey[prepared.ObjectKey]; exists {
+				replacedPaths = append(replacedPaths, existingObject.StoragePath)
+			}
 		}
 
 		return nil
 	})
 	if err != nil {
-		for _, storedPath := range storedPaths {
-			_ = s.storage.Delete(storedPath)
-		}
+		writeSession.DeletePaths(storedPaths)
 
 		return nil, err
 	}
+
+	writeSession.CleanupUnreferencedPaths(ctx, replacedPaths)
 
 	return &UploadObjectBatchOutput{
 		UploadedCount: len(uploadedItems),

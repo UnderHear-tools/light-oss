@@ -68,8 +68,20 @@ func (s *SitePublishService) PublishFile(
 		_ = reader.Close()
 	}()
 
-	stored, err := s.storage.Save(ctx, reader)
+	existingObject, err := s.siteService.objectService.findActiveObject(ctx, input.BucketName, parentPrefix+fileName)
 	if err != nil {
+		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
+	}
+
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
+
+	stored, err := writeSession.Save(ctx, reader)
+	if err != nil {
+		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+			return nil, err
+		}
+
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "object_store_failed", "failed to store object", err)
 	}
 
@@ -106,7 +118,7 @@ func (s *SitePublishService) PublishFile(
 		return nil
 	})
 	if err != nil {
-		_ = s.storage.Delete(stored.RelativePath)
+		writeSession.DeletePaths([]string{stored.RelativePath})
 
 		if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
 			return nil, apperrors.New(http.StatusConflict, "domain_conflict", "domain is already bound to another site")
@@ -120,6 +132,10 @@ func (s *SitePublishService) PublishFile(
 		}
 
 		return nil, apperrors.Wrap(http.StatusInternalServerError, "site_create_failed", "failed to create site", err)
+	}
+
+	if existingObject != nil {
+		writeSession.CleanupUnreferencedPaths(ctx, []string{existingObject.StoragePath})
 	}
 
 	return createdSite, nil

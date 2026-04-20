@@ -2913,7 +2913,7 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		t.Fatalf("enable sqlite foreign keys: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.Bucket{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
+	if err := db.AutoMigrate(&model.Bucket{}, &model.SystemStorageQuota{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 
@@ -2942,20 +2942,23 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 	objectRepo := repository.NewObjectRepository(db)
 	siteRepo := repository.NewSiteRepository(db)
 	localStorage := storage.NewLocalStorage(root)
-	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage)
+	storageQuotaRepo := repository.NewStorageQuotaRepository(db)
+	storageQuotaService := service.NewStorageQuotaService(zap.NewNop(), root, localStorage, objectRepo, storageQuotaRepo)
+	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage, storageQuotaService)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	return handler.NewRouter(handler.Dependencies{
-		Config:             cfg,
-		Logger:             zap.NewNop(),
-		DB:                 sqlDB,
-		GormDB:             db,
-		AuthValidator:      middleware.NewTokenValidator(cfg.BearerTokens),
-		BucketService:      service.NewBucketService(zap.NewNop(), db, bucketRepo, objectRepo, siteRepo, localStorage),
-		ObjectService:      objectService,
-		SiteService:        siteService,
-		SitePublishService: service.NewSitePublishService(db, objectRepo, siteRepo, localStorage, siteService),
-		SignService:        service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds),
-		SystemStatsService: service.NewSystemStatsService(zap.NewNop(), root),
+		Config:              cfg,
+		Logger:              zap.NewNop(),
+		DB:                  sqlDB,
+		GormDB:              db,
+		AuthValidator:       middleware.NewTokenValidator(cfg.BearerTokens),
+		BucketService:       service.NewBucketService(zap.NewNop(), db, bucketRepo, objectRepo, siteRepo, localStorage),
+		ObjectService:       objectService,
+		SiteService:         siteService,
+		SitePublishService:  service.NewSitePublishService(db, objectRepo, siteRepo, localStorage, storageQuotaService, siteService),
+		SignService:         service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds),
+		SystemStatsService:  service.NewSystemStatsService(zap.NewNop(), storageQuotaService),
+		StorageQuotaService: storageQuotaService,
 	}), root
 }
 

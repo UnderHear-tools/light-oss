@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { listBuckets } from "@/api/buckets";
 import { getSystemStats } from "@/api/system";
+import type { StorageLimitStatus, SystemStorageStats } from "@/api/types";
 import { StatCard } from "@/components/StatCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +79,7 @@ export function DashboardPage() {
 
   const host = getApiHostLabel(settings.apiBaseUrl);
   const systemStats = systemStatsQuery.data;
+  const storageStats = systemStats?.storage;
   const disks = systemStats?.disks ?? [];
   const systemFallbackText = getSystemFallbackText(t, {
     tokenConfigured,
@@ -217,16 +219,64 @@ export function DashboardPage() {
             }
           />
           <StatCard
-            description={systemStats?.storage.root_path ?? systemFallbackText}
+            description={storageStats?.root_path ?? systemFallbackText}
             icon={HardDriveIcon}
             title={t("dashboard.system.storageUsed")}
             value={
-              systemStats
-                ? formatBytes(systemStats.storage.used_bytes)
+              storageStats
+                ? `${formatBytes(storageStats.used_bytes)} / ${formatBytes(storageStats.max_bytes)}`
                 : systemFallbackText
             }
           />
         </div>
+
+        {storageStats ? (
+          <Card className="border-border/70 bg-card">
+            <CardHeader>
+              <CardTitle>{t("dashboard.system.storageUsed")}</CardTitle>
+              <CardDescription>{storageStats.root_path}</CardDescription>
+              <CardAction>
+                <Badge
+                  variant={getStorageStatusBadgeVariant(
+                    storageStats.limit_status,
+                  )}
+                >
+                  {getStorageStatusLabel(t, storageStats.limit_status)}
+                </Badge>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex min-w-56 flex-col gap-2">
+                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <span>
+                    {formatBytes(storageStats.used_bytes)} /{" "}
+                    {formatBytes(storageStats.max_bytes)}
+                  </span>
+                  <span>{formatPercent(storageStats.used_percent)}</span>
+                </div>
+                <Progress value={clampPercent(storageStats.used_percent)} />
+              </div>
+
+              {storageStats.limit_status !== "ok" ? (
+                <Alert
+                  variant={
+                    storageStats.limit_status === "exceeded"
+                      ? "destructive"
+                      : "default"
+                  }
+                >
+                  <CircleAlertIcon />
+                  <AlertTitle>
+                    {getStorageAlertTitle(t, storageStats.limit_status)}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {getStorageAlertDescription(t, storageStats)}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="border-border/70 bg-card">
           <CardHeader>
@@ -379,4 +429,63 @@ function getOSLabel(
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
+}
+
+function getStorageStatusLabel(
+  t: ReturnType<typeof useI18n>["t"],
+  status: StorageLimitStatus,
+) {
+  switch (status) {
+    case "warning":
+      return t("settings.storage.status.warning");
+    case "exceeded":
+      return t("settings.storage.status.exceeded");
+    default:
+      return t("settings.storage.status.ok");
+  }
+}
+
+function getStorageStatusBadgeVariant(status: StorageLimitStatus) {
+  switch (status) {
+    case "warning":
+      return "secondary" as const;
+    case "exceeded":
+      return "destructive" as const;
+    default:
+      return "outline" as const;
+  }
+}
+
+function getStorageAlertTitle(
+  t: ReturnType<typeof useI18n>["t"],
+  status: StorageLimitStatus,
+) {
+  switch (status) {
+    case "warning":
+      return t("dashboard.system.storageAlertWarningTitle");
+    case "exceeded":
+      return t("dashboard.system.storageAlertExceededTitle");
+    default:
+      return "";
+  }
+}
+
+function getStorageAlertDescription(
+  t: ReturnType<typeof useI18n>["t"],
+  storageStats: SystemStorageStats,
+) {
+  switch (storageStats.limit_status) {
+    case "warning":
+      return t("dashboard.system.storageAlertWarningDescription", {
+        used: formatBytes(storageStats.used_bytes),
+        max: formatBytes(storageStats.max_bytes),
+      });
+    case "exceeded":
+      return t("dashboard.system.storageAlertExceededDescription", {
+        used: formatBytes(storageStats.used_bytes),
+        max: formatBytes(storageStats.max_bytes),
+      });
+    default:
+      return "";
+  }
 }
