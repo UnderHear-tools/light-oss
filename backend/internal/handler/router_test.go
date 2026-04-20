@@ -141,6 +141,39 @@ func TestProtectedRoutesRequireAuth(t *testing.T) {
 	}
 }
 
+func TestCORSAllowsAllOrigins(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	getReq.Header.Set("Origin", "http://console.example.com")
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", getRec.Code)
+	}
+	if got := getRec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected wildcard allow origin on GET, got %q", got)
+	}
+
+	optionsReq := httptest.NewRequest(http.MethodOptions, "/api/v1/buckets", nil)
+	optionsReq.Header.Set("Origin", "http://console.example.com")
+	optionsReq.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	optionsReq.Header.Set("Access-Control-Request-Headers", "Authorization")
+	optionsRec := httptest.NewRecorder()
+	router.ServeHTTP(optionsRec, optionsReq)
+
+	if optionsRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", optionsRec.Code)
+	}
+	if got := optionsRec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected wildcard allow origin on preflight, got %q", got)
+	}
+	if got := optionsRec.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Authorization") {
+		t.Fatalf("expected Authorization in allow headers, got %q", got)
+	}
+}
+
 func TestListBucketsSupportsSearch(t *testing.T) {
 	router := newTestRouter(t, 1024)
 
@@ -2899,7 +2932,6 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		MaxMultipartMemoryBytes:    8 * 1024 * 1024,
 		RateLimitRPS:               1000,
 		RateLimitBurst:             1000,
-		CORSAllowedOrigins:         []string{"http://localhost:3000"},
 		BearerTokens:               []string{"dev-token"},
 		SigningSecret:              "test-secret",
 		DefaultSignedURLTTLSeconds: 300,

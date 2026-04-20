@@ -79,7 +79,6 @@ Light OSS 由四部分组成：
 | --------------------------- | ------------------------------------------------------------------- | ----------------------------- | ---------------------------------------- |
 | `APP_PUBLIC_BASE_URL`       | `http://localhost:8080`                                             | `http://api.underhear.cn`     | 影响签名下载链接生成。                   |
 | `APP_STORAGE_ROOT`          | `./light-oss-data/storage` 或 Windows 下 `.\light-oss-data\storage` | `/data/storage`               | Compose 中后端卷挂载在 `/data/storage`。 |
-| `APP_CORS_ALLOWED_ORIGINS`  | `http://localhost:3000`                                             | `http://console.underhear.cn` | 浏览器跨域访问后端时必须允许控制台来源。 |
 | `VITE_DEFAULT_API_BASE_URL` | `http://localhost:8080`                                             | `http://api.underhear.cn`     | 前端首次加载时默认使用的 API 地址。      |
 
 ### 本地运行
@@ -97,7 +96,6 @@ APP_ENV=development
 APP_ADDR=:8080
 APP_PUBLIC_BASE_URL=http://localhost:8080
 APP_STORAGE_ROOT=./light-oss-data/storage
-APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
 APP_BEARER_TOKENS=light-oss
 APP_SIGNING_SECRET=change-me-in-local-dev
 
@@ -161,7 +159,6 @@ Docker Compose 仍默认读取根目录 `.env`，不会自动采用 `.env.person
 ```env
 APP_PUBLIC_BASE_URL=http://api.underhear.cn
 APP_STORAGE_ROOT=/data/storage
-APP_CORS_ALLOWED_ORIGINS=http://console.underhear.cn
 VITE_DEFAULT_API_BASE_URL=http://api.underhear.cn
 VITE_DEFAULT_BEARER_TOKEN=light-oss
 ```
@@ -219,6 +216,8 @@ make up
 
 前端设置页若已在浏览器 `localStorage` 保存过 `API Base URL` 或 `Bearer Token`，仍以浏览器已保存值为准；这里的 `VITE_*` 变量只影响首次加载时的默认值。
 
+后端默认允许所有来源访问，无需额外配置 CORS 来源白名单。
+
 > 不要把真实生产密码、签名密钥、域名配置直接提交到公开仓库。
 
 ### MySQL
@@ -242,7 +241,6 @@ make up
 | `APP_MAX_MULTIPART_MEMORY_BYTES`     | `8388608`                                                                                                 | 处理 `multipart/form-data` 时允许驻留内存的大小。          |
 | `APP_RATE_LIMIT_RPS`                 | `5`                                                                                                       | 每秒允许的请求速率。                                       |
 | `APP_RATE_LIMIT_BURST`               | `10`                                                                                                      | 突发请求桶容量。                                           |
-| `APP_CORS_ALLOWED_ORIGINS`           | `http://localhost:3000`                                                                                   | 允许访问后端的前端来源，多个值用逗号分隔。                 |
 | `APP_BEARER_TOKENS`                  | `light-oss`                                                                                               | 后端允许的 Bearer Token 列表，多个值用逗号分隔。           |
 | `APP_SIGNING_SECRET`                 | `change-me-in-local-dev`                                                                                  | 私有对象签名下载链接使用的密钥。                           |
 | `APP_DEFAULT_SIGNED_URL_TTL_SECONDS` | `300`                                                                                                     | 默认签名下载链接有效期，单位秒。                           |
@@ -648,7 +646,6 @@ curl -H "Host: $SITE_DOMAIN" http://127.0.0.1/
 常见原因有三类：
 
 - `/settings` 中 `API Base URL` 填错了
-- `APP_CORS_ALLOWED_ORIGINS` 没放行当前控制台来源
 - 你在 Docker 网关模式下仍然把 API 指向了 `http://localhost:8080`
 
 建议：

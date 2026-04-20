@@ -25,7 +25,6 @@ type Config struct {
 	UploadChunkCacheTTLSeconds     int64
 	RateLimitRPS                   float64
 	RateLimitBurst                 int
-	CORSAllowedOrigins             []string
 	BearerTokens                   []string
 	SigningSecret                  string
 	DefaultSignedURLTTLSeconds     int64
@@ -58,7 +57,6 @@ func Load() (Config, error) {
 	v.SetDefault("APP_UPLOAD_CHUNK_CACHE_TTL_SECONDS", int64(172800))
 	v.SetDefault("APP_RATE_LIMIT_RPS", 5.0)
 	v.SetDefault("APP_RATE_LIMIT_BURST", 10)
-	v.SetDefault("APP_CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 	v.SetDefault("APP_BEARER_TOKENS", "dev-token")
 	v.SetDefault("APP_SIGNING_SECRET", "dev-signing-secret")
 	v.SetDefault("APP_DEFAULT_SIGNED_URL_TTL_SECONDS", 300)
@@ -83,7 +81,6 @@ func Load() (Config, error) {
 		UploadChunkCacheTTLSeconds:     v.GetInt64("APP_UPLOAD_CHUNK_CACHE_TTL_SECONDS"),
 		RateLimitRPS:                   v.GetFloat64("APP_RATE_LIMIT_RPS"),
 		RateLimitBurst:                 v.GetInt("APP_RATE_LIMIT_BURST"),
-		CORSAllowedOrigins:             splitCSV(v.GetString("APP_CORS_ALLOWED_ORIGINS")),
 		BearerTokens:                   splitCSV(v.GetString("APP_BEARER_TOKENS")),
 		SigningSecret:                  v.GetString("APP_SIGNING_SECRET"),
 		DefaultSignedURLTTLSeconds:     v.GetInt64("APP_DEFAULT_SIGNED_URL_TTL_SECONDS"),

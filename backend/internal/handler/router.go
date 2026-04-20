@@ -222,7 +222,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	router.Use(middleware.RequestLogger(deps.Logger))
 	router.Use(rateLimiter.Middleware())
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     deps.Config.CORSAllowedOrigins,
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{"Authorization", "Content-Type", "X-Object-Visibility", "X-Original-Filename", "X-Allow-Overwrite", "X-Request-ID"},
 		ExposeHeaders:    []string{"Content-Disposition", "Content-Length", "Content-Type", "ETag", "X-Request-ID", "X-Object-Visibility", "X-Original-Filename"},
