@@ -42,14 +42,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
@@ -77,6 +70,7 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
   ] as const;
   const recycleBinQueryKey = [...recycleBinBaseQueryKey, cursor] as const;
   const showBucketColumn = bucketName.trim() === "";
+  const tableMinWidthClass = showBucketColumn ? "min-w-[70rem]" : "min-w-[62rem]";
 
   const recycleBinQuery = useQuery({
     queryKey: recycleBinQueryKey,
@@ -319,14 +313,170 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
           </DialogHeader>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4">
-            {selectedCount > 0 ? (
-              <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="text-sm font-medium">
-                  {t("buckets.recycleBin.selectedCount", {
-                    count: selectedCount,
-                  })}
+            {recycleBinQuery.isError ? (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                {recycleBinQuery.error.message}
+              </div>
+            ) : null}
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70">
+              {recycleBinQuery.isLoading || recycleBinQuery.isFetching ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+                  <LoaderCircleIcon className="animate-spin text-muted-foreground" />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+              ) : items.length > 0 ? (
+                <>
+                  <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+                    <div className={`flex h-full min-h-0 flex-col ${tableMinWidthClass}`}>
+                      <table className="shrink-0 w-full table-fixed border-b border-border/70 bg-popover caption-bottom text-sm">
+                        <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">
+                              <Checkbox
+                                aria-label={t("explorer.selection.selectAll")}
+                                checked={
+                                  allSelected
+                                    ? true
+                                    : partiallySelected
+                                      ? "indeterminate"
+                                      : false
+                                }
+                                onCheckedChange={handleSelectAll}
+                              />
+                            </TableHead>
+                            <TableHead className="w-24">
+                              {t("buckets.recycleBin.table.type")}
+                            </TableHead>
+                            <TableHead className="whitespace-normal">
+                              {t("buckets.recycleBin.table.path")}
+                            </TableHead>
+                            {showBucketColumn ? (
+                              <TableHead className="w-32">
+                                {t("buckets.recycleBin.table.bucket")}
+                              </TableHead>
+                            ) : null}
+                            <TableHead className="w-28">
+                              {t("buckets.recycleBin.table.size")}
+                            </TableHead>
+                            <TableHead className="w-40">
+                              {t("buckets.recycleBin.table.deletedAt")}
+                            </TableHead>
+                            <TableHead className="w-48 text-left">
+                              {t("buckets.recycleBin.table.actions")}
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                      </table>
+
+                      <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+                        <table className="w-full table-fixed caption-bottom text-sm">
+                          <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
+                          <TableBody className="min-h-0">
+                            {items.map((item) => {
+                              const rowPending =
+                                restoreMutation.isPending || deleteMutation.isPending;
+                              return (
+                                <TableRow key={item.id}>
+                                  <TableCell className="align-top">
+                                    <Checkbox
+                                      aria-label={t("explorer.selection.selectRow", {
+                                        name: item.name,
+                                      })}
+                                      checked={selectedIds.has(item.id)}
+                                      onCheckedChange={(checked) =>
+                                        handleSelectRow(item.id, checked)
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="align-top">
+                                    {item.type === "directory"
+                                      ? t("buckets.recycleBin.type.directory")
+                                      : t("buckets.recycleBin.type.file")}
+                                  </TableCell>
+                                  <TableCell className="min-w-0 whitespace-normal align-top">
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                      <span className="break-all font-medium">
+                                        {item.name}
+                                      </span>
+                                      <span className="break-all text-xs text-muted-foreground">
+                                        {item.path}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  {showBucketColumn ? (
+                                    <TableCell className="break-all align-top">
+                                      {item.bucket_name}
+                                    </TableCell>
+                                  ) : null}
+                                  <TableCell className="align-top">
+                                    {formatBytes(item.size)}
+                                  </TableCell>
+                                  <TableCell className="align-top">
+                                    {formatDate(item.deleted_at, locale)}
+                                  </TableCell>
+                                  <TableCell className="whitespace-normal align-top">
+                                    <div className="flex flex-wrap justify-start gap-2">
+                                      <Button
+                                        disabled={rowPending}
+                                        onClick={() => void handleRestore([item])}
+                                        size="sm"
+                                        type="button"
+                                        variant="outline"
+                                      >
+                                        <ArchiveRestoreIcon />
+                                        {t("buckets.recycleBin.restore")}
+                                      </Button>
+                                      <Button
+                                        disabled={rowPending}
+                                        onClick={() => openDeleteConfirmation([item])}
+                                        size="sm"
+                                        type="button"
+                                        variant="destructive"
+                                      >
+                                        <Trash2Icon />
+                                        {t("buckets.recycleBin.delete")}
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </table>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-h-0 flex-1 p-6">
+                  <Empty className="min-h-0 flex-1 border">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Trash2Icon />
+                      </EmptyMedia>
+                      <EmptyTitle>
+                        {t("buckets.recycleBin.emptyTitle")}
+                      </EmptyTitle>
+                      <EmptyDescription>
+                        {t("buckets.recycleBin.emptyDescription")}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {selectedCount > 0 ? (
+                <>
+                  <div className="mr-1 text-sm font-medium text-muted-foreground">
+                    {t("buckets.recycleBin.selectedCount", {
+                      count: selectedCount,
+                    })}
+                  </div>
                   <Button
                     disabled={actionsPending}
                     onClick={() => void handleRestore(selectedItems)}
@@ -361,168 +511,15 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
                   >
                     {t("buckets.recycleBin.clearSelection")}
                   </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {recycleBinQuery.isError ? (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-                {recycleBinQuery.error.message}
-              </div>
-            ) : null}
-
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70">
-              {recycleBinQuery.isLoading || recycleBinQuery.isFetching ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-                  <LoaderCircleIcon className="animate-spin text-muted-foreground" />
-                </div>
-              ) : items.length > 0 ? (
-                <>
-                  <Table className="table-fixed border-b border-border/70">
-                    <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            aria-label={t("explorer.selection.selectAll")}
-                            checked={
-                              allSelected
-                                ? true
-                                : partiallySelected
-                                  ? "indeterminate"
-                                  : false
-                            }
-                            onCheckedChange={handleSelectAll}
-                          />
-                        </TableHead>
-                        <TableHead className="w-24">
-                          {t("buckets.recycleBin.table.type")}
-                        </TableHead>
-                        <TableHead className="w-full min-w-0 whitespace-normal">
-                          {t("buckets.recycleBin.table.path")}
-                        </TableHead>
-                        {showBucketColumn ? (
-                          <TableHead className="w-32">
-                            {t("buckets.recycleBin.table.bucket")}
-                          </TableHead>
-                        ) : null}
-                        <TableHead className="w-28">
-                          {t("buckets.recycleBin.table.size")}
-                        </TableHead>
-                        <TableHead className="w-40">
-                          {t("buckets.recycleBin.table.deletedAt")}
-                        </TableHead>
-                        <TableHead className="w-44 text-right">
-                          {t("buckets.recycleBin.table.actions")}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                  </Table>
-
-                  <ScrollArea className="min-h-0 flex-1">
-                    <Table className="table-fixed">
-                      <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
-                      <TableBody className="min-h-0">
-                        {items.map((item) => {
-                          const rowPending =
-                            restoreMutation.isPending || deleteMutation.isPending;
-                          return (
-                            <TableRow key={item.id}>
-                              <TableCell className="align-top">
-                                <Checkbox
-                                  aria-label={t("explorer.selection.selectRow", {
-                                    name: item.name,
-                                  })}
-                                  checked={selectedIds.has(item.id)}
-                                  onCheckedChange={(checked) =>
-                                    handleSelectRow(item.id, checked)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell className="align-top">
-                                {item.type === "directory"
-                                  ? t("buckets.recycleBin.type.directory")
-                                  : t("buckets.recycleBin.type.file")}
-                              </TableCell>
-                              <TableCell className="w-full min-w-0 whitespace-normal align-top">
-                                <div className="flex min-w-0 max-w-full flex-col overflow-hidden">
-                                  <span className="truncate font-medium">
-                                    {item.name}
-                                  </span>
-                                  <span className="block break-all text-xs text-muted-foreground">
-                                    {item.path}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              {showBucketColumn ? (
-                                <TableCell className="align-top">
-                                  {item.bucket_name}
-                                </TableCell>
-                              ) : null}
-                              <TableCell className="align-top">
-                                {formatBytes(item.size)}
-                              </TableCell>
-                              <TableCell className="align-top">
-                                {formatDate(item.deleted_at, locale)}
-                              </TableCell>
-                              <TableCell className="whitespace-normal align-top">
-                                <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row">
-                                  <Button
-                                    disabled={rowPending}
-                                    onClick={() => void handleRestore([item])}
-                                    size="sm"
-                                    type="button"
-                                    variant="outline"
-                                  >
-                                    <ArchiveRestoreIcon />
-                                    {t("buckets.recycleBin.restore")}
-                                  </Button>
-                                  <Button
-                                    disabled={rowPending}
-                                    onClick={() => openDeleteConfirmation([item])}
-                                    size="sm"
-                                    type="button"
-                                    variant="destructive"
-                                  >
-                                    <Trash2Icon />
-                                    {t("buckets.recycleBin.delete")}
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
                 </>
-              ) : (
-                <div className="flex min-h-0 flex-1 p-6">
-                  <Empty className="min-h-0 flex-1 border">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <Trash2Icon />
-                      </EmptyMedia>
-                      <EmptyTitle>
-                        {t("buckets.recycleBin.emptyTitle")}
-                      </EmptyTitle>
-                      <EmptyDescription>
-                        {t("buckets.recycleBin.emptyDescription")}
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                </div>
-              )}
+              ) : null}
             </div>
-          </div>
-
-          <DialogFooter className="items-center justify-between sm:flex-row">
-            <div className="text-sm text-muted-foreground">
-              {t("buckets.recycleBin.pagination", {
-                page: cursorHistory.length + 1,
-              })}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="text-sm text-muted-foreground">
+                {t("buckets.recycleBin.pagination", {
+                  page: cursorHistory.length + 1,
+                })}
+              </div>
               <Button
                 onClick={() => {
                   void queryClient.invalidateQueries({
@@ -633,7 +630,7 @@ function RecycleBinTableColGroup({
       {showBucketColumn ? <col className="w-32" /> : null}
       <col className="w-28" />
       <col className="w-40" />
-      <col className="w-44" />
+      <col className="w-48" />
     </colgroup>
   );
 }
