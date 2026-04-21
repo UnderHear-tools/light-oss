@@ -67,6 +67,21 @@ type Object struct {
 	Bucket           *Bucket    `json:"-" gorm:"foreignKey:BucketName;references:Name;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
+type RecycleBinObject struct {
+	ID               uint64     `gorm:"primaryKey"`
+	BucketName       string     `gorm:"size:128;not null;index:idx_recycle_bin_objects_deleted,priority:3;index:idx_recycle_bin_objects_bucket"`
+	ObjectKey        string     `gorm:"size:512;not null"`
+	OriginalFilename string     `gorm:"size:255;not null"`
+	StoragePath      string     `gorm:"size:512;not null;index:idx_recycle_bin_objects_storage_path"`
+	Size             int64      `gorm:"not null"`
+	ContentType      string     `gorm:"size:255;not null"`
+	ETag             string     `gorm:"column:etag;size:64;not null"`
+	FileFingerprint  *string    `gorm:"column:file_fingerprint;size:64"`
+	Visibility       Visibility `gorm:"size:16;not null"`
+	CreatedAt        time.Time  `gorm:"not null"`
+	DeletedAt        time.Time  `gorm:"not null;index:idx_recycle_bin_objects_deleted,priority:1,sort:desc"`
+}
+
 type UploadSession struct {
 	ID                    string     `gorm:"primaryKey;size:36"`
 	OwnerScope            string     `gorm:"size:64;not null;index:idx_upload_sessions_owner_status,priority:1;index:idx_upload_sessions_owner_lookup,priority:1"`

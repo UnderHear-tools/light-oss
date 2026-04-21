@@ -3,9 +3,12 @@ import type { AppSettings } from "../lib/settings";
 import {
   buildPublicObjectURL,
   checkObjectExists,
+  deleteRecycleBinObjects,
   deleteExplorerEntriesBatch,
   deleteFolder,
   downloadFolderZip,
+  listRecycleBinObjects,
+  restoreRecycleBinObjects,
   updateObjectVisibility,
   uploadFolder,
   uploadObject,
@@ -342,6 +345,57 @@ describe("objects api helpers", () => {
             { type: "file", path: "docs/readme.txt" },
             { type: "directory", path: "docs/assets/" },
           ],
+        },
+      }),
+    );
+  });
+
+  it("lists recycle bin items with cursor pagination params", async () => {
+    await listRecycleBinObjects(settings, {
+      bucket: "demo",
+      limit: 20,
+      cursor: "cursor-1",
+    });
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      settings,
+      expect.objectContaining({
+        method: "GET",
+        url: "/api/v1/recycle-bin/objects",
+        params: {
+          bucket: "demo",
+          limit: 20,
+          cursor: "cursor-1",
+        },
+      }),
+    );
+  });
+
+  it("posts recycle bin restore requests with item ids", async () => {
+    await restoreRecycleBinObjects(settings, [12, 15]);
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      settings,
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/v1/recycle-bin/objects/restore",
+        data: {
+          item_ids: [12, 15],
+        },
+      }),
+    );
+  });
+
+  it("posts recycle bin permanent delete requests with item ids", async () => {
+    await deleteRecycleBinObjects(settings, [7]);
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      settings,
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/v1/recycle-bin/objects/batch-delete",
+        data: {
+          item_ids: [7],
         },
       }),
     );

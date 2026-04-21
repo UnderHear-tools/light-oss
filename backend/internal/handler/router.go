@@ -32,6 +32,7 @@ type Dependencies struct {
 	AuthValidator       *middleware.TokenValidator
 	BucketService       *service.BucketService
 	ObjectService       *service.ObjectService
+	RecycleBinService   *service.RecycleBinService
 	SiteService         *service.SiteService
 	SitePublishService  *service.SitePublishService
 	SignService         *service.SignService
@@ -47,6 +48,7 @@ type apiHandler struct {
 	authValidator       *middleware.TokenValidator
 	bucketService       *service.BucketService
 	objectService       *service.ObjectService
+	recycleBinService   *service.RecycleBinService
 	siteService         *service.SiteService
 	sitePublishService  *service.SitePublishService
 	signService         *service.SignService
@@ -84,6 +86,10 @@ type deleteExplorerEntriesBatchRequest struct {
 type deleteExplorerEntriesBatchItemRequest struct {
 	Type string `json:"type"`
 	Path string `json:"path"`
+}
+
+type recycleBinBatchRequest struct {
+	ItemIDs []uint64 `json:"item_ids"`
 }
 
 type siteRequest struct {
@@ -148,6 +154,37 @@ type deleteExplorerEntriesBatchResponse struct {
 	DeletedCount int                                            `json:"deleted_count"`
 	FailedCount  int                                            `json:"failed_count"`
 	FailedItems  []deleteExplorerEntriesBatchFailedItemResponse `json:"failed_items"`
+}
+
+type recycleBinObjectResponse struct {
+	ID               uint64    `json:"id"`
+	Type             string    `json:"type"`
+	BucketName       string    `json:"bucket_name"`
+	Path             string    `json:"path"`
+	Name             string    `json:"name"`
+	ObjectKey        string    `json:"object_key"`
+	OriginalFilename string    `json:"original_filename"`
+	Size             int64     `json:"size"`
+	ContentType      string    `json:"content_type"`
+	ETag             string    `json:"etag"`
+	Visibility       string    `json:"visibility"`
+	CreatedAt        time.Time `json:"created_at"`
+	DeletedAt        time.Time `json:"deleted_at"`
+}
+
+type recycleBinFailedItemResponse struct {
+	ID         uint64 `json:"id"`
+	BucketName string `json:"bucket_name"`
+	Path       string `json:"path"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+}
+
+type recycleBinBatchResponse struct {
+	DeletedCount  int                            `json:"deleted_count"`
+	RestoredCount int                            `json:"restored_count"`
+	FailedCount   int                            `json:"failed_count"`
+	FailedItems   []recycleBinFailedItemResponse `json:"failed_items"`
 }
 
 type siteResponse struct {
@@ -219,6 +256,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		authValidator:       deps.AuthValidator,
 		bucketService:       deps.BucketService,
 		objectService:       deps.ObjectService,
+		recycleBinService:   deps.RecycleBinService,
 		siteService:         deps.SiteService,
 		sitePublishService:  deps.SitePublishService,
 		signService:         deps.SignService,
@@ -271,6 +309,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.PATCH("/buckets/:bucket/objects/visibility/*key", handler.updateObjectVisibility)
 	protected.GET("/buckets/:bucket/objects", handler.listObjects)
 	protected.DELETE("/buckets/:bucket/objects/*key", handler.deleteObject)
+	protected.GET("/recycle-bin/objects", handler.listRecycleBinObjects)
+	protected.POST("/recycle-bin/objects/restore", handler.restoreRecycleBinObjects)
+	protected.POST("/recycle-bin/objects/batch-delete", handler.deleteRecycleBinObjects)
 	protected.POST("/sites", handler.createSite)
 	protected.POST("/sites/publish/object", handler.publishObjectSite)
 	protected.POST("/sites/publish/file", middleware.MaxBodySize(deps.Config.MaxUploadSizeBytes), handler.publishSiteFile)
@@ -676,6 +717,91 @@ func (h *apiHandler) deleteExplorerEntriesBatch(c *gin.Context) {
 	})
 }
 
+func (h *apiHandler) listRecycleBinObjects(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	result, err := h.recycleBinService.ListObjects(c.Request.Context(), service.ListRecycleBinObjectsInput{
+		BucketName: c.Query("bucket"),
+		Limit:  limit,
+		Cursor: c.Query("cursor"),
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	items := make([]recycleBinObjectResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, recycleBinObjectToResponse(item))
+	}
+
+	response.JSON(c, http.StatusOK, gin.H{
+		"items":       items,
+		"next_cursor": result.NextCursor,
+	})
+}
+
+func (h *apiHandler) restoreRecycleBinObjects(c *gin.Context) {
+	var req recycleBinBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "request body is invalid"))
+		return
+	}
+
+	result, err := h.recycleBinService.RestoreObjects(c.Request.Context(), req.ItemIDs)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	failedItems := make([]recycleBinFailedItemResponse, 0, len(result.FailedItems))
+	for _, item := range result.FailedItems {
+		failedItems = append(failedItems, recycleBinFailedItemResponse{
+			ID:         item.ID,
+			BucketName: item.BucketName,
+			Path:       item.Path,
+			Code:       item.Code,
+			Message:    item.Message,
+		})
+	}
+
+	response.JSON(c, http.StatusOK, recycleBinBatchResponse{
+		RestoredCount: result.RestoredCount,
+		FailedCount:   result.FailedCount,
+		FailedItems:   failedItems,
+	})
+}
+
+func (h *apiHandler) deleteRecycleBinObjects(c *gin.Context) {
+	var req recycleBinBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.New(http.StatusBadRequest, "invalid_request", "request body is invalid"))
+		return
+	}
+
+	result, err := h.recycleBinService.DeleteObjects(c.Request.Context(), req.ItemIDs)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	failedItems := make([]recycleBinFailedItemResponse, 0, len(result.FailedItems))
+	for _, item := range result.FailedItems {
+		failedItems = append(failedItems, recycleBinFailedItemResponse{
+			ID:         item.ID,
+			BucketName: item.BucketName,
+			Path:       item.Path,
+			Code:       item.Code,
+			Message:    item.Message,
+		})
+	}
+
+	response.JSON(c, http.StatusOK, recycleBinBatchResponse{
+		DeletedCount: result.DeletedCount,
+		FailedCount:  result.FailedCount,
+		FailedItems:  failedItems,
+	})
+}
+
 func (h *apiHandler) headSite(c *gin.Context) {
 	h.serveSiteByID(c, true)
 }
@@ -917,6 +1043,24 @@ func explorerEntryToResponse(entry service.ExplorerEntry) explorerEntryResponse 
 	response.UpdatedAt = &updatedAt
 
 	return response
+}
+
+func recycleBinObjectToResponse(item service.RecycleBinObjectItem) recycleBinObjectResponse {
+	return recycleBinObjectResponse{
+		ID:               item.ID,
+		Type:             string(item.Type),
+		BucketName:       item.BucketName,
+		Path:             item.Path,
+		Name:             item.Name,
+		ObjectKey:        item.ObjectKey,
+		OriginalFilename: item.OriginalFilename,
+		Size:             item.Size,
+		ContentType:      item.ContentType,
+		ETag:             item.ETag,
+		Visibility:       string(item.Visibility),
+		CreatedAt:        item.CreatedAt,
+		DeletedAt:        item.DeletedAt,
+	}
 }
 
 func systemStatsToResponse(stats service.SystemStats) systemStatsResponse {

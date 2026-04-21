@@ -98,6 +98,7 @@ import {
   UploadObjectDialog,
   type UploadDialogValue,
 } from "@/features/explorer/UploadObjectDialog";
+import { RecycleBinDialog } from "@/features/buckets/RecycleBinDialog";
 import {
   explorerPageSizes,
   getExplorerBreadcrumbs,
@@ -1086,40 +1087,43 @@ export function BucketObjectsPage() {
                   </Tooltip>
                 </div>
 
-                <div className="flex w-full min-w-0 flex-col gap-3 lg:ml-auto lg:max-w-md">
-                  <form
-                    className="flex w-full min-w-0 items-center gap-2"
-                    onSubmit={handleSearchSubmit}
-                  >
-                    <FieldGroup className="min-w-0 flex-1">
-                      <Field className="min-w-0" orientation="responsive">
-                        <FieldLabel
-                          className="sr-only"
-                          htmlFor="explorer-search"
-                        >
-                          {t("explorer.toolbar.search")}
-                        </FieldLabel>
-                        <Input
-                          className="min-w-0"
-                          id="explorer-search"
-                          onChange={(event) =>
-                            setSearchInput(event.target.value)
-                          }
-                          placeholder={t("explorer.toolbar.searchPlaceholder")}
-                          value={searchInput}
-                        />
-                      </Field>
-                    </FieldGroup>
-                    <Button
-                      className="shrink-0"
-                      size="icon"
-                      type="submit"
-                      variant="outline"
+                <div className="flex w-full min-w-0 flex-col gap-3 lg:ml-auto lg:max-w-xl">
+                  <div className="flex w-full min-w-0 items-center gap-2">
+                    <RecycleBinDialog bucketName={bucket} />
+                    <form
+                      className="flex min-w-0 flex-1 items-center gap-2"
+                      onSubmit={handleSearchSubmit}
                     >
-                      <SearchIcon />
-                      <span className="sr-only">{t("common.apply")}</span>
-                    </Button>
-                  </form>
+                      <FieldGroup className="min-w-0 flex-1">
+                        <Field className="min-w-0" orientation="responsive">
+                          <FieldLabel
+                            className="sr-only"
+                            htmlFor="explorer-search"
+                          >
+                            {t("explorer.toolbar.search")}
+                          </FieldLabel>
+                          <Input
+                            className="min-w-0"
+                            id="explorer-search"
+                            onChange={(event) =>
+                              setSearchInput(event.target.value)
+                            }
+                            placeholder={t("explorer.toolbar.searchPlaceholder")}
+                            value={searchInput}
+                          />
+                        </Field>
+                      </FieldGroup>
+                      <Button
+                        className="shrink-0"
+                        size="icon"
+                        type="submit"
+                        variant="outline"
+                      >
+                        <SearchIcon />
+                        <span className="sr-only">{t("common.apply")}</span>
+                      </Button>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>

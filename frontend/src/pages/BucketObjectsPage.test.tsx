@@ -7,6 +7,9 @@ import { renderWithApp } from "../test/test-utils";
 
 vi.mock("../api/objects", () => ({
   listExplorerEntries: vi.fn(),
+  listRecycleBinObjects: vi.fn(),
+  restoreRecycleBinObjects: vi.fn(),
+  deleteRecycleBinObjects: vi.fn(),
   createFolder: vi.fn(),
   checkObjectExists: vi.fn(),
   uploadFolder: vi.fn(),
@@ -41,10 +44,13 @@ import {
   checkObjectExists,
   createFolder,
   createSignedDownloadURL,
+  deleteRecycleBinObjects,
   deleteExplorerEntriesBatch,
   deleteFolder,
   deleteObject,
   downloadFolderZip,
+  listRecycleBinObjects,
+  restoreRecycleBinObjects,
   listExplorerEntries,
   uploadFolder,
   updateObjectVisibility,
@@ -61,6 +67,20 @@ import {
 describe("BucketObjectsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listRecycleBinObjects).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 0,
+      failed_count: 0,
+      failed_items: [],
+    });
+    vi.mocked(deleteRecycleBinObjects).mockResolvedValue({
+      deleted_count: 0,
+      failed_count: 0,
+      failed_items: [],
+    });
     vi.mocked(checkObjectExists).mockResolvedValue(false);
     vi.mocked(createSignedDownloadURL).mockResolvedValue({
       url: "http://localhost:8080/signed-download",
@@ -116,6 +136,243 @@ describe("BucketObjectsPage", () => {
     expect(
       screen.queryByText("Failed to load folder entries"),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens a bucket-scoped recycle bin dialog from the explorer toolbar", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects).mockResolvedValue({
+      items: [createRecycleBinItem()],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      await within(dialog).findByRole("heading", { name: "Recycle bin" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("docs/report.txt")).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("columnheader", { name: "Bucket" }),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(listRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        {
+          bucket: "demo",
+          limit: 20,
+          cursor: "",
+        },
+      );
+    });
+  });
+
+  it("restores a recycle bin item for the current bucket and refreshes the dialog", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects)
+      .mockResolvedValueOnce({
+        items: [createRecycleBinItem()],
+        next_cursor: "",
+      })
+      .mockResolvedValue({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const rowText = await screen.findByText("docs/report.txt");
+    const row = rowText.closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: "Restore" }),
+    );
+
+    await waitFor(() => {
+      expect(restoreRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [101],
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("docs/report.txt")).not.toBeInTheDocument();
+    });
+  });
+
+  it("confirms permanent deletion for recycle bin items in the current bucket", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects)
+      .mockResolvedValueOnce({
+        items: [createRecycleBinItem()],
+        next_cursor: "",
+      })
+      .mockResolvedValue({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(deleteRecycleBinObjects).mockResolvedValue({
+      deleted_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const rowText = await screen.findByText("docs/report.txt");
+    const row = rowText.closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", {
+        name: "Delete permanently",
+      }),
+    );
+
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", {
+        name: "Delete permanently",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(deleteRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [101],
+      );
+    });
+  });
+
+  it("supports batch recycle bin actions for the current bucket", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects)
+      .mockResolvedValueOnce({
+        items: [
+          createRecycleBinItem(),
+          createRecycleBinItem({
+            id: 102,
+            path: "docs/notes.txt",
+            name: "notes.txt",
+            object_key: "docs/notes.txt",
+          }),
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          createRecycleBinItem({
+            id: 102,
+            path: "docs/notes.txt",
+            name: "notes.txt",
+            object_key: "docs/notes.txt",
+          }),
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValue({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+    vi.mocked(deleteRecycleBinObjects).mockResolvedValue({
+      deleted_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select report.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Restore selected" }),
+    );
+
+    await waitFor(() => {
+      expect(restoreRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [101],
+      );
+    });
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select notes.txt" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete selected" }),
+    );
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", {
+        name: "Delete permanently",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(deleteRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [102],
+      );
+    });
   });
 
   it("navigates into a directory from the table", async () => {
@@ -2065,3 +2322,38 @@ describe("BucketObjectsPage", () => {
     ).toBeInTheDocument();
   });
 });
+
+function createRecycleBinItem(
+  overrides: Partial<{
+    id: number;
+    type: "file" | "directory";
+    bucket_name: string;
+    path: string;
+    name: string;
+    object_key: string;
+    original_filename: string;
+    size: number;
+    content_type: string;
+    etag: string;
+    visibility: "public" | "private";
+    created_at: string;
+    deleted_at: string;
+  }> = {},
+) {
+  return {
+    id: 101,
+    type: "file" as const,
+    bucket_name: "demo",
+    path: "docs/report.txt",
+    name: "report.txt",
+    object_key: "docs/report.txt",
+    original_filename: "report.txt",
+    size: 128,
+    content_type: "text/plain",
+    etag: "etag-1",
+    visibility: "private" as const,
+    created_at: "2026-04-20T00:00:00Z",
+    deleted_at: "2026-04-21T00:00:00Z",
+    ...overrides,
+  };
+}

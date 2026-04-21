@@ -85,12 +85,14 @@ func main() {
 	tokenValidator := middleware.NewTokenValidator(cfg.BearerTokens)
 	bucketRepo := repository.NewBucketRepository(gormDB)
 	objectRepo := repository.NewObjectRepository(gormDB)
+	recycleRepo := repository.NewRecycleBinRepository(gormDB)
 	siteRepo := repository.NewSiteRepository(gormDB)
 	localStorage := storage.NewLocalStorage(cfg.StorageRoot)
 	storageQuotaRepo := repository.NewStorageQuotaRepository(gormDB)
-	storageQuotaService := service.NewStorageQuotaService(logger, cfg.StorageRoot, localStorage, objectRepo, storageQuotaRepo)
-	bucketService := service.NewBucketService(logger, gormDB, bucketRepo, objectRepo, siteRepo, localStorage)
-	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage, storageQuotaService)
+	storageQuotaService := service.NewStorageQuotaService(logger, cfg.StorageRoot, localStorage, objectRepo, recycleRepo, storageQuotaRepo)
+	bucketService := service.NewBucketService(logger, gormDB, bucketRepo, objectRepo, recycleRepo, siteRepo, storageQuotaService)
+	objectService := service.NewObjectService(gormDB, bucketRepo, objectRepo, recycleRepo, localStorage, storageQuotaService)
+	recycleBinService := service.NewRecycleBinService(gormDB, bucketRepo, objectRepo, recycleRepo, storageQuotaService)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	sitePublishService := service.NewSitePublishService(gormDB, objectRepo, siteRepo, localStorage, storageQuotaService, siteService)
 	signService := service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds)
@@ -104,6 +106,7 @@ func main() {
 		AuthValidator:       tokenValidator,
 		BucketService:       bucketService,
 		ObjectService:       objectService,
+		RecycleBinService:   recycleBinService,
 		SiteService:         siteService,
 		SitePublishService:  sitePublishService,
 		SignService:         signService,

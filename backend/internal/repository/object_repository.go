@@ -33,6 +33,10 @@ func NewObjectRepository(db *gorm.DB) *ObjectRepository {
 	return &ObjectRepository{db: db}
 }
 
+func (r *ObjectRepository) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *ObjectRepository) WithDB(db *gorm.DB) *ObjectRepository {
 	if db == nil {
 		return r
@@ -284,6 +288,21 @@ func (r *ObjectRepository) HardDeleteByBucket(ctx context.Context, bucketName st
 	return r.db.WithContext(ctx).
 		Where("bucket_name = ?", bucketName).
 		Delete(&model.Object{}).Error
+}
+
+func (r *ObjectRepository) HardDelete(ctx context.Context, bucketName string, objectKey string) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Where("bucket_name = ? AND object_key = ? AND is_deleted = ?", bucketName, objectKey, false).
+		Delete(&model.Object{})
+	return result.RowsAffected > 0, result.Error
+}
+
+func (r *ObjectRepository) HardDeleteByPrefix(ctx context.Context, bucketName string, prefix string) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("bucket_name = ? AND is_deleted = ?", bucketName, false).
+		Where(objectKeyPrefixLikeClause, likePrefixPattern(prefix)).
+		Delete(&model.Object{})
+	return result.RowsAffected, result.Error
 }
 
 func likePrefixPattern(prefix string) string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -306,66 +307,96 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 		return err
 	}
 
-	exists, err := s.objectRepo.ExistsActiveWithPrefix(ctx, bucketName, folderPath)
-	if err != nil {
-		return apperrors.Wrap(500, "folder_lookup_failed", "failed to look up folder", err)
-	}
-	if !exists {
-		return apperrors.New(404, "folder_not_found", "folder not found")
-	}
+	writeSession := s.quota.BeginWrite()
+	defer writeSession.Close()
 
 	if recursive {
-		objects, err := s.objectRepo.ListActiveByPrefixOrdered(ctx, bucketName, folderPath)
-		if err != nil {
-			return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
-		}
+		err := s.gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			objectRepo := s.objectRepo.WithDB(tx)
+			recycleRepo := s.recycleRepo.WithDB(tx)
 
-		writeSession := s.quota.BeginWrite()
-		defer writeSession.Close()
+			objects, err := objectRepo.ListActiveByPrefixOrdered(ctx, bucketName, folderPath)
+			if err != nil {
+				return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
+			}
+			if len(objects) == 0 {
+				return gorm.ErrRecordNotFound
+			}
 
-		deleted, err := s.objectRepo.SoftDeleteByPrefix(ctx, bucketName, folderPath)
+			if err := recycleRepo.CreateBatch(ctx, recycleBinObjectsFromObjects(objects, time.Now().UTC())); err != nil {
+				return apperrors.Wrap(500, "folder_delete_failed", "failed to move folder to recycle bin", err)
+			}
+
+			deleted, err := objectRepo.HardDeleteByPrefix(ctx, bucketName, folderPath)
+			if err != nil {
+				return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
+			}
+			if deleted == 0 {
+				return gorm.ErrRecordNotFound
+			}
+
+			return nil
+		})
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.New(404, "folder_not_found", "folder not found")
+			}
+			if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+				return err
+			}
+
 			return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
 		}
-		if deleted == 0 {
-			return apperrors.New(404, "folder_not_found", "folder not found")
-		}
-
-		writeSession.CleanupUnreferencedPaths(ctx, storagePathsFromObjects(objects))
 
 		return nil
 	}
 
 	markerKey := folderPath + folderMarkerFilename
-	hasOtherItems, err := s.objectRepo.ExistsActiveWithPrefixExceptKey(ctx, bucketName, folderPath, markerKey)
-	if err != nil {
-		return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
-	}
-	if hasOtherItems {
-		return apperrors.New(409, "folder_not_empty", "folder is not empty")
-	}
+	err := s.gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		objectRepo := s.objectRepo.WithDB(tx)
+		recycleRepo := s.recycleRepo.WithDB(tx)
 
-	marker, err := s.objectRepo.FindActive(ctx, bucketName, markerKey)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return apperrors.New(404, "folder_not_found", "folder not found")
+		hasOtherItems, err := objectRepo.ExistsActiveWithPrefixExceptKey(ctx, bucketName, folderPath, markerKey)
+		if err != nil {
+			return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
+		}
+		if hasOtherItems {
+			return apperrors.New(409, "folder_not_empty", "folder is not empty")
 		}
 
-		return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
-	}
+		marker, err := objectRepo.FindActive(ctx, bucketName, markerKey)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return gorm.ErrRecordNotFound
+			}
 
-	writeSession := s.quota.BeginWrite()
-	defer writeSession.Close()
+			return apperrors.Wrap(500, "folder_lookup_failed", "failed to inspect folder", err)
+		}
 
-	deleted, err := s.objectRepo.SoftDelete(ctx, bucketName, markerKey)
+		if err := recycleRepo.CreateBatch(ctx, recycleBinObjectsFromObjects([]model.Object{*marker}, time.Now().UTC())); err != nil {
+			return apperrors.Wrap(500, "folder_delete_failed", "failed to move folder to recycle bin", err)
+		}
+
+		deleted, err := objectRepo.HardDelete(ctx, bucketName, markerKey)
+		if err != nil {
+			return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
+		}
+		if !deleted {
+			return gorm.ErrRecordNotFound
+		}
+
+		return nil
+	})
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(404, "folder_not_found", "folder not found")
+		}
+		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+			return err
+		}
+
 		return apperrors.Wrap(500, "folder_delete_failed", "failed to delete folder", err)
 	}
-	if !deleted {
-		return apperrors.New(404, "folder_not_found", "folder not found")
-	}
-
-	writeSession.CleanupUnreferencedPaths(ctx, []string{marker.StoragePath})
 
 	return nil
 }

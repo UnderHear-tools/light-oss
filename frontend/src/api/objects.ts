@@ -4,12 +4,15 @@ import type { AxiosProgressEvent } from "axios";
 import type { AppSettings } from "../lib/settings";
 import type {
   BatchUploadResult,
+  DeleteRecycleBinObjectsResult,
   DeleteExplorerEntriesBatchItem,
   DeleteExplorerEntriesBatchResult,
   ExplorerEntriesResult,
   ObjectItem,
   ObjectListResult,
   ObjectVisibility,
+  RecycleBinObjectListResult,
+  RestoreRecycleBinObjectsResult,
   SignedDownloadResult,
 } from "./types";
 import { buildFolderUploadManifest } from "../lib/folder-upload";
@@ -64,6 +67,12 @@ export interface UpdateObjectVisibilityParams {
   bucket: string;
   objectKey: string;
   visibility: ObjectVisibility;
+}
+
+export interface ListRecycleBinObjectsParams {
+  bucket?: string;
+  limit: number;
+  cursor: string;
 }
 
 export function listObjects(settings: AppSettings, params: ListObjectsParams) {
@@ -249,6 +258,47 @@ export function deleteExplorerEntriesBatch(
     url: `/api/v1/buckets/${encodeURIComponent(bucket)}/entries/batch-delete`,
     data: {
       items,
+    },
+  });
+}
+
+export function listRecycleBinObjects(
+  settings: AppSettings,
+  params: ListRecycleBinObjectsParams,
+) {
+  return apiRequest<RecycleBinObjectListResult>(settings, {
+    method: "GET",
+    url: "/api/v1/recycle-bin/objects",
+    params: {
+      bucket: params.bucket || undefined,
+      limit: params.limit,
+      cursor: params.cursor || undefined,
+    },
+  });
+}
+
+export function restoreRecycleBinObjects(
+  settings: AppSettings,
+  itemIds: number[],
+) {
+  return apiRequest<RestoreRecycleBinObjectsResult>(settings, {
+    method: "POST",
+    url: "/api/v1/recycle-bin/objects/restore",
+    data: {
+      item_ids: itemIds,
+    },
+  });
+}
+
+export function deleteRecycleBinObjects(
+  settings: AppSettings,
+  itemIds: number[],
+) {
+  return apiRequest<DeleteRecycleBinObjectsResult>(settings, {
+    method: "POST",
+    url: "/api/v1/recycle-bin/objects/batch-delete",
+    data: {
+      item_ids: itemIds,
     },
   });
 }

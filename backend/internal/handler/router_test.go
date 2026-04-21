@@ -100,6 +100,35 @@ type deleteExplorerEntriesBatchResponse struct {
 	FailedItems  []deleteExplorerEntriesBatchFailedItemResponse `json:"failed_items"`
 }
 
+type recycleBinObjectResponse struct {
+	ID         uint64 `json:"id"`
+	Type       string `json:"type"`
+	BucketName string `json:"bucket_name"`
+	Path       string `json:"path"`
+	Name       string `json:"name"`
+	ObjectKey  string `json:"object_key"`
+}
+
+type recycleBinListResponse struct {
+	Items      []recycleBinObjectResponse `json:"items"`
+	NextCursor string                     `json:"next_cursor"`
+}
+
+type recycleBinFailedItemResponse struct {
+	ID         uint64 `json:"id"`
+	BucketName string `json:"bucket_name"`
+	Path       string `json:"path"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+}
+
+type recycleBinBatchResponse struct {
+	DeletedCount  int                            `json:"deleted_count"`
+	RestoredCount int                            `json:"restored_count"`
+	FailedCount   int                            `json:"failed_count"`
+	FailedItems   []recycleBinFailedItemResponse `json:"failed_items"`
+}
+
 type signResponse struct {
 	URL string `json:"url"`
 }
@@ -1718,17 +1747,20 @@ func TestListFoldersAndExplorerEntries(t *testing.T) {
 	if len(firstEntriesBody.Data.Items) != 2 {
 		t.Fatalf("unexpected first entries page: %+v", firstEntriesBody.Data.Items)
 	}
-	if firstEntriesBody.Data.Items[0].Type != "directory" || firstEntriesBody.Data.Items[0].Name != "empty" {
+	if firstEntriesBody.Data.Items[0].Type != "directory" || firstEntriesBody.Data.Items[0].Name != "images" {
 		t.Fatalf("unexpected first directory entry: %+v", firstEntriesBody.Data.Items[0])
 	}
-	if firstEntriesBody.Data.Items[0].IsEmpty == nil || !*firstEntriesBody.Data.Items[0].IsEmpty {
-		t.Fatalf("expected empty directory flag on %+v", firstEntriesBody.Data.Items[0])
+	if firstEntriesBody.Data.Items[0].IsEmpty == nil || *firstEntriesBody.Data.Items[0].IsEmpty {
+		t.Fatalf("expected non-empty directory flag on %+v", firstEntriesBody.Data.Items[0])
 	}
 	if firstEntriesBody.Data.Items[0].CreatedAt != nil {
 		t.Fatalf("expected directory created_at to be nil, got %+v", firstEntriesBody.Data.Items[0].CreatedAt)
 	}
-	if firstEntriesBody.Data.Items[1].Type != "directory" || firstEntriesBody.Data.Items[1].Name != "images" {
+	if firstEntriesBody.Data.Items[1].Type != "directory" || firstEntriesBody.Data.Items[1].Name != "empty" {
 		t.Fatalf("unexpected second directory entry: %+v", firstEntriesBody.Data.Items[1])
+	}
+	if firstEntriesBody.Data.Items[1].IsEmpty == nil || !*firstEntriesBody.Data.Items[1].IsEmpty {
+		t.Fatalf("expected empty directory flag on %+v", firstEntriesBody.Data.Items[1])
 	}
 	if firstEntriesBody.Data.Items[1].CreatedAt != nil {
 		t.Fatalf("expected directory created_at to be nil, got %+v", firstEntriesBody.Data.Items[1].CreatedAt)
@@ -1754,13 +1786,13 @@ func TestListFoldersAndExplorerEntries(t *testing.T) {
 	if len(secondEntriesBody.Data.Items) != 2 {
 		t.Fatalf("unexpected second entries page: %+v", secondEntriesBody.Data.Items)
 	}
-	if secondEntriesBody.Data.Items[0].Type != "file" || secondEntriesBody.Data.Items[0].Name != "alpha.txt" {
+	if secondEntriesBody.Data.Items[0].Type != "file" || secondEntriesBody.Data.Items[0].Name != "zeta.txt" {
 		t.Fatalf("unexpected file entry: %+v", secondEntriesBody.Data.Items[0])
 	}
 	if secondEntriesBody.Data.Items[0].CreatedAt == nil || secondEntriesBody.Data.Items[0].CreatedAt.IsZero() {
 		t.Fatalf("expected file created_at on %+v", secondEntriesBody.Data.Items[0])
 	}
-	if secondEntriesBody.Data.Items[1].Type != "file" || secondEntriesBody.Data.Items[1].Name != "zeta.txt" {
+	if secondEntriesBody.Data.Items[1].Type != "file" || secondEntriesBody.Data.Items[1].Name != "alpha.txt" {
 		t.Fatalf("unexpected file entry: %+v", secondEntriesBody.Data.Items[1])
 	}
 	if secondEntriesBody.Data.Items[1].CreatedAt == nil || secondEntriesBody.Data.Items[1].CreatedAt.IsZero() {
@@ -2437,7 +2469,7 @@ func TestRecursiveDeleteEscapesLikeWildcards(t *testing.T) {
 	if len(rootEntriesBody.Data.Items) != 2 {
 		t.Fatalf("expected 2 remaining root directories, got %+v", rootEntriesBody.Data.Items)
 	}
-	if rootEntriesBody.Data.Items[0].Path != "ab/" || rootEntriesBody.Data.Items[1].Path != "ghosts/" {
+	if rootEntriesBody.Data.Items[0].Path != "ghosts/" || rootEntriesBody.Data.Items[1].Path != "ab/" {
 		t.Fatalf("unexpected remaining directories after underscore delete: %+v", rootEntriesBody.Data.Items)
 	}
 
@@ -2913,7 +2945,7 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		t.Fatalf("enable sqlite foreign keys: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.Bucket{}, &model.SystemStorageQuota{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
+	if err := db.AutoMigrate(&model.Bucket{}, &model.SystemStorageQuota{}, &model.Object{}, &model.RecycleBinObject{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 
@@ -2940,11 +2972,13 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 
 	bucketRepo := repository.NewBucketRepository(db)
 	objectRepo := repository.NewObjectRepository(db)
+	recycleRepo := repository.NewRecycleBinRepository(db)
 	siteRepo := repository.NewSiteRepository(db)
 	localStorage := storage.NewLocalStorage(root)
 	storageQuotaRepo := repository.NewStorageQuotaRepository(db)
-	storageQuotaService := service.NewStorageQuotaService(zap.NewNop(), root, localStorage, objectRepo, storageQuotaRepo)
-	objectService := service.NewObjectService(bucketRepo, objectRepo, localStorage, storageQuotaService)
+	storageQuotaService := service.NewStorageQuotaService(zap.NewNop(), root, localStorage, objectRepo, recycleRepo, storageQuotaRepo)
+	objectService := service.NewObjectService(db, bucketRepo, objectRepo, recycleRepo, localStorage, storageQuotaService)
+	recycleBinService := service.NewRecycleBinService(db, bucketRepo, objectRepo, recycleRepo, storageQuotaService)
 	siteService := service.NewSiteService(bucketRepo, siteRepo, objectService)
 	return handler.NewRouter(handler.Dependencies{
 		Config:              cfg,
@@ -2952,8 +2986,9 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		DB:                  sqlDB,
 		GormDB:              db,
 		AuthValidator:       middleware.NewTokenValidator(cfg.BearerTokens),
-		BucketService:       service.NewBucketService(zap.NewNop(), db, bucketRepo, objectRepo, siteRepo, localStorage),
+		BucketService:       service.NewBucketService(zap.NewNop(), db, bucketRepo, objectRepo, recycleRepo, siteRepo, storageQuotaService),
 		ObjectService:       objectService,
+		RecycleBinService:   recycleBinService,
 		SiteService:         siteService,
 		SitePublishService:  service.NewSitePublishService(db, objectRepo, siteRepo, localStorage, storageQuotaService, siteService),
 		SignService:         service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds),

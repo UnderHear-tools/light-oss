@@ -48,23 +48,29 @@ type ListObjectsOutput struct {
 }
 
 type ObjectService struct {
-	bucketRepo *repository.BucketRepository
-	objectRepo *repository.ObjectRepository
-	storage    *storage.LocalStorage
-	quota      *StorageQuotaService
+	gormDB      *gorm.DB
+	bucketRepo  *repository.BucketRepository
+	objectRepo  *repository.ObjectRepository
+	recycleRepo *repository.RecycleBinRepository
+	storage     *storage.LocalStorage
+	quota       *StorageQuotaService
 }
 
 func NewObjectService(
+	gormDB *gorm.DB,
 	bucketRepo *repository.BucketRepository,
 	objectRepo *repository.ObjectRepository,
+	recycleRepo *repository.RecycleBinRepository,
 	localStorage *storage.LocalStorage,
 	quotaService *StorageQuotaService,
 ) *ObjectService {
 	return &ObjectService{
-		bucketRepo: bucketRepo,
-		objectRepo: objectRepo,
-		storage:    localStorage,
-		quota:      quotaService,
+		gormDB:      gormDB,
+		bucketRepo:  bucketRepo,
+		objectRepo:  objectRepo,
+		recycleRepo: recycleRepo,
+		storage:     localStorage,
+		quota:       quotaService,
 	}
 }
 
@@ -231,27 +237,46 @@ func (s *ObjectService) Delete(ctx context.Context, bucketName string, objectKey
 		return err
 	}
 
-	object, err := s.objectRepo.FindActive(ctx, bucketName, objectKey)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return apperrors.New(http.StatusNotFound, "object_not_found", "object not found")
-		}
-
-		return apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
-	}
-
 	writeSession := s.quota.BeginWrite()
 	defer writeSession.Close()
 
-	deleted, err := s.objectRepo.SoftDelete(ctx, bucketName, objectKey)
+	err := s.gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		objectRepo := s.objectRepo.WithDB(tx)
+		recycleRepo := s.recycleRepo.WithDB(tx)
+
+		object, err := objectRepo.FindActive(ctx, bucketName, objectKey)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return gorm.ErrRecordNotFound
+			}
+
+			return apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
+		}
+
+		if err := recycleRepo.CreateBatch(ctx, recycleBinObjectsFromObjects([]model.Object{*object}, time.Now().UTC())); err != nil {
+			return apperrors.Wrap(http.StatusInternalServerError, "object_delete_failed", "failed to move object to recycle bin", err)
+		}
+
+		deleted, err := objectRepo.HardDelete(ctx, bucketName, objectKey)
+		if err != nil {
+			return apperrors.Wrap(http.StatusInternalServerError, "object_delete_failed", "failed to delete object", err)
+		}
+		if !deleted {
+			return gorm.ErrRecordNotFound
+		}
+
+		return nil
+	})
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.New(http.StatusNotFound, "object_not_found", "object not found")
+		}
+		if appErr := apperrors.From(err); appErr.Code != "internal_error" {
+			return err
+		}
+
 		return apperrors.Wrap(http.StatusInternalServerError, "object_delete_failed", "failed to delete object", err)
 	}
-	if !deleted {
-		return apperrors.New(http.StatusNotFound, "object_not_found", "object not found")
-	}
-
-	writeSession.CleanupUnreferencedPaths(ctx, []string{object.StoragePath})
 
 	return nil
 }
@@ -415,4 +440,25 @@ func storagePathsFromObjects(objects []model.Object) []string {
 	}
 
 	return paths
+}
+
+func recycleBinObjectsFromObjects(objects []model.Object, deletedAt time.Time) []model.RecycleBinObject {
+	items := make([]model.RecycleBinObject, 0, len(objects))
+	for _, object := range objects {
+		items = append(items, model.RecycleBinObject{
+			BucketName:       object.BucketName,
+			ObjectKey:        object.ObjectKey,
+			OriginalFilename: object.OriginalFilename,
+			StoragePath:      object.StoragePath,
+			Size:             object.Size,
+			ContentType:      object.ContentType,
+			ETag:             object.ETag,
+			FileFingerprint:  object.FileFingerprint,
+			Visibility:       object.Visibility,
+			CreatedAt:        object.CreatedAt,
+			DeletedAt:        deletedAt,
+		})
+	}
+
+	return items
 }

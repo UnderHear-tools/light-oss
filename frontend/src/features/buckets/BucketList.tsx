@@ -88,34 +88,36 @@ export function BucketList({
           </div>
         </div>
 
-        <form
-          className="flex w-full min-w-0 items-center gap-2 lg:max-w-sm"
-          onSubmit={onSearchSubmit}
-        >
-          <FieldGroup className="min-w-0 flex-1">
-            <Field className="min-w-0" orientation="responsive">
-              <FieldLabel className="sr-only" htmlFor="bucket-search">
-                {t("buckets.search.label")}
-              </FieldLabel>
-              <Input
-                className="min-w-0"
-                id="bucket-search"
-                onChange={(event) => onSearchInputChange(event.target.value)}
-                placeholder={t("buckets.search.placeholder")}
-                value={searchInput}
-              />
-            </Field>
-          </FieldGroup>
-          <Button
-            className="shrink-0"
-            size="icon"
-            type="submit"
-            variant="outline"
+        <div className="flex w-full min-w-0 items-center gap-2 lg:max-w-xl lg:justify-end">
+          <form
+            className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-sm"
+            onSubmit={onSearchSubmit}
           >
-            <SearchIcon />
-            <span className="sr-only">{t("common.apply")}</span>
-          </Button>
-        </form>
+            <FieldGroup className="min-w-0 flex-1">
+              <Field className="min-w-0" orientation="responsive">
+                <FieldLabel className="sr-only" htmlFor="bucket-search">
+                  {t("buckets.search.label")}
+                </FieldLabel>
+                <Input
+                  className="min-w-0"
+                  id="bucket-search"
+                  onChange={(event) => onSearchInputChange(event.target.value)}
+                  placeholder={t("buckets.search.placeholder")}
+                  value={searchInput}
+                />
+              </Field>
+            </FieldGroup>
+            <Button
+              className="shrink-0"
+              size="icon"
+              type="submit"
+              variant="outline"
+            >
+              <SearchIcon />
+              <span className="sr-only">{t("common.apply")}</span>
+            </Button>
+          </form>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-5">

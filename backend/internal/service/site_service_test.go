@@ -186,18 +186,19 @@ func newTestSiteServices(t *testing.T) (*repository.BucketRepository, *ObjectSer
 	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
 		t.Fatalf("enable sqlite foreign keys: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Bucket{}, &model.SystemStorageQuota{}, &model.Object{}, &model.Site{}, &model.SiteDomain{}); err != nil {
+	if err := db.AutoMigrate(&model.Bucket{}, &model.SystemStorageQuota{}, &model.Object{}, &model.RecycleBinObject{}, &model.Site{}, &model.SiteDomain{}); err != nil {
 		t.Fatalf("migrate sqlite: %v", err)
 	}
 
 	root := t.TempDir()
 	bucketRepo := repository.NewBucketRepository(db)
 	objectRepo := repository.NewObjectRepository(db)
+	recycleRepo := repository.NewRecycleBinRepository(db)
 	siteRepo := repository.NewSiteRepository(db)
 	localStorage := storage.NewLocalStorage(root)
 	storageQuotaRepo := repository.NewStorageQuotaRepository(db)
-	storageQuotaService := NewStorageQuotaService(zap.NewNop(), root, localStorage, objectRepo, storageQuotaRepo)
-	objectService := NewObjectService(bucketRepo, objectRepo, localStorage, storageQuotaService)
+	storageQuotaService := NewStorageQuotaService(zap.NewNop(), root, localStorage, objectRepo, recycleRepo, storageQuotaRepo)
+	objectService := NewObjectService(db, bucketRepo, objectRepo, recycleRepo, localStorage, storageQuotaService)
 	siteService := NewSiteService(bucketRepo, siteRepo, objectService)
 	return bucketRepo, objectService, siteService
 }

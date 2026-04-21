@@ -93,6 +93,49 @@ export interface DeleteExplorerEntriesBatchResult {
   failed_items: DeleteExplorerEntriesBatchFailedItem[];
 }
 
+export type RecycleBinObjectType = "file" | "directory";
+
+export interface RecycleBinObjectItem {
+  id: number;
+  type: RecycleBinObjectType;
+  bucket_name: string;
+  path: string;
+  name: string;
+  object_key: string;
+  original_filename: string;
+  size: number;
+  content_type: string;
+  etag: string;
+  visibility: ObjectVisibility;
+  created_at: string;
+  deleted_at: string;
+}
+
+export interface RecycleBinObjectListResult {
+  items: RecycleBinObjectItem[];
+  next_cursor: string;
+}
+
+export interface RecycleBinFailedItem {
+  id: number;
+  bucket_name: string;
+  path: string;
+  code: string;
+  message: string;
+}
+
+export interface RestoreRecycleBinObjectsResult {
+  restored_count: number;
+  failed_count: number;
+  failed_items: RecycleBinFailedItem[];
+}
+
+export interface DeleteRecycleBinObjectsResult {
+  deleted_count: number;
+  failed_count: number;
+  failed_items: RecycleBinFailedItem[];
+}
+
 export interface BatchUploadResult {
   uploaded_count: number;
   items: ObjectItem[];

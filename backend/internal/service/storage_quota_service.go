@@ -38,6 +38,7 @@ type StorageQuotaService struct {
 	storageRoot string
 	storage     *storage.LocalStorage
 	objectRepo  *repository.ObjectRepository
+	recycleRepo *repository.RecycleBinRepository
 	quotaRepo   *repository.StorageQuotaRepository
 	writeMu     sync.Mutex
 }
@@ -51,6 +52,7 @@ func NewStorageQuotaService(
 	storageRoot string,
 	localStorage *storage.LocalStorage,
 	objectRepo *repository.ObjectRepository,
+	recycleRepo *repository.RecycleBinRepository,
 	quotaRepo *repository.StorageQuotaRepository,
 ) *StorageQuotaService {
 	return &StorageQuotaService{
@@ -58,6 +60,7 @@ func NewStorageQuotaService(
 		storageRoot: storageRoot,
 		storage:     localStorage,
 		objectRepo:  objectRepo,
+		recycleRepo: recycleRepo,
 		quotaRepo:   quotaRepo,
 	}
 }
@@ -138,6 +141,15 @@ func (s *StorageQuotaWriteSession) CleanupUnreferencedPaths(ctx context.Context,
 			continue
 		}
 		if exists {
+			continue
+		}
+
+		recycled, err := s.service.recycleRepo.ExistsByStoragePath(ctx, path)
+		if err != nil {
+			s.service.logger.Warn("check recycle bin storage reference failed", zap.String("storage_path", path), zap.Error(err))
+			continue
+		}
+		if recycled {
 			continue
 		}
 
