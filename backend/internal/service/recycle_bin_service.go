@@ -43,8 +43,8 @@ type RecycleBinObjectItem struct {
 
 type ListRecycleBinObjectsInput struct {
 	BucketName string
-	Limit  int
-	Cursor string
+	Limit      int
+	Cursor     string
 }
 
 type ListRecycleBinObjectsOutput struct {
@@ -70,6 +70,16 @@ type DeleteRecycleBinObjectsOutput struct {
 	DeletedCount int
 	FailedCount  int
 	FailedItems  []RecycleBinFailedItem
+}
+
+type recycleBinLogicalItem struct {
+	Item       RecycleBinObjectItem
+	LastCursor *repository.RecycleBinCursor
+}
+
+type recycleBinDirectoryKey struct {
+	BucketName string
+	Path       string
 }
 
 type RecycleBinService struct {
@@ -116,30 +126,57 @@ func (s *RecycleBinService) ListObjects(ctx context.Context, input ListRecycleBi
 		return nil, apperrors.New(http.StatusBadRequest, "invalid_cursor", "cursor is invalid")
 	}
 
-	items, err := s.recycleRepo.List(ctx, repository.ListRecycleBinObjectsParams{
-		BucketName: input.BucketName,
-		Limit:  limit + 1,
-		Cursor: cursor,
-	})
-	if err != nil {
-		return nil, apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_list_failed", "failed to list recycle bin objects", err)
+	batchSize := limit + 1
+	if batchSize < defaultListLimit {
+		batchSize = defaultListLimit
 	}
 
-	nextCursor := ""
-	if len(items) > limit {
-		last := items[limit-1]
-		nextCursor = encodeRecycleBinCursor(last.DeletedAt, last.ID)
-		items = items[:limit]
-	}
+	items := make([]RecycleBinObjectItem, 0, limit)
+	queryCursor := cursor
+	var pageLastCursor *repository.RecycleBinCursor
+	pendingRawItems := make([]model.RecycleBinObject, 0, batchSize)
 
-	result := make([]RecycleBinObjectItem, 0, len(items))
-	for _, item := range items {
-		result = append(result, recycleBinObjectToItem(item))
+	for {
+		rawItems, listErr := s.recycleRepo.List(ctx, repository.ListRecycleBinObjectsParams{
+			BucketName: input.BucketName,
+			Limit:      batchSize,
+			Cursor:     queryCursor,
+		})
+		if listErr != nil {
+			return nil, apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_list_failed", "failed to list recycle bin objects", listErr)
+		}
+		if len(rawItems) > 0 {
+			pendingRawItems = append(pendingRawItems, rawItems...)
+			queryCursor = recycleBinCursorFromObject(rawItems[len(rawItems)-1])
+		}
+
+		completeRawItems, remainingRawItems := splitCompleteRecycleBinRawItems(pendingRawItems, len(rawItems) == 0)
+		for _, logicalItem := range recycleBinLogicalItemsFromRawItems(completeRawItems) {
+			if len(items) == limit {
+				nextCursor := ""
+				if pageLastCursor != nil {
+					nextCursor = encodeRecycleBinCursor(pageLastCursor.DeletedAt, pageLastCursor.ID)
+				}
+
+				return &ListRecycleBinObjectsOutput{
+					Items:      items,
+					NextCursor: nextCursor,
+				}, nil
+			}
+
+			items = append(items, logicalItem.Item)
+			pageLastCursor = logicalItem.LastCursor
+		}
+
+		pendingRawItems = remainingRawItems
+		if len(rawItems) == 0 {
+			break
+		}
 	}
 
 	return &ListRecycleBinObjectsOutput{
-		Items:      result,
-		NextCursor: nextCursor,
+		Items:      items,
+		NextCursor: "",
 	}, nil
 }
 
@@ -186,11 +223,11 @@ func (s *RecycleBinService) DeleteObjects(ctx context.Context, itemIDs []uint64)
 	storagePaths := make([]string, 0, len(normalizedIDs))
 
 	for _, itemID := range normalizedIDs {
-		failedItem, path, deleteErr := s.deleteObject(ctx, itemID)
+		failedItem, paths, deleteErr := s.deleteObject(ctx, itemID)
 		if deleteErr == nil {
 			result.DeletedCount++
-			if path != "" {
-				storagePaths = append(storagePaths, path)
+			if len(paths) > 0 {
+				storagePaths = append(storagePaths, paths...)
 			}
 			continue
 		}
@@ -235,6 +272,11 @@ func (s *RecycleBinService) restoreObject(ctx context.Context, itemID uint64) (R
 		failedItem.BucketName = item.BucketName
 		failedItem.Path = recycleBinObjectPath(*item)
 
+		groupItems, err := loadRecycleBinActionItems(ctx, recycleRepo, *item)
+		if err != nil {
+			return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_restore_failed", "failed to load recycle bin item group", err)
+		}
+
 		exists, err := bucketRepo.Exists(ctx, item.BucketName)
 		if err != nil {
 			return apperrors.Wrap(http.StatusInternalServerError, "bucket_lookup_failed", "failed to look up bucket", err)
@@ -243,45 +285,62 @@ func (s *RecycleBinService) restoreObject(ctx context.Context, itemID uint64) (R
 			return apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
 		}
 
-		activeExists, err := objectRepo.ExistsActive(ctx, item.BucketName, item.ObjectKey)
+		restoreTargets := make([]model.RecycleBinObject, 0, len(groupItems))
+		restoreKeys := make([]string, 0, len(groupItems))
+		for _, groupItem := range groupItems {
+			if shouldSkipRecycleBinRestoreItem(groupItem) {
+				continue
+			}
+
+			restoreTargets = append(restoreTargets, groupItem)
+			restoreKeys = append(restoreKeys, groupItem.ObjectKey)
+		}
+
+		existingKeys, err := objectRepo.ListExistingActiveKeys(ctx, item.BucketName, restoreKeys)
 		if err != nil {
 			return apperrors.Wrap(http.StatusInternalServerError, "object_lookup_failed", "failed to look up object", err)
 		}
-		if activeExists {
+		if len(existingKeys) > 0 {
 			return apperrors.New(http.StatusConflict, "object_exists", "object already exists")
 		}
 
-		object := &model.Object{
-			BucketName:       item.BucketName,
-			ObjectKey:        item.ObjectKey,
-			OriginalFilename: item.OriginalFilename,
-			StoragePath:      item.StoragePath,
-			Size:             item.Size,
-			ContentType:      item.ContentType,
-			ETag:             item.ETag,
-			FileFingerprint:  item.FileFingerprint,
-			Visibility:       item.Visibility,
-			IsDeleted:        false,
-			CreatedAt:        item.CreatedAt,
-			UpdatedAt:        time.Now().UTC(),
+		restoredObjects := make([]model.Object, 0, len(restoreTargets))
+		updatedAt := time.Now().UTC()
+		for _, restoreTarget := range restoreTargets {
+			restoredObjects = append(restoredObjects, model.Object{
+				BucketName:       restoreTarget.BucketName,
+				ObjectKey:        restoreTarget.ObjectKey,
+				OriginalFilename: restoreTarget.OriginalFilename,
+				StoragePath:      restoreTarget.StoragePath,
+				Size:             restoreTarget.Size,
+				ContentType:      restoreTarget.ContentType,
+				ETag:             restoreTarget.ETag,
+				FileFingerprint:  restoreTarget.FileFingerprint,
+				Visibility:       restoreTarget.Visibility,
+				IsDeleted:        false,
+				CreatedAt:        restoreTarget.CreatedAt,
+				UpdatedAt:        updatedAt,
+			})
 		}
 
-		if err := tx.WithContext(ctx).Create(object).Error; err != nil {
-			if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
-				return apperrors.New(http.StatusConflict, "object_exists", "object already exists")
-			}
-			if isForeignKeyError(err) {
-				return apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
-			}
+		if len(restoredObjects) > 0 {
+			if err := tx.WithContext(ctx).Create(&restoredObjects).Error; err != nil {
+				if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateError(err) {
+					return apperrors.New(http.StatusConflict, "object_exists", "object already exists")
+				}
+				if isForeignKeyError(err) {
+					return apperrors.New(http.StatusNotFound, "bucket_not_found", "bucket not found")
+				}
 
-			return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_restore_failed", "failed to restore object", err)
+				return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_restore_failed", "failed to restore object", err)
+			}
 		}
 
-		deleted, err := recycleRepo.HardDelete(ctx, item.ID)
+		deleted, err := recycleRepo.HardDeleteByIDs(ctx, recycleBinObjectIDs(groupItems))
 		if err != nil {
 			return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_restore_failed", "failed to remove recycle bin item", err)
 		}
-		if !deleted {
+		if deleted != int64(len(groupItems)) {
 			return apperrors.New(http.StatusNotFound, "recycle_bin_item_not_found", "recycle bin item not found")
 		}
 
@@ -290,9 +349,9 @@ func (s *RecycleBinService) restoreObject(ctx context.Context, itemID uint64) (R
 	return failedItem, err
 }
 
-func (s *RecycleBinService) deleteObject(ctx context.Context, itemID uint64) (RecycleBinFailedItem, string, error) {
+func (s *RecycleBinService) deleteObject(ctx context.Context, itemID uint64) (RecycleBinFailedItem, []string, error) {
 	failedItem := RecycleBinFailedItem{ID: itemID}
-	storagePath := ""
+	storagePaths := make([]string, 0)
 
 	err := s.gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		recycleRepo := s.recycleRepo.WithDB(tx)
@@ -308,20 +367,24 @@ func (s *RecycleBinService) deleteObject(ctx context.Context, itemID uint64) (Re
 
 		failedItem.BucketName = item.BucketName
 		failedItem.Path = recycleBinObjectPath(*item)
-		storagePath = item.StoragePath
+		groupItems, err := loadRecycleBinActionItems(ctx, recycleRepo, *item)
+		if err != nil {
+			return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_delete_failed", "failed to load recycle bin item group", err)
+		}
+		storagePaths = recycleBinObjectStoragePaths(groupItems)
 
-		deleted, err := recycleRepo.HardDelete(ctx, item.ID)
+		deleted, err := recycleRepo.HardDeleteByIDs(ctx, recycleBinObjectIDs(groupItems))
 		if err != nil {
 			return apperrors.Wrap(http.StatusInternalServerError, "recycle_bin_delete_failed", "failed to delete recycle bin item", err)
 		}
-		if !deleted {
+		if deleted != int64(len(groupItems)) {
 			return apperrors.New(http.StatusNotFound, "recycle_bin_item_not_found", "recycle bin item not found")
 		}
 
 		return nil
 	})
 
-	return failedItem, storagePath, err
+	return failedItem, storagePaths, err
 }
 
 func validateRecycleBinItemIDs(itemIDs []uint64) ([]uint64, error) {
@@ -390,6 +453,183 @@ func recycleBinObjectName(item model.RecycleBinObject) string {
 	}
 
 	return path.Base(entryPath)
+}
+
+func recycleBinCursorFromObject(item model.RecycleBinObject) *repository.RecycleBinCursor {
+	return &repository.RecycleBinCursor{
+		DeletedAt: item.DeletedAt,
+		ID:        item.ID,
+	}
+}
+
+func splitCompleteRecycleBinRawItems(
+	items []model.RecycleBinObject,
+	reachedEnd bool,
+) ([]model.RecycleBinObject, []model.RecycleBinObject) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+	if reachedEnd {
+		return items, nil
+	}
+
+	lastDeletedAt := items[len(items)-1].DeletedAt
+	splitIndex := len(items)
+	for splitIndex > 0 && items[splitIndex-1].DeletedAt.Equal(lastDeletedAt) {
+		splitIndex--
+	}
+
+	return items[:splitIndex], items[splitIndex:]
+}
+
+func recycleBinLogicalItemsFromRawItems(items []model.RecycleBinObject) []recycleBinLogicalItem {
+	logicalItems := make([]recycleBinLogicalItem, 0, len(items))
+
+	for start := 0; start < len(items); {
+		end := start + 1
+		for end < len(items) && items[end].DeletedAt.Equal(items[start].DeletedAt) {
+			end++
+		}
+
+		logicalItems = append(logicalItems, recycleBinLogicalItemsFromDeletedAtBatch(items[start:end])...)
+		start = end
+	}
+
+	return logicalItems
+}
+
+func recycleBinLogicalItemsFromDeletedAtBatch(items []model.RecycleBinObject) []recycleBinLogicalItem {
+	logicalItems := make([]recycleBinLogicalItem, 0, len(items))
+	directoryMarkers := make(map[recycleBinDirectoryKey]model.RecycleBinObject)
+	logicalItemIndexByDirectory := make(map[recycleBinDirectoryKey]int)
+
+	for _, item := range items {
+		if recycleBinObjectType(item) != RecycleBinItemTypeDirectory {
+			continue
+		}
+
+		key := recycleBinDirectoryKey{
+			BucketName: item.BucketName,
+			Path:       recycleBinObjectPath(item),
+		}
+		directoryMarkers[key] = item
+	}
+
+	for _, item := range items {
+		directoryKey, grouped := recycleBinOwningDirectoryKey(directoryMarkers, item)
+		if !grouped {
+			logicalItems = append(logicalItems, recycleBinLogicalItem{
+				Item:       recycleBinObjectToItem(item),
+				LastCursor: recycleBinCursorFromObject(item),
+			})
+			continue
+		}
+
+		logicalIndex, exists := logicalItemIndexByDirectory[directoryKey]
+		if !exists {
+			directoryMarker := directoryMarkers[directoryKey]
+			logicalItems = append(logicalItems, recycleBinLogicalItem{
+				Item:       recycleBinObjectToItem(directoryMarker),
+				LastCursor: recycleBinCursorFromObject(item),
+			})
+			logicalIndex = len(logicalItems) - 1
+			logicalItemIndexByDirectory[directoryKey] = logicalIndex
+		} else {
+			logicalItems[logicalIndex].LastCursor = recycleBinCursorFromObject(item)
+		}
+
+		if recycleBinObjectType(item) == RecycleBinItemTypeFile {
+			logicalItems[logicalIndex].Item.Size += item.Size
+		}
+	}
+
+	return logicalItems
+}
+
+func recycleBinOwningDirectoryKey(
+	directoryMarkers map[recycleBinDirectoryKey]model.RecycleBinObject,
+	item model.RecycleBinObject,
+) (recycleBinDirectoryKey, bool) {
+	itemPath := recycleBinObjectPath(item)
+	includeSelf := recycleBinObjectType(item) == RecycleBinItemTypeDirectory
+
+	for _, candidatePath := range recycleBinAncestorDirectoryPaths(itemPath, includeSelf) {
+		key := recycleBinDirectoryKey{
+			BucketName: item.BucketName,
+			Path:       candidatePath,
+		}
+		if _, exists := directoryMarkers[key]; exists {
+			return key, true
+		}
+	}
+
+	return recycleBinDirectoryKey{}, false
+}
+
+func recycleBinAncestorDirectoryPaths(itemPath string, includeSelf bool) []string {
+	trimmedPath := strings.TrimSuffix(itemPath, "/")
+	if trimmedPath == "" {
+		return nil
+	}
+
+	segments := strings.Split(trimmedPath, "/")
+	maxDepth := len(segments) - 1
+	if includeSelf {
+		maxDepth = len(segments)
+	}
+	if maxDepth <= 0 {
+		return nil
+	}
+
+	paths := make([]string, 0, maxDepth)
+	for depth := 1; depth <= maxDepth; depth++ {
+		paths = append(paths, strings.Join(segments[:depth], "/")+"/")
+	}
+
+	return paths
+}
+
+func loadRecycleBinActionItems(
+	ctx context.Context,
+	recycleRepo *repository.RecycleBinRepository,
+	item model.RecycleBinObject,
+) ([]model.RecycleBinObject, error) {
+	if recycleBinObjectType(item) != RecycleBinItemTypeDirectory {
+		return []model.RecycleBinObject{item}, nil
+	}
+
+	return recycleRepo.ListDirectoryGroup(
+		ctx,
+		item.BucketName,
+		item.DeletedAt,
+		recycleBinObjectPath(item),
+	)
+}
+
+func shouldSkipRecycleBinRestoreItem(item model.RecycleBinObject) bool {
+	return recycleBinObjectType(item) == RecycleBinItemTypeDirectory && item.StoragePath == ""
+}
+
+func recycleBinObjectIDs(items []model.RecycleBinObject) []uint64 {
+	ids := make([]uint64, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+
+	return ids
+}
+
+func recycleBinObjectStoragePaths(items []model.RecycleBinObject) []string {
+	paths := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.StoragePath == "" {
+			continue
+		}
+
+		paths = append(paths, item.StoragePath)
+	}
+
+	return paths
 }
 
 func encodeRecycleBinCursor(deletedAt time.Time, id uint64) string {

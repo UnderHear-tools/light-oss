@@ -445,20 +445,76 @@ func storagePathsFromObjects(objects []model.Object) []string {
 func recycleBinObjectsFromObjects(objects []model.Object, deletedAt time.Time) []model.RecycleBinObject {
 	items := make([]model.RecycleBinObject, 0, len(objects))
 	for _, object := range objects {
-		items = append(items, model.RecycleBinObject{
-			BucketName:       object.BucketName,
-			ObjectKey:        object.ObjectKey,
-			OriginalFilename: object.OriginalFilename,
-			StoragePath:      object.StoragePath,
-			Size:             object.Size,
-			ContentType:      object.ContentType,
-			ETag:             object.ETag,
-			FileFingerprint:  object.FileFingerprint,
-			Visibility:       object.Visibility,
-			CreatedAt:        object.CreatedAt,
-			DeletedAt:        deletedAt,
-		})
+		items = append(items, recycleBinObjectFromObject(object, deletedAt))
 	}
 
 	return items
+}
+
+func recycleBinObjectsFromFolderDelete(
+	objects []model.Object,
+	folderPath string,
+	deletedAt time.Time,
+) []model.RecycleBinObject {
+	if len(objects) == 0 {
+		return nil
+	}
+
+	markerKey := folderPath + folderMarkerFilename
+	items := make([]model.RecycleBinObject, 0, len(objects)+1)
+	var representative *model.Object
+
+	for index := range objects {
+		object := objects[index]
+		if object.ObjectKey == markerKey {
+			representative = &objects[index]
+			continue
+		}
+
+		items = append(items, recycleBinObjectFromObject(object, deletedAt))
+	}
+
+	if representative != nil {
+		items = append(items, recycleBinObjectFromObject(*representative, deletedAt))
+		return items
+	}
+
+	items = append(items, syntheticRecycleBinDirectoryObject(objects[0].BucketName, folderPath, deletedAt))
+	return items
+}
+
+func recycleBinObjectFromObject(object model.Object, deletedAt time.Time) model.RecycleBinObject {
+	return model.RecycleBinObject{
+		BucketName:       object.BucketName,
+		ObjectKey:        object.ObjectKey,
+		OriginalFilename: object.OriginalFilename,
+		StoragePath:      object.StoragePath,
+		Size:             object.Size,
+		ContentType:      object.ContentType,
+		ETag:             object.ETag,
+		FileFingerprint:  object.FileFingerprint,
+		Visibility:       object.Visibility,
+		CreatedAt:        object.CreatedAt,
+		DeletedAt:        deletedAt,
+	}
+}
+
+func syntheticRecycleBinDirectoryObject(
+	bucketName string,
+	folderPath string,
+	deletedAt time.Time,
+) model.RecycleBinObject {
+	return model.RecycleBinObject{
+		BucketName:       bucketName,
+		ObjectKey:        folderPath + folderMarkerFilename,
+		OriginalFilename: folderMarkerFilename,
+		StoragePath:      "",
+		Size:             0,
+		ContentType:      "application/x-directory",
+		ETag:             "",
+		FileFingerprint:  nil,
+		Visibility:       model.VisibilityPrivate,
+		CreatedAt:        deletedAt,
+		DeletedAt:        deletedAt,
+	}
 }

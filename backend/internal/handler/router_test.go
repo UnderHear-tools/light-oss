@@ -107,6 +107,7 @@ type recycleBinObjectResponse struct {
 	Path       string `json:"path"`
 	Name       string `json:"name"`
 	ObjectKey  string `json:"object_key"`
+	Size       int64  `json:"size"`
 }
 
 type recycleBinListResponse struct {
@@ -2933,6 +2934,11 @@ func newTestRouter(t *testing.T, maxUploadSize int64) *gin.Engine {
 }
 
 func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engine, string) {
+	router, root, _ := newTestRouterWithStorageRootAndDB(t, maxUploadSize)
+	return router, root
+}
+
+func newTestRouterWithStorageRootAndDB(t *testing.T, maxUploadSize int64) (*gin.Engine, string, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -2994,7 +3000,7 @@ func newTestRouterWithStorageRoot(t *testing.T, maxUploadSize int64) (*gin.Engin
 		SignService:         service.NewSignService(signing.NewSigner(cfg.SigningSecret), cfg.PublicBaseURL, cfg.DefaultSignedURLTTLSeconds, cfg.MaxSignedURLTTLSeconds),
 		SystemStatsService:  service.NewSystemStatsService(zap.NewNop(), storageQuotaService),
 		StorageQuotaService: storageQuotaService,
-	}), root
+	}), root, db
 }
 
 func createBucket(t *testing.T, router *gin.Engine, name string) {

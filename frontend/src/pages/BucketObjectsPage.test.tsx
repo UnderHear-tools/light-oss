@@ -285,6 +285,128 @@ describe("BucketObjectsPage", () => {
     });
   });
 
+  it("restores a recycle bin directory row using its single visible item id", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects)
+      .mockResolvedValueOnce({
+        items: [
+          createRecycleBinItem({
+            type: "directory",
+            path: "docs/",
+            name: "docs",
+            object_key: "docs/.light-oss-folder",
+            size: 256,
+            content_type: "application/x-directory",
+            etag: "",
+            visibility: "private",
+          }),
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValue({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const row = (await screen.findByText("docs/")).closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: "Restore" }),
+    );
+
+    await waitFor(() => {
+      expect(restoreRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [101],
+      );
+    });
+  });
+
+  it("permanently deletes a recycle bin directory row using its single visible item id", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects)
+      .mockResolvedValueOnce({
+        items: [
+          createRecycleBinItem({
+            type: "directory",
+            id: 202,
+            path: "docs/",
+            name: "docs",
+            object_key: "docs/.light-oss-folder",
+            size: 256,
+            content_type: "application/x-directory",
+            etag: "",
+            visibility: "private",
+          }),
+        ],
+        next_cursor: "",
+      })
+      .mockResolvedValue({
+        items: [],
+        next_cursor: "",
+      });
+    vi.mocked(deleteRecycleBinObjects).mockResolvedValue({
+      deleted_count: 1,
+      failed_count: 0,
+      failed_items: [],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const row = (await screen.findByText("docs/")).closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", {
+        name: "Delete permanently",
+      }),
+    );
+
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", {
+        name: "Delete permanently",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(deleteRecycleBinObjects).toHaveBeenCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        [202],
+      );
+    });
+  });
+
   it("supports batch recycle bin actions for the current bucket", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [],

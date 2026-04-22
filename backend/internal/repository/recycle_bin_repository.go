@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,8 +17,8 @@ type RecycleBinCursor struct {
 
 type ListRecycleBinObjectsParams struct {
 	BucketName string
-	Limit  int
-	Cursor *RecycleBinCursor
+	Limit      int
+	Cursor     *RecycleBinCursor
 }
 
 type RecycleBinRepository struct {
@@ -123,6 +124,26 @@ func (r *RecycleBinRepository) ListAllByBucket(ctx context.Context, bucketName s
 	return items, nil
 }
 
+func (r *RecycleBinRepository) ListDirectoryGroup(
+	ctx context.Context,
+	bucketName string,
+	deletedAt time.Time,
+	prefix string,
+) ([]model.RecycleBinObject, error) {
+	var items []model.RecycleBinObject
+
+	err := r.db.WithContext(ctx).
+		Where("bucket_name = ? AND deleted_at = ?", bucketName, deletedAt).
+		Where(recycleBinObjectKeyPrefixLikeClause, recycleBinLikePrefixPattern(prefix)).
+		Order("id DESC").
+		Find(&items).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
 func (r *RecycleBinRepository) HardDelete(ctx context.Context, id uint64) (bool, error) {
 	result := r.db.WithContext(ctx).
 		Where("id = ?", id).
@@ -145,4 +166,19 @@ func (r *RecycleBinRepository) HardDeleteByBucket(ctx context.Context, bucketNam
 	return r.db.WithContext(ctx).
 		Where("bucket_name = ?", bucketName).
 		Delete(&model.RecycleBinObject{}).Error
+}
+
+const recycleBinObjectKeyPrefixLikeClause = "object_key LIKE ? ESCAPE '!'"
+
+func recycleBinLikePrefixPattern(prefix string) string {
+	return recycleBinEscapeLikeValue(prefix) + "%"
+}
+
+func recycleBinEscapeLikeValue(value string) string {
+	replacer := strings.NewReplacer(
+		"!", "!!",
+		"%", "!%",
+		"_", "!_",
+	)
+	return replacer.Replace(value)
 }

@@ -323,7 +323,8 @@ func (s *ObjectService) DeleteFolder(ctx context.Context, bucketName string, fol
 				return gorm.ErrRecordNotFound
 			}
 
-			if err := recycleRepo.CreateBatch(ctx, recycleBinObjectsFromObjects(objects, time.Now().UTC())); err != nil {
+			deletedAt := time.Now().UTC()
+			if err := recycleRepo.CreateBatch(ctx, recycleBinObjectsFromFolderDelete(objects, folderPath, deletedAt)); err != nil {
 				return apperrors.Wrap(500, "folder_delete_failed", "failed to move folder to recycle bin", err)
 			}
 

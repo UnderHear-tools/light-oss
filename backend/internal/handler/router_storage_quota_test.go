@@ -6,6 +6,11 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
+
+	"gorm.io/gorm"
+
+	"light-oss/backend/internal/model"
 )
 
 func TestProtectedUpdateStorageQuotaRequiresAuth(t *testing.T) {
@@ -269,26 +274,557 @@ func TestDeleteFolderMovesObjectsToRecycleBinAndKeepsStorageFiles(t *testing.T) 
 
 	var listBody apiEnvelope[recycleBinListResponse]
 	decodeJSON(t, listRec.Body.Bytes(), &listBody)
-	if len(listBody.Data.Items) != 3 {
-		t.Fatalf("expected 3 recycle bin items, got %d", len(listBody.Data.Items))
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 recycle bin item, got %d", len(listBody.Data.Items))
 	}
 
-	itemByPath := make(map[string]recycleBinObjectResponse, len(listBody.Data.Items))
-	for _, item := range listBody.Data.Items {
-		itemByPath[item.Path] = item
+	item := listBody.Data.Items[0]
+	if item.Path != "docs/" || item.Type != "directory" {
+		t.Fatalf("expected docs/ directory recycle bin item, got %+v", item)
+	}
+	if item.Size != 2 {
+		t.Fatalf("expected docs/ directory size to aggregate descendants, got %d", item.Size)
+	}
+}
+
+func TestDeleteFolderWithoutMarkerMovesSingleDirectoryToRecycleBin(t *testing.T) {
+	router, storageRoot := newTestRouterWithStorageRoot(t, 1024)
+
+	createBucket(t, router, "folder-no-marker")
+	uploadObject(t, router, "/api/v1/buckets/folder-no-marker/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/folder-no-marker/objects/docs/b.txt", "B", "public")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/folder-no-marker/folders?path=docs/&recursive=true", nil)
+	req.Header.Set("Authorization", "Bearer dev-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 2 {
+		t.Fatalf("expected storage files to remain after recursive folder delete, got %d", files)
 	}
 
-	if _, exists := itemByPath["docs/"]; !exists {
-		t.Fatalf("expected directory marker in recycle bin, got %+v", listBody.Data.Items)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
 	}
-	if itemByPath["docs/"].Type != "directory" {
-		t.Fatalf("expected docs/ to be a directory recycle bin item, got %+v", itemByPath["docs/"])
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 recycle bin item, got %d", len(listBody.Data.Items))
 	}
-	if _, exists := itemByPath["docs/a.txt"]; !exists {
-		t.Fatalf("expected docs/a.txt in recycle bin")
+
+	item := listBody.Data.Items[0]
+	if item.Path != "docs/" || item.Type != "directory" || item.ObjectKey != "docs/.light-oss-folder" {
+		t.Fatalf("expected synthetic docs/ directory recycle bin item, got %+v", item)
 	}
-	if _, exists := itemByPath["docs/b.txt"]; !exists {
-		t.Fatalf("expected docs/b.txt in recycle bin")
+	if item.Size != 2 {
+		t.Fatalf("expected docs/ directory size to aggregate descendants, got %d", item.Size)
+	}
+}
+
+func TestRecycleBinRestoreRestoresDirectoryWithoutSyntheticMarker(t *testing.T) {
+	router, storageRoot := newTestRouterWithStorageRoot(t, 1024)
+
+	createBucket(t, router, "restore-folder")
+	uploadObject(t, router, "/api/v1/buckets/restore-folder/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/restore-folder/objects/docs/nested/b.txt", "B", "public")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/restore-folder/folders?path=docs/&recursive=true", nil)
+	deleteReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 recycle bin item, got %d", len(listBody.Data.Items))
+	}
+
+	restoreReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/recycle-bin/objects/restore",
+		bytes.NewBufferString(`{"item_ids":[`+strconv.FormatUint(listBody.Data.Items[0].ID, 10)+`]}`),
+	)
+	restoreReq.Header.Set("Authorization", "Bearer dev-token")
+	restoreReq.Header.Set("Content-Type", "application/json")
+	restoreRec := httptest.NewRecorder()
+	router.ServeHTTP(restoreRec, restoreReq)
+	if restoreRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", restoreRec.Code, restoreRec.Body.String())
+	}
+
+	var restoreBody apiEnvelope[recycleBinBatchResponse]
+	decodeJSON(t, restoreRec.Body.Bytes(), &restoreBody)
+	if restoreBody.Data.RestoredCount != 1 || restoreBody.Data.FailedCount != 0 {
+		t.Fatalf("unexpected restore result %+v", restoreBody.Data)
+	}
+
+	getAReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/restore-folder/objects/docs/a.txt", nil)
+	getARec := httptest.NewRecorder()
+	router.ServeHTTP(getARec, getAReq)
+	if getARec.Code != http.StatusOK || getARec.Body.String() != "A" {
+		t.Fatalf("expected restored docs/a.txt, got %d body=%q", getARec.Code, getARec.Body.String())
+	}
+
+	getBReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/restore-folder/objects/docs/nested/b.txt", nil)
+	getBRec := httptest.NewRecorder()
+	router.ServeHTTP(getBRec, getBReq)
+	if getBRec.Code != http.StatusOK || getBRec.Body.String() != "B" {
+		t.Fatalf("expected restored docs/nested/b.txt, got %d body=%q", getBRec.Code, getBRec.Body.String())
+	}
+
+	markerReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/restore-folder/objects/docs/.light-oss-folder", nil)
+	markerReq.Header.Set("Authorization", "Bearer dev-token")
+	markerRec := httptest.NewRecorder()
+	router.ServeHTTP(markerRec, markerReq)
+	if markerRec.Code != http.StatusNotFound {
+		t.Fatalf("expected synthetic marker to stay absent after restore, got %d", markerRec.Code)
+	}
+
+	finalListReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	finalListReq.Header.Set("Authorization", "Bearer dev-token")
+	finalListRec := httptest.NewRecorder()
+	router.ServeHTTP(finalListRec, finalListReq)
+	if finalListRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", finalListRec.Code, finalListRec.Body.String())
+	}
+
+	var finalListBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, finalListRec.Body.Bytes(), &finalListBody)
+	if len(finalListBody.Data.Items) != 0 {
+		t.Fatalf("expected recycle bin to be empty after restore, got %+v", finalListBody.Data.Items)
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 2 {
+		t.Fatalf("expected restored directory to reuse existing storage files, got %d", files)
+	}
+}
+
+func TestRecycleBinRestoreDirectoryConflictReturnsFailedItem(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "restore-folder-conflict")
+	uploadObject(t, router, "/api/v1/buckets/restore-folder-conflict/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/restore-folder-conflict/objects/docs/b.txt", "B", "public")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/restore-folder-conflict/folders?path=docs/&recursive=true", nil)
+	deleteReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	uploadObject(t, router, "/api/v1/buckets/restore-folder-conflict/objects/docs/a.txt", "replacement", "public")
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 recycle bin item, got %d", len(listBody.Data.Items))
+	}
+
+	restoreReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/recycle-bin/objects/restore",
+		bytes.NewBufferString(`{"item_ids":[`+strconv.FormatUint(listBody.Data.Items[0].ID, 10)+`]}`),
+	)
+	restoreReq.Header.Set("Authorization", "Bearer dev-token")
+	restoreReq.Header.Set("Content-Type", "application/json")
+	restoreRec := httptest.NewRecorder()
+	router.ServeHTTP(restoreRec, restoreReq)
+	if restoreRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", restoreRec.Code, restoreRec.Body.String())
+	}
+
+	var restoreBody apiEnvelope[recycleBinBatchResponse]
+	decodeJSON(t, restoreRec.Body.Bytes(), &restoreBody)
+	if restoreBody.Data.RestoredCount != 0 || restoreBody.Data.FailedCount != 1 {
+		t.Fatalf("unexpected restore result %+v", restoreBody.Data)
+	}
+	if len(restoreBody.Data.FailedItems) != 1 || restoreBody.Data.FailedItems[0].Code != "object_exists" {
+		t.Fatalf("expected object_exists failure, got %+v", restoreBody.Data.FailedItems)
+	}
+
+	getBReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/restore-folder-conflict/objects/docs/b.txt", nil)
+	getBRec := httptest.NewRecorder()
+	router.ServeHTTP(getBRec, getBReq)
+	if getBRec.Code != http.StatusNotFound {
+		t.Fatalf("expected docs/b.txt to stay deleted after failed restore, got %d", getBRec.Code)
+	}
+
+	finalListReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	finalListReq.Header.Set("Authorization", "Bearer dev-token")
+	finalListRec := httptest.NewRecorder()
+	router.ServeHTTP(finalListRec, finalListReq)
+	if finalListRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", finalListRec.Code, finalListRec.Body.String())
+	}
+
+	var finalListBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, finalListRec.Body.Bytes(), &finalListBody)
+	if len(finalListBody.Data.Items) != 1 || finalListBody.Data.Items[0].Path != "docs/" {
+		t.Fatalf("expected directory recycle bin item to remain after failed restore, got %+v", finalListBody.Data.Items)
+	}
+}
+
+func TestRecycleBinPermanentDeleteDirectoryReclaimsStorageFiles(t *testing.T) {
+	router, storageRoot := newTestRouterWithStorageRoot(t, 1024)
+
+	createBucket(t, router, "recycle-directory-delete")
+	uploadObject(t, router, "/api/v1/buckets/recycle-directory-delete/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/recycle-directory-delete/objects/docs/b.txt", "B", "public")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/recycle-directory-delete/folders?path=docs/&recursive=true", nil)
+	deleteReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 {
+		t.Fatalf("expected 1 recycle bin item, got %d", len(listBody.Data.Items))
+	}
+
+	deleteRecycleReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/recycle-bin/objects/batch-delete",
+		bytes.NewBufferString(`{"item_ids":[`+strconv.FormatUint(listBody.Data.Items[0].ID, 10)+`]}`),
+	)
+	deleteRecycleReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRecycleReq.Header.Set("Content-Type", "application/json")
+	deleteRecycleRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRecycleRec, deleteRecycleReq)
+	if deleteRecycleRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", deleteRecycleRec.Code, deleteRecycleRec.Body.String())
+	}
+
+	var deleteBody apiEnvelope[recycleBinBatchResponse]
+	decodeJSON(t, deleteRecycleRec.Body.Bytes(), &deleteBody)
+	if deleteBody.Data.DeletedCount != 1 || deleteBody.Data.FailedCount != 0 {
+		t.Fatalf("unexpected delete result %+v", deleteBody.Data)
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 0 {
+		t.Fatalf("expected storage files to be removed after permanent directory delete, got %d", files)
+	}
+
+	finalListReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	finalListReq.Header.Set("Authorization", "Bearer dev-token")
+	finalListRec := httptest.NewRecorder()
+	router.ServeHTTP(finalListRec, finalListReq)
+	if finalListRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", finalListRec.Code, finalListRec.Body.String())
+	}
+
+	var finalListBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, finalListRec.Body.Bytes(), &finalListBody)
+	if len(finalListBody.Data.Items) != 0 {
+		t.Fatalf("expected recycle bin to be empty after permanent directory delete, got %+v", finalListBody.Data.Items)
+	}
+}
+
+func TestListRecycleBinObjectsPaginatesLogicalDirectoryItems(t *testing.T) {
+	router := newTestRouter(t, 1024)
+
+	createBucket(t, router, "recycle-pagination")
+	uploadObject(t, router, "/api/v1/buckets/recycle-pagination/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/recycle-pagination/objects/docs/b.txt", "B", "public")
+	uploadObject(t, router, "/api/v1/buckets/recycle-pagination/objects/notes.txt", "note", "public")
+
+	deleteFileReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/recycle-pagination/objects/notes.txt", nil)
+	deleteFileReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteFileRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteFileRec, deleteFileReq)
+	if deleteFileRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteFileRec.Code, deleteFileRec.Body.String())
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	deleteFolderReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/recycle-pagination/folders?path=docs/&recursive=true", nil)
+	deleteFolderReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteFolderRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteFolderRec, deleteFolderReq)
+	if deleteFolderRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteFolderRec.Code, deleteFolderRec.Body.String())
+	}
+
+	firstPageReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects?limit=1", nil)
+	firstPageReq.Header.Set("Authorization", "Bearer dev-token")
+	firstPageRec := httptest.NewRecorder()
+	router.ServeHTTP(firstPageRec, firstPageReq)
+	if firstPageRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", firstPageRec.Code, firstPageRec.Body.String())
+	}
+
+	var firstPageBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, firstPageRec.Body.Bytes(), &firstPageBody)
+	if len(firstPageBody.Data.Items) != 1 || firstPageBody.Data.Items[0].Path != "docs/" {
+		t.Fatalf("expected first page to contain only docs/, got %+v", firstPageBody.Data.Items)
+	}
+	if firstPageBody.Data.NextCursor == "" {
+		t.Fatalf("expected next cursor for logical recycle bin pagination")
+	}
+
+	secondPageReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/recycle-bin/objects?limit=1&cursor="+firstPageBody.Data.NextCursor,
+		nil,
+	)
+	secondPageReq.Header.Set("Authorization", "Bearer dev-token")
+	secondPageRec := httptest.NewRecorder()
+	router.ServeHTTP(secondPageRec, secondPageReq)
+	if secondPageRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", secondPageRec.Code, secondPageRec.Body.String())
+	}
+
+	var secondPageBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, secondPageRec.Body.Bytes(), &secondPageBody)
+	if len(secondPageBody.Data.Items) != 1 || secondPageBody.Data.Items[0].Path != "notes.txt" {
+		t.Fatalf("expected second page to contain notes.txt, got %+v", secondPageBody.Data.Items)
+	}
+}
+
+func TestListRecycleBinObjectsPaginatesLegacyDirectoryItems(t *testing.T) {
+	router, _, db := newTestRouterWithStorageRootAndDB(t, 1024)
+
+	createBucket(t, router, "legacy-recycle-pagination")
+	createFolder(t, router, "legacy-recycle-pagination", "", "docs")
+	uploadObject(t, router, "/api/v1/buckets/legacy-recycle-pagination/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/legacy-recycle-pagination/objects/docs/b.txt", "B", "public")
+	uploadObject(t, router, "/api/v1/buckets/legacy-recycle-pagination/objects/notes.txt", "note", "public")
+
+	deleteFileReq := httptest.NewRequest(http.MethodDelete, "/api/v1/buckets/legacy-recycle-pagination/objects/notes.txt", nil)
+	deleteFileReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteFileRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteFileRec, deleteFileReq)
+	if deleteFileRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d, body=%s", deleteFileRec.Code, deleteFileRec.Body.String())
+	}
+
+	seedLegacyRecycleBinDirectory(t, db, "legacy-recycle-pagination", "docs/", time.Now().UTC().Add(10*time.Millisecond))
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 2 {
+		t.Fatalf("expected 2 logical recycle bin items, got %+v", listBody.Data.Items)
+	}
+	if listBody.Data.Items[0].Path != "docs/" || listBody.Data.Items[1].Path != "notes.txt" {
+		t.Fatalf("expected docs/ then notes.txt, got %+v", listBody.Data.Items)
+	}
+
+	firstPageReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects?limit=1", nil)
+	firstPageReq.Header.Set("Authorization", "Bearer dev-token")
+	firstPageRec := httptest.NewRecorder()
+	router.ServeHTTP(firstPageRec, firstPageReq)
+	if firstPageRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", firstPageRec.Code, firstPageRec.Body.String())
+	}
+
+	var firstPageBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, firstPageRec.Body.Bytes(), &firstPageBody)
+	if len(firstPageBody.Data.Items) != 1 || firstPageBody.Data.Items[0].Path != "docs/" {
+		t.Fatalf("expected first page to contain docs/, got %+v", firstPageBody.Data.Items)
+	}
+	if firstPageBody.Data.NextCursor == "" {
+		t.Fatalf("expected next cursor for legacy logical directory pagination")
+	}
+
+	secondPageReq := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/recycle-bin/objects?limit=1&cursor="+firstPageBody.Data.NextCursor,
+		nil,
+	)
+	secondPageReq.Header.Set("Authorization", "Bearer dev-token")
+	secondPageRec := httptest.NewRecorder()
+	router.ServeHTTP(secondPageRec, secondPageReq)
+	if secondPageRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", secondPageRec.Code, secondPageRec.Body.String())
+	}
+
+	var secondPageBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, secondPageRec.Body.Bytes(), &secondPageBody)
+	if len(secondPageBody.Data.Items) != 1 || secondPageBody.Data.Items[0].Path != "notes.txt" {
+		t.Fatalf("expected second page to contain notes.txt, got %+v", secondPageBody.Data.Items)
+	}
+}
+
+func TestRecycleBinRestoreRestoresLegacyDirectoryGroup(t *testing.T) {
+	router, storageRoot, db := newTestRouterWithStorageRootAndDB(t, 1024)
+
+	createBucket(t, router, "legacy-restore-folder")
+	createFolder(t, router, "legacy-restore-folder", "", "docs")
+	uploadObject(t, router, "/api/v1/buckets/legacy-restore-folder/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/legacy-restore-folder/objects/docs/nested/b.txt", "B", "public")
+
+	seedLegacyRecycleBinDirectory(t, db, "legacy-restore-folder", "docs/", time.Now().UTC())
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 || listBody.Data.Items[0].Path != "docs/" {
+		t.Fatalf("expected one legacy directory recycle bin item, got %+v", listBody.Data.Items)
+	}
+
+	restoreReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/recycle-bin/objects/restore",
+		bytes.NewBufferString(`{"item_ids":[`+strconv.FormatUint(listBody.Data.Items[0].ID, 10)+`]}`),
+	)
+	restoreReq.Header.Set("Authorization", "Bearer dev-token")
+	restoreReq.Header.Set("Content-Type", "application/json")
+	restoreRec := httptest.NewRecorder()
+	router.ServeHTTP(restoreRec, restoreReq)
+	if restoreRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", restoreRec.Code, restoreRec.Body.String())
+	}
+
+	var restoreBody apiEnvelope[recycleBinBatchResponse]
+	decodeJSON(t, restoreRec.Body.Bytes(), &restoreBody)
+	if restoreBody.Data.RestoredCount != 1 || restoreBody.Data.FailedCount != 0 {
+		t.Fatalf("unexpected restore result %+v", restoreBody.Data)
+	}
+
+	getAReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/legacy-restore-folder/objects/docs/a.txt", nil)
+	getARec := httptest.NewRecorder()
+	router.ServeHTTP(getARec, getAReq)
+	if getARec.Code != http.StatusOK || getARec.Body.String() != "A" {
+		t.Fatalf("expected restored docs/a.txt, got %d body=%q", getARec.Code, getARec.Body.String())
+	}
+
+	getBReq := httptest.NewRequest(http.MethodGet, "/api/v1/buckets/legacy-restore-folder/objects/docs/nested/b.txt", nil)
+	getBRec := httptest.NewRecorder()
+	router.ServeHTTP(getBRec, getBReq)
+	if getBRec.Code != http.StatusOK || getBRec.Body.String() != "B" {
+		t.Fatalf("expected restored docs/nested/b.txt, got %d body=%q", getBRec.Code, getBRec.Body.String())
+	}
+
+	finalListReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	finalListReq.Header.Set("Authorization", "Bearer dev-token")
+	finalListRec := httptest.NewRecorder()
+	router.ServeHTTP(finalListRec, finalListReq)
+	if finalListRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", finalListRec.Code, finalListRec.Body.String())
+	}
+
+	var finalListBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, finalListRec.Body.Bytes(), &finalListBody)
+	if len(finalListBody.Data.Items) != 0 {
+		t.Fatalf("expected recycle bin to be empty after legacy restore, got %+v", finalListBody.Data.Items)
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 3 {
+		t.Fatalf("expected restored legacy directory to reuse storage files, got %d", files)
+	}
+}
+
+func TestRecycleBinPermanentDeleteLegacyDirectoryReclaimsStorageFiles(t *testing.T) {
+	router, storageRoot, db := newTestRouterWithStorageRootAndDB(t, 1024)
+
+	createBucket(t, router, "legacy-directory-delete")
+	createFolder(t, router, "legacy-directory-delete", "", "docs")
+	uploadObject(t, router, "/api/v1/buckets/legacy-directory-delete/objects/docs/a.txt", "A", "public")
+	uploadObject(t, router, "/api/v1/buckets/legacy-directory-delete/objects/docs/b.txt", "B", "public")
+
+	seedLegacyRecycleBinDirectory(t, db, "legacy-directory-delete", "docs/", time.Now().UTC())
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	listReq.Header.Set("Authorization", "Bearer dev-token")
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, listRec.Body.Bytes(), &listBody)
+	if len(listBody.Data.Items) != 1 || listBody.Data.Items[0].Path != "docs/" {
+		t.Fatalf("expected one legacy directory recycle bin item, got %+v", listBody.Data.Items)
+	}
+
+	deleteRecycleReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/recycle-bin/objects/batch-delete",
+		bytes.NewBufferString(`{"item_ids":[`+strconv.FormatUint(listBody.Data.Items[0].ID, 10)+`]}`),
+	)
+	deleteRecycleReq.Header.Set("Authorization", "Bearer dev-token")
+	deleteRecycleReq.Header.Set("Content-Type", "application/json")
+	deleteRecycleRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRecycleRec, deleteRecycleReq)
+	if deleteRecycleRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", deleteRecycleRec.Code, deleteRecycleRec.Body.String())
+	}
+
+	var deleteBody apiEnvelope[recycleBinBatchResponse]
+	decodeJSON(t, deleteRecycleRec.Body.Bytes(), &deleteBody)
+	if deleteBody.Data.DeletedCount != 1 || deleteBody.Data.FailedCount != 0 {
+		t.Fatalf("unexpected delete result %+v", deleteBody.Data)
+	}
+	if files := countFilesUnderRoot(t, storageRoot); files != 0 {
+		t.Fatalf("expected legacy directory delete to reclaim storage files, got %d", files)
+	}
+
+	finalListReq := httptest.NewRequest(http.MethodGet, "/api/v1/recycle-bin/objects", nil)
+	finalListReq.Header.Set("Authorization", "Bearer dev-token")
+	finalListRec := httptest.NewRecorder()
+	router.ServeHTTP(finalListRec, finalListReq)
+	if finalListRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", finalListRec.Code, finalListRec.Body.String())
+	}
+
+	var finalListBody apiEnvelope[recycleBinListResponse]
+	decodeJSON(t, finalListRec.Body.Bytes(), &finalListBody)
+	if len(finalListBody.Data.Items) != 0 {
+		t.Fatalf("expected recycle bin to be empty after legacy permanent delete, got %+v", finalListBody.Data.Items)
 	}
 }
 
@@ -526,6 +1062,78 @@ func TestCreateFolderReturnsStorageLimitExceededWhenUsageIsAtLimit(t *testing.T)
 	assertAPIErrorCode(t, rec.Body.Bytes(), "storage_limit_exceeded")
 	if files := countFilesUnderRoot(t, storageRoot); files != 1 {
 		t.Fatalf("expected only the original file to remain after rejected folder create, got %d", files)
+	}
+}
+
+func seedLegacyRecycleBinDirectory(
+	t *testing.T,
+	db *gorm.DB,
+	bucketName string,
+	folderPath string,
+	deletedAt time.Time,
+) {
+	t.Helper()
+
+	var objects []model.Object
+	if err := db.
+		Where("bucket_name = ? AND is_deleted = ?", bucketName, false).
+		Where("object_key LIKE ?", folderPath+"%").
+		Order("object_key ASC").
+		Find(&objects).Error; err != nil {
+		t.Fatalf("list active folder objects: %v", err)
+	}
+	if len(objects) == 0 {
+		t.Fatalf("expected active objects for %s%s", bucketName, folderPath)
+	}
+
+	markerKey := folderPath + ".light-oss-folder"
+	recycleItems := make([]model.RecycleBinObject, 0, len(objects))
+	markerFound := false
+	for _, object := range objects {
+		if object.ObjectKey != markerKey {
+			continue
+		}
+
+		recycleItems = append(recycleItems, recycleBinObjectFromActiveObject(object, deletedAt))
+		markerFound = true
+		break
+	}
+	if !markerFound {
+		t.Fatalf("expected folder marker %q in active objects", markerKey)
+	}
+
+	for _, object := range objects {
+		if object.ObjectKey == markerKey {
+			continue
+		}
+
+		recycleItems = append(recycleItems, recycleBinObjectFromActiveObject(object, deletedAt))
+	}
+
+	if err := db.Create(&recycleItems).Error; err != nil {
+		t.Fatalf("create legacy recycle bin rows: %v", err)
+	}
+	if err := db.
+		Where("bucket_name = ? AND is_deleted = ?", bucketName, false).
+		Where("object_key LIKE ?", folderPath+"%").
+		Delete(&model.Object{}).Error; err != nil {
+		t.Fatalf("delete active folder objects: %v", err)
+	}
+}
+
+func recycleBinObjectFromActiveObject(object model.Object, deletedAt time.Time) model.RecycleBinObject {
+	return model.RecycleBinObject{
+		BucketName:       object.BucketName,
+		ObjectKey:        object.ObjectKey,
+		OriginalFilename: object.OriginalFilename,
+		StoragePath:      object.StoragePath,
+		Size:             object.Size,
+		ContentType:      object.ContentType,
+		ETag:             object.ETag,
+		FileFingerprint:  object.FileFingerprint,
+		Visibility:       object.Visibility,
+		CreatedAt:        object.CreatedAt,
+		DeletedAt:        deletedAt,
 	}
 }
 
