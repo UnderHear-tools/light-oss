@@ -30,7 +30,7 @@ export function Layout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="min-h-svh overflow-hidden bg-transparent">
+      <SidebarInset className="h-svh overflow-hidden bg-transparent">
         <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14">
           <div className="flex w-full items-center gap-2 px-4 md:px-6">
             <SidebarTrigger className="-ml-1 cursor-pointer" />

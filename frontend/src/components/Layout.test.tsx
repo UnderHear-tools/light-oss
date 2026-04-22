@@ -40,7 +40,7 @@ describe("Layout", () => {
     expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
     expect(screen.getByText("Dashboard body")).toBeInTheDocument();
     expect(await screen.findByText("Service OK")).toBeInTheDocument();
-    expect(screen.getByText("DB OK")).toBeInTheDocument();
+    expect(screen.getByText("Database OK")).toBeInTheDocument();
   });
 
   it("shows unreachable sidebar health state when the request fails", async () => {
@@ -56,7 +56,7 @@ describe("Layout", () => {
     );
 
     expect(await screen.findByText("Service Unreachable")).toBeInTheDocument();
-    expect(screen.getByText("DB Unknown")).toBeInTheDocument();
+    expect(screen.getByText("Database Unknown")).toBeInTheDocument();
   });
 
   it("shows token error sidebar health state when the request is unauthorized", async () => {
@@ -77,7 +77,7 @@ describe("Layout", () => {
     );
 
     expect(await screen.findByText("Service Token error")).toBeInTheDocument();
-    expect(screen.getByText("DB Token error")).toBeInTheDocument();
+    expect(screen.getByText("Database Token error")).toBeInTheDocument();
   });
 
   it("shows the site management breadcrumb and active navigation on /sites", async () => {
@@ -107,5 +107,33 @@ describe("Layout", () => {
     expect(screen.getAllByText("Site management")[0]).toBeInTheDocument();
     expect(screen.getByText("Sites body")).toBeInTheDocument();
     expect(await screen.findByText("Service OK")).toBeInTheDocument();
+  });
+
+  it("uses a viewport-height shell so route overflow stays inside the layout scroll area", async () => {
+    vi.mocked(getHealthStatus).mockResolvedValueOnce({
+      status: {
+        service: "ok",
+        db: "ok",
+      },
+      version: "mvp",
+    });
+
+    const { container } = renderWithApp(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
+        </Route>
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    const sidebarInset = container.querySelector("[data-slot='sidebar-inset']");
+    const outletScrollArea = container.querySelector(
+      "[data-slot='sidebar-inset'] > main > div",
+    );
+
+    expect(sidebarInset?.className).toContain("h-svh");
+    expect(sidebarInset?.className).not.toContain("min-h-svh");
+    expect(outletScrollArea?.className).toContain("overflow-auto");
   });
 });

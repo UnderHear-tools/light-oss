@@ -72,8 +72,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -98,6 +98,8 @@ import {
   type PublishSiteValue,
 } from "@/features/explorer/PublishSiteDialog";
 import { cn } from "@/lib/utils";
+
+const explorerTableMinWidthClass = "min-w-[85.5rem]";
 
 export function ExplorerTable({
   bucket,
@@ -166,185 +168,227 @@ export function ExplorerTable({
   const partiallySelected = selectedCount > 0 && !allSelected;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-4">
-            <Checkbox
-              aria-label={t("explorer.selection.selectAll")}
-              disabled={selectionDisabled}
-              checked={
-                allSelected ? true : partiallySelected ? "indeterminate" : false
-              }
-              onCheckedChange={onSelectAll}
-            />
-          </TableHead>
-          <TableHead className="w-[360px] max-w-[360px] text-base font-semibold text-muted-foreground">
-            <ExplorerSortHeader
-              activeSortBy={sortBy}
-              label={t("explorer.table.name")}
-              onApply={onSortApply}
-              onClear={onSortClear}
-              open={openSortBy === "name"}
-              onOpenChange={(open) => setOpenSortBy(open ? "name" : null)}
-              sortBy="name"
-              sortOrder={sortOrder}
-            />
-          </TableHead>
-          <TableHead className="w-[280px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.url")}
-          </TableHead>
-          <TableHead className="w-[120px] text-base font-semibold text-muted-foreground">
-            <ExplorerSortHeader
-              activeSortBy={sortBy}
-              label={t("explorer.table.size")}
-              onApply={onSortApply}
-              onClear={onSortClear}
-              open={openSortBy === "size"}
-              onOpenChange={(open) => setOpenSortBy(open ? "size" : null)}
-              sortBy="size"
-              sortOrder={sortOrder}
-            />
-          </TableHead>
-          <TableHead className="w-[160px] text-base font-semibold text-muted-foreground">
-            {t("objects.form.visibility.label")}
-          </TableHead>
-          <TableHead className="w-[220px] text-base font-semibold text-muted-foreground">
-            <ExplorerSortHeader
-              activeSortBy={sortBy}
-              label={t("objects.table.createdAt")}
-              onApply={onSortApply}
-              onClear={onSortClear}
-              open={openSortBy === "created_at"}
-              onOpenChange={(open) => setOpenSortBy(open ? "created_at" : null)}
-              sortBy="created_at"
-              sortOrder={sortOrder}
-            />
-          </TableHead>
-          <TableHead className="w-[180px] text-base font-semibold text-muted-foreground">
-            {t("explorer.table.actions")}
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody className="[&_tr:last-child]:border-b">
-        {entries.map((entry) => {
-          const selected = selectedPaths.has(entry.path);
-
-          return (
-            <TableRow
-              data-state={selected ? "selected" : undefined}
-              key={entry.path}
-            >
-              <TableCell className="w-4">
-                <Checkbox
-                  aria-label={t("explorer.selection.selectRow", {
-                    name: entry.name,
-                  })}
-                  disabled={selectionDisabled}
-                  checked={selected}
-                  onCheckedChange={(checked) =>
-                    onSelectEntry(entry.path, checked)
-                  }
-                />
-              </TableCell>
-              <TableCell className="w-[360px] max-w-[360px]">
-                <ExplorerEntryName
-                  entry={entry}
-                  buildPublicUrl={buildPublicUrl}
-                  onOpenDirectory={onOpenDirectory}
-                  onUpdateVisibility={onUpdateVisibility}
-                />
-              </TableCell>
-              <TableCell className="max-w-[280px]">
-                <ExplorerEntryUrlCell
-                  buildPublicUrl={buildPublicUrl}
-                  copyLabel={t("explorer.actions.copyUrl")}
-                  entry={entry}
-                />
-              </TableCell>
-              <TableCell
-                className={
-                  entry.type === "directory"
-                    ? "text-muted-foreground"
-                    : undefined
-                }
-              >
-                {entry.type === "directory" ? "-" : formatBytes(entry.size)}
-              </TableCell>
-              <TableCell
-                className={
-                  entry.type === "directory"
-                    ? "text-muted-foreground"
-                    : undefined
-                }
-              >
-                {entry.type === "directory" ? (
-                  "-"
-                ) : (
-                  <Badge
-                    variant={
-                      entry.visibility === "public" ? "outline" : "secondary"
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+        <div
+          className={cn(
+            "flex h-full min-h-0 flex-col",
+            explorerTableMinWidthClass,
+          )}
+        >
+          <table className="shrink-0 w-full table-fixed border-b border-border/70 bg-card caption-bottom text-sm">
+            <ExplorerTableColGroup />
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    aria-label={t("explorer.selection.selectAll")}
+                    disabled={selectionDisabled}
+                    checked={
+                      allSelected
+                        ? true
+                        : partiallySelected
+                          ? "indeterminate"
+                          : false
                     }
-                    className="flex items-center"
-                  >
-                    {entry.visibility === "public" ? (
-                      <>
-                        <LockOpenIcon />
-                        {t("objects.visibility.public")}
-                      </>
-                    ) : (
-                      <>
-                        <LockIcon />
-                        {t("objects.visibility.private")}
-                      </>
-                    )}
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell
-                className={
-                  entry.type === "directory"
-                    ? "text-muted-foreground"
-                    : undefined
-                }
-              >
-                {entry.type === "directory"
-                  ? "-"
-                  : formatDate(entry.created_at ?? entry.updated_at, locale)}
-              </TableCell>
-              <TableCell>
-                {entry.type === "directory" ? (
-                  <ExplorerDirectoryActions
-                    bucket={bucket}
-                    deletingPath={deletingPath}
-                    downloadingFolderPath={downloadingFolderPath}
-                    entry={entry}
-                    onDeleteFolder={onDeleteFolder}
-                    onDownloadFolder={onDownloadFolder}
-                    onOpenDirectory={onOpenDirectory}
-                    onPublishSite={onPublishSite}
-                    publishingPath={publishingPath}
+                    onCheckedChange={onSelectAll}
                   />
-                ) : (
-                  <ExplorerFileActions
-                    bucket={bucket}
-                    buildPublicUrl={buildPublicUrl}
-                    deletingPath={deletingPath}
-                    downloadingFilePath={downloadingFilePath}
-                    entry={entry}
-                    onDeleteFile={onDeleteFile}
-                    onDownloadFile={onDownloadFile}
-                    onPublishObjectSite={onPublishObjectSite}
-                    onUpdateVisibility={onUpdateVisibility}
-                    publishingPath={publishingPath}
+                </TableHead>
+                <TableHead className="w-[22.5rem] max-w-[22.5rem] text-base font-semibold text-muted-foreground">
+                  <ExplorerSortHeader
+                    activeSortBy={sortBy}
+                    label={t("explorer.table.name")}
+                    onApply={onSortApply}
+                    onClear={onSortClear}
+                    open={openSortBy === "name"}
+                    onOpenChange={(open) => setOpenSortBy(open ? "name" : null)}
+                    sortBy="name"
+                    sortOrder={sortOrder}
                   />
-                )}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+                </TableHead>
+                <TableHead className="w-[17.5rem] text-base font-semibold text-muted-foreground">
+                  {t("explorer.table.url")}
+                </TableHead>
+                <TableHead className="w-[7.5rem] text-base font-semibold text-muted-foreground">
+                  <ExplorerSortHeader
+                    activeSortBy={sortBy}
+                    label={t("explorer.table.size")}
+                    onApply={onSortApply}
+                    onClear={onSortClear}
+                    open={openSortBy === "size"}
+                    onOpenChange={(open) => setOpenSortBy(open ? "size" : null)}
+                    sortBy="size"
+                    sortOrder={sortOrder}
+                  />
+                </TableHead>
+                <TableHead className="w-[10rem] text-base font-semibold text-muted-foreground">
+                  {t("objects.form.visibility.label")}
+                </TableHead>
+                <TableHead className="w-[13.75rem] text-base font-semibold text-muted-foreground">
+                  <ExplorerSortHeader
+                    activeSortBy={sortBy}
+                    label={t("objects.table.createdAt")}
+                    onApply={onSortApply}
+                    onClear={onSortClear}
+                    open={openSortBy === "created_at"}
+                    onOpenChange={(open) =>
+                      setOpenSortBy(open ? "created_at" : null)
+                    }
+                    sortBy="created_at"
+                    sortOrder={sortOrder}
+                  />
+                </TableHead>
+                <TableHead className="w-[11.25rem] text-base font-semibold text-muted-foreground">
+                  {t("explorer.table.actions")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+          </table>
+
+          <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+            <table className="w-full table-fixed caption-bottom text-sm">
+              <ExplorerTableColGroup />
+              <TableBody className="[&_tr:last-child]:border-b">
+                {entries.map((entry) => {
+                  const selected = selectedPaths.has(entry.path);
+
+                  return (
+                    <TableRow
+                      data-state={selected ? "selected" : undefined}
+                      key={entry.path}
+                    >
+                      <TableCell className="w-12">
+                        <Checkbox
+                          aria-label={t("explorer.selection.selectRow", {
+                            name: entry.name,
+                          })}
+                          disabled={selectionDisabled}
+                          checked={selected}
+                          onCheckedChange={(checked) =>
+                            onSelectEntry(entry.path, checked)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="w-[22.5rem] max-w-[22.5rem]">
+                        <ExplorerEntryName
+                          entry={entry}
+                          buildPublicUrl={buildPublicUrl}
+                          onOpenDirectory={onOpenDirectory}
+                          onUpdateVisibility={onUpdateVisibility}
+                        />
+                      </TableCell>
+                      <TableCell className="max-w-[17.5rem]">
+                        <ExplorerEntryUrlCell
+                          buildPublicUrl={buildPublicUrl}
+                          copyLabel={t("explorer.actions.copyUrl")}
+                          entry={entry}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className={
+                          entry.type === "directory"
+                            ? "text-muted-foreground"
+                            : undefined
+                        }
+                      >
+                        {entry.type === "directory"
+                          ? "-"
+                          : formatBytes(entry.size)}
+                      </TableCell>
+                      <TableCell
+                        className={
+                          entry.type === "directory"
+                            ? "text-muted-foreground"
+                            : undefined
+                        }
+                      >
+                        {entry.type === "directory" ? (
+                          "-"
+                        ) : (
+                          <Badge
+                            variant={
+                              entry.visibility === "public"
+                                ? "outline"
+                                : "secondary"
+                            }
+                            className="flex items-center"
+                          >
+                            {entry.visibility === "public" ? (
+                              <>
+                                <LockOpenIcon />
+                                {t("objects.visibility.public")}
+                              </>
+                            ) : (
+                              <>
+                                <LockIcon />
+                                {t("objects.visibility.private")}
+                              </>
+                            )}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        className={
+                          entry.type === "directory"
+                            ? "text-muted-foreground"
+                            : undefined
+                        }
+                      >
+                        {entry.type === "directory"
+                          ? "-"
+                          : formatDate(entry.created_at ?? entry.updated_at, locale)}
+                      </TableCell>
+                      <TableCell>
+                        {entry.type === "directory" ? (
+                          <ExplorerDirectoryActions
+                            bucket={bucket}
+                            deletingPath={deletingPath}
+                            downloadingFolderPath={downloadingFolderPath}
+                            entry={entry}
+                            onDeleteFolder={onDeleteFolder}
+                            onDownloadFolder={onDownloadFolder}
+                            onOpenDirectory={onOpenDirectory}
+                            onPublishSite={onPublishSite}
+                            publishingPath={publishingPath}
+                          />
+                        ) : (
+                          <ExplorerFileActions
+                            bucket={bucket}
+                            buildPublicUrl={buildPublicUrl}
+                            deletingPath={deletingPath}
+                            downloadingFilePath={downloadingFilePath}
+                            entry={entry}
+                            onDeleteFile={onDeleteFile}
+                            onDownloadFile={onDownloadFile}
+                            onPublishObjectSite={onPublishObjectSite}
+                            onUpdateVisibility={onUpdateVisibility}
+                            publishingPath={publishingPath}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </table>
+          </ScrollArea>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExplorerTableColGroup() {
+  return (
+    <colgroup>
+      <col className="w-12" />
+      <col className="w-[22.5rem]" />
+      <col className="w-[17.5rem]" />
+      <col className="w-[7.5rem]" />
+      <col className="w-[10rem]" />
+      <col className="w-[13.75rem]" />
+      <col className="w-[11.25rem]" />
+    </colgroup>
   );
 }
 

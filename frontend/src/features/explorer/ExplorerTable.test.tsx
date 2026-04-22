@@ -165,6 +165,20 @@ describe("ExplorerTable", () => {
     );
   });
 
+  it("keeps the header table separate from the scrollable body area", () => {
+    renderExplorerTable(createFileEntry({}));
+
+    const tables = screen.getAllByRole("table");
+    const scrollArea = document.querySelector("[data-slot='scroll-area']");
+
+    expect(tables).toHaveLength(2);
+    expect(scrollArea).not.toBeNull();
+    expect(scrollArea?.className).toContain("flex-1");
+    expect(scrollArea?.className).toContain("overflow-hidden");
+    expect(scrollArea).toContainElement(tables[1]);
+    expect(scrollArea).not.toContainElement(tables[0]);
+  });
+
   it("routes public and private file download actions through the shared callback", async () => {
     const onDownloadFile = vi.fn().mockResolvedValue(undefined);
 

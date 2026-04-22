@@ -543,8 +543,11 @@ describe("BucketObjectsPage", () => {
       { route: "/buckets/demo" },
     );
 
-    const table = await screen.findByRole("table");
-    await userEvent.click(within(table).getByRole("button", { name: "docs" }));
+    const tables = await screen.findAllByRole("table");
+    const table = tables.at(-1);
+
+    expect(table).toBeDefined();
+    await userEvent.click(within(table!).getByRole("button", { name: "docs" }));
 
     expect(await screen.findByText("readme.txt")).toBeInTheDocument();
     await waitFor(() => {
