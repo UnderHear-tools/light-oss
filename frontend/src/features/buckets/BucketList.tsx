@@ -262,7 +262,7 @@ function DeleteBucketButton({
   return (
     <AlertDialog onOpenChange={handleOpenChange} open={open}>
       <AlertDialogTrigger asChild>
-        <Button disabled={disabled} size="sm" type="button" variant="outline">
+        <Button disabled={disabled} size="sm" type="button" variant="destructive">
           <Trash2Icon />
           {t("common.delete")}
         </Button>

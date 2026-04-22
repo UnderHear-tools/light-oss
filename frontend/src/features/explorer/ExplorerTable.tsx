@@ -666,8 +666,9 @@ function ExplorerSortHeader({
   const { t } = useI18n();
   const active = activeSortBy === sortBy;
   const appliedSortOrder = active ? (sortOrder ?? "asc") : "asc";
-  const [draftSortOrder, setDraftSortOrder] =
-    useState<ExplorerSortOrder>(appliedSortOrder);
+  const [draftSortOrder, setDraftSortOrder] = useState<
+    ExplorerSortOrder | null
+  >(active ? appliedSortOrder : null);
   const triggerState = active
     ? appliedSortOrder === "asc"
       ? t("explorer.sort.state.asc")
@@ -686,10 +687,15 @@ function ExplorerSortHeader({
     if (!open) {
       return;
     }
-    setDraftSortOrder(appliedSortOrder);
-  }, [appliedSortOrder, open]);
+    setDraftSortOrder(active ? appliedSortOrder : null);
+  }, [active, appliedSortOrder, open]);
 
   function handleConfirm() {
+    if (!draftSortOrder) {
+      toast.error(t("explorer.sort.validation.required"));
+      return;
+    }
+
     onApply(sortBy, draftSortOrder);
     onOpenChange(false);
   }
@@ -752,7 +758,7 @@ function ExplorerSortHeader({
                 }
               }}
               type="single"
-              value={draftSortOrder}
+              value={draftSortOrder ?? ""}
               variant="outline"
             >
               <ToggleGroupItem className="flex-1" value="asc">

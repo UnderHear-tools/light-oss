@@ -11,6 +11,18 @@ import type { ExplorerSortBy, ExplorerSortOrder } from "../../lib/explorer";
 import { renderWithApp } from "../../test/test-utils";
 import { ExplorerTable } from "./ExplorerTable";
 
+const sonner = vi.hoisted(() => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock("sonner", () => ({
+  toast: sonner.toast,
+  Toaster: () => null,
+}));
+
 describe("ExplorerTable", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -33,6 +45,8 @@ describe("ExplorerTable", () => {
       configurable: true,
       value: vi.fn(),
     });
+    sonner.toast.success.mockReset();
+    sonner.toast.error.mockReset();
   });
 
   it("shows sort popover actions and applies sorting only after confirmation", async () => {
@@ -55,6 +69,19 @@ describe("ExplorerTable", () => {
     expect(
       within(popover!).getByText("Choose an order and confirm to apply it."),
     ).toBeInTheDocument();
+    expect(
+      within(popover!).getByRole("radio", { name: "Ascending" }),
+    ).not.toBeChecked();
+    expect(
+      within(popover!).getByRole("radio", { name: "Descending" }),
+    ).not.toBeChecked();
+
+    await userEvent.click(within(popover!).getByRole("button", { name: "Apply" }));
+    expect(sonner.toast.error).toHaveBeenCalledWith(
+      "Select a sort order before applying.",
+    );
+    expect(onSortApply).not.toHaveBeenCalled();
+    expect(screen.getByText("Sort by Size")).toBeInTheDocument();
 
     await userEvent.click(
       within(popover!).getByRole("radio", { name: "Descending" }),
