@@ -298,6 +298,8 @@ const enUS = {
   "explorer.sort.cancel": "Cancel",
   "explorer.sort.option.asc": "Ascending",
   "explorer.sort.option.desc": "Descending",
+  "explorer.sort.validation.required":
+    "Select a sort order before applying.",
   "explorer.sort.popover.title": "Sort by {label}",
   "explorer.sort.popover.description":
     "Choose an order and confirm to apply it.",
@@ -707,6 +709,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "explorer.sort.cancel": "取消",
   "explorer.sort.option.asc": "升序",
   "explorer.sort.option.desc": "降序",
+  "explorer.sort.validation.required": "请先选择排序方式，再点击确定。",
   "explorer.sort.popover.title": "按 {label} 排序",
   "explorer.sort.popover.description": "选择排序方式后，点击确定才会应用。",
   "explorer.sort.state.none": "未排序",
