@@ -989,6 +989,69 @@ describe("BucketObjectsPage", () => {
     ).toHaveAttribute("data-state", "checked");
   });
 
+  it("renders bulk actions inside the footer alongside the pagination summary", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [
+        {
+          type: "file",
+          path: "alpha.txt",
+          name: "alpha.txt",
+          is_empty: null,
+          object_key: "alpha.txt",
+          original_filename: "alpha.txt",
+          size: 5,
+          content_type: "text/plain",
+          etag: "etag-a",
+          visibility: "public",
+          updated_at: "2026-04-07T01:00:00Z",
+        },
+        {
+          type: "directory",
+          path: "docs/",
+          name: "docs",
+          is_empty: false,
+          object_key: null,
+          original_filename: null,
+          size: null,
+          content_type: null,
+          etag: null,
+          visibility: null,
+          updated_at: null,
+        },
+      ],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
+    );
+
+    const summary = await screen.findByText("Showing 2 items / Page 1");
+    const footer = summary.closest(".border-t");
+
+    expect(footer).not.toBeNull();
+    expect(
+      within(footer as HTMLElement).getByText("1 items selected"),
+    ).toBeInTheDocument();
+    expect(
+      within(footer as HTMLElement).getByRole("button", {
+        name: "Download selected",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(footer as HTMLElement).getByRole("button", {
+        name: "Delete selected",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("submits mixed selected entries to bulk delete and clears selection after success", async () => {
     vi.mocked(listExplorerEntries)
       .mockResolvedValueOnce({

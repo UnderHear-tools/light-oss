@@ -1128,32 +1128,6 @@ export function BucketObjectsPage() {
               </div>
             </div>
 
-            {selectedCount > 0 ? (
-              <div className="border-b border-border/70 px-4 py-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="text-sm font-medium text-foreground">
-                    {t("explorer.bulk.selectedCount", {
-                      count: selectedCount,
-                    })}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {bulkActionButtons.map((action) => (
-                      <Button
-                        key={action.key}
-                        disabled={action.disabled}
-                        onClick={action.onClick}
-                        type="button"
-                        variant={action.variant}
-                      >
-                        {action.icon}
-                        {action.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             {entriesQuery.isError ? (
               <div className="border-b border-border/70 p-4">
                 <Alert variant="destructive">
@@ -1205,14 +1179,35 @@ export function BucketObjectsPage() {
                     sortOrder={sortOrder}
                   />
                 </div>
-                <div className="flex flex-col gap-4 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {t("explorer.pagination.summary", {
-                      count: entries.length,
-                      page: cursorHistory.length + 1,
-                    })}
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex flex-col gap-4 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center">
+                  {selectedCount > 0 ? (
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <div className="mr-1 text-sm font-medium text-foreground">
+                        {t("explorer.bulk.selectedCount", {
+                          count: selectedCount,
+                        })}
+                      </div>
+                      {bulkActionButtons.map((action) => (
+                        <Button
+                          key={action.key}
+                          disabled={action.disabled}
+                          onClick={action.onClick}
+                          type="button"
+                          variant={action.variant}
+                        >
+                          {action.icon}
+                          {action.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:justify-end">
+                    <div className="text-sm text-muted-foreground">
+                      {t("explorer.pagination.summary", {
+                        count: entries.length,
+                        page: cursorHistory.length + 1,
+                      })}
+                    </div>
                     <Select
                       onValueChange={(value) =>
                         updateSearchParams({
