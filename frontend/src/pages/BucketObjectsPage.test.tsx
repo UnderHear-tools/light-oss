@@ -647,6 +647,10 @@ describe("BucketObjectsPage", () => {
     expect(reopenedSizePopover).not.toBeNull();
 
     await userEvent.click(
+      within(reopenedSizePopover!).getByRole("radio", { name: "Ascending" }),
+    );
+
+    await userEvent.click(
       within(reopenedSizePopover!).getByRole("button", { name: "Apply" }),
     );
 
@@ -714,6 +718,10 @@ describe("BucketObjectsPage", () => {
       "[data-slot='popover-content']",
     ) as HTMLElement | null;
     expect(createdPopover).not.toBeNull();
+
+    await userEvent.click(
+      within(createdPopover!).getByRole("radio", { name: "Ascending" }),
+    );
 
     await userEvent.click(
       within(createdPopover!).getByRole("button", { name: "Apply" }),

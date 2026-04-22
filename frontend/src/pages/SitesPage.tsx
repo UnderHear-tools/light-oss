@@ -393,7 +393,7 @@ function DeleteSiteButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button size="sm" type="button" variant="outline">
+        <Button size="sm" type="button" variant="destructive">
           <Trash2Icon />
           {t("common.delete")}
         </Button>
