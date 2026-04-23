@@ -180,7 +180,7 @@ describe("BucketObjectsPage", () => {
     });
   });
 
-  it("restores a recycle bin item for the current bucket and refreshes the dialog", async () => {
+  it("restores a recycle bin item for the current bucket without refetching the dialog", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [],
       next_cursor: "",
@@ -218,6 +218,15 @@ describe("BucketObjectsPage", () => {
       within(row as HTMLElement).getByRole("button", { name: "Restore" }),
     );
 
+    const confirmDialog = await screen.findByRole("alertdialog");
+    expect(
+      within(confirmDialog).getByText("Restore recycle bin items?"),
+    ).toBeInTheDocument();
+    expect(restoreRecycleBinObjects).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Restore" }),
+    );
+
     await waitFor(() => {
       expect(restoreRecycleBinObjects).toHaveBeenCalledWith(
         { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
@@ -228,6 +237,7 @@ describe("BucketObjectsPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("docs/report.txt")).not.toBeInTheDocument();
     });
+    expect(listRecycleBinObjects).toHaveBeenCalledTimes(1);
   });
 
   it("confirms permanent deletion for recycle bin items in the current bucket", async () => {
@@ -331,6 +341,11 @@ describe("BucketObjectsPage", () => {
     expect(row).not.toBeNull();
     await userEvent.click(
       within(row as HTMLElement).getByRole("button", { name: "Restore" }),
+    );
+
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Restore" }),
     );
 
     await waitFor(() => {
@@ -468,6 +483,10 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Restore selected" }),
     );
+    const restoreConfirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(restoreConfirmDialog).getByRole("button", { name: "Restore" }),
+    );
 
     await waitFor(() => {
       expect(restoreRecycleBinObjects).toHaveBeenCalledWith(
@@ -544,7 +563,7 @@ describe("BucketObjectsPage", () => {
     );
 
     const tables = await screen.findAllByRole("table");
-    const table = tables.at(-1);
+    const table = tables[tables.length - 1];
 
     expect(table).toBeDefined();
     await userEvent.click(within(table!).getByRole("button", { name: "docs" }));
@@ -974,9 +993,7 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(
       await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
     );
-    await userEvent.click(
-      screen.getByRole("checkbox", { name: "Select docs" }),
-    );
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select docs" }));
     await userEvent.click(
       screen.getByRole("button", { name: "Download selected" }),
     );
@@ -1214,7 +1231,9 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(
       await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
     );
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select docs" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select docs" }),
+    );
     await userEvent.click(
       screen.getByRole("checkbox", { name: "Select meeting.md" }),
     );

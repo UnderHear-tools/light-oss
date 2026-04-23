@@ -12,7 +12,10 @@ import {
   listRecycleBinObjects,
   restoreRecycleBinObjects,
 } from "@/api/objects";
-import type { RecycleBinObjectItem } from "@/api/types";
+import type {
+  RecycleBinObjectItem,
+  RecycleBinObjectListResult,
+} from "@/api/types";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -42,13 +45,20 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
 import { toast } from "sonner";
 
 const recycleBinPageSize = 20;
+const emptyRecycleBinItems: RecycleBinObjectItem[] = [];
 
 export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
   const { settings } = useAppSettings();
@@ -58,6 +68,10 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
   const [cursor, setCursor] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [pendingRestoreItems, setPendingRestoreItems] = useState<
+    RecycleBinObjectItem[]
+  >([]);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [pendingDeleteItems, setPendingDeleteItems] = useState<
     RecycleBinObjectItem[]
   >([]);
@@ -70,7 +84,9 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
   ] as const;
   const recycleBinQueryKey = [...recycleBinBaseQueryKey, cursor] as const;
   const showBucketColumn = bucketName.trim() === "";
-  const tableMinWidthClass = showBucketColumn ? "min-w-[70rem]" : "min-w-[62rem]";
+  const tableMinWidthClass = showBucketColumn
+    ? "min-w-[70rem]"
+    : "min-w-[62rem]";
 
   const recycleBinQuery = useQuery({
     queryKey: recycleBinQueryKey,
@@ -81,17 +97,17 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
         cursor,
       }),
     enabled:
-      open &&
-      settings.apiBaseUrl.trim() !== "" &&
-      bucketName.trim() !== "",
+      open && settings.apiBaseUrl.trim() !== "" && bucketName.trim() !== "",
   });
 
-  const items = recycleBinQuery.data?.items ?? [];
+  const items = recycleBinQuery.data?.items ?? emptyRecycleBinItems;
 
   useEffect(() => {
     setCursor("");
     setCursorHistory([]);
     setSelectedIds(new Set());
+    setPendingRestoreItems([]);
+    setRestoreDialogOpen(false);
     setPendingDeleteItems([]);
     setDeleteDialogOpen(false);
   }, [bucketName]);
@@ -137,6 +153,8 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
         (item) => !failedIDs.has(item.id),
       );
 
+      setRestoreDialogOpen(false);
+      setPendingRestoreItems([]);
       setSelectedIds((current) => {
         if (current.size === 0) {
           return current;
@@ -162,8 +180,12 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
         );
       }
 
+      removeRecycleBinItemsFromCache(
+        queryClient,
+        recycleBinBaseQueryKey,
+        restoredItems,
+      );
       await invalidateAffectedQueries(queryClient, settings, restoredItems);
-      await queryClient.invalidateQueries({ queryKey: recycleBinBaseQueryKey });
     },
     onError: (error) => {
       const message =
@@ -232,6 +254,8 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
     setCursor("");
     setCursorHistory([]);
     setSelectedIds(new Set());
+    setPendingRestoreItems([]);
+    setRestoreDialogOpen(false);
     setPendingDeleteItems([]);
     setDeleteDialogOpen(false);
   }
@@ -276,13 +300,22 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
     setCursor(previousCursor);
   }
 
+  function openRestoreConfirmation(targetItems: RecycleBinObjectItem[]) {
+    setPendingRestoreItems(targetItems);
+    setRestoreDialogOpen(true);
+  }
+
   function openDeleteConfirmation(targetItems: RecycleBinObjectItem[]) {
     setPendingDeleteItems(targetItems);
     setDeleteDialogOpen(true);
   }
 
-  async function handleRestore(targetItems: RecycleBinObjectItem[]) {
-    await restoreMutation.mutateAsync(targetItems);
+  async function handleRestore() {
+    if (pendingRestoreItems.length === 0) {
+      return;
+    }
+
+    await restoreMutation.mutateAsync(pendingRestoreItems);
   }
 
   async function handleDelete() {
@@ -327,9 +360,13 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
               ) : items.length > 0 ? (
                 <>
                   <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-                    <div className={`flex h-full min-h-0 flex-col ${tableMinWidthClass}`}>
+                    <div
+                      className={`flex h-full min-h-0 flex-col ${tableMinWidthClass}`}
+                    >
                       <table className="shrink-0 w-full table-fixed border-b border-border/70 bg-popover caption-bottom text-sm">
-                        <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
+                        <RecycleBinTableColGroup
+                          showBucketColumn={showBucketColumn}
+                        />
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-12">
@@ -371,18 +408,24 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
 
                       <ScrollArea className="min-h-0 flex-1 overflow-hidden">
                         <table className="w-full table-fixed caption-bottom text-sm">
-                          <RecycleBinTableColGroup showBucketColumn={showBucketColumn} />
+                          <RecycleBinTableColGroup
+                            showBucketColumn={showBucketColumn}
+                          />
                           <TableBody className="min-h-0">
                             {items.map((item) => {
                               const rowPending =
-                                restoreMutation.isPending || deleteMutation.isPending;
+                                restoreMutation.isPending ||
+                                deleteMutation.isPending;
                               return (
                                 <TableRow key={item.id}>
                                   <TableCell className="align-top">
                                     <Checkbox
-                                      aria-label={t("explorer.selection.selectRow", {
-                                        name: item.name,
-                                      })}
+                                      aria-label={t(
+                                        "explorer.selection.selectRow",
+                                        {
+                                          name: item.name,
+                                        },
+                                      )}
                                       checked={selectedIds.has(item.id)}
                                       onCheckedChange={(checked) =>
                                         handleSelectRow(item.id, checked)
@@ -419,7 +462,9 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
                                     <div className="flex flex-wrap justify-start gap-2">
                                       <Button
                                         disabled={rowPending}
-                                        onClick={() => void handleRestore([item])}
+                                        onClick={() =>
+                                          openRestoreConfirmation([item])
+                                        }
                                         size="sm"
                                         type="button"
                                         variant="outline"
@@ -429,7 +474,9 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
                                       </Button>
                                       <Button
                                         disabled={rowPending}
-                                        onClick={() => openDeleteConfirmation([item])}
+                                        onClick={() =>
+                                          openDeleteConfirmation([item])
+                                        }
                                         size="sm"
                                         type="button"
                                         variant="destructive"
@@ -479,7 +526,7 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
                   </div>
                   <Button
                     disabled={actionsPending}
-                    onClick={() => void handleRestore(selectedItems)}
+                    onClick={() => openRestoreConfirmation(selectedItems)}
                     type="button"
                     variant="outline"
                   >
@@ -555,6 +602,69 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
 
       <AlertDialog
         onOpenChange={(nextOpen) => {
+          if (!restoreMutation.isPending) {
+            setRestoreDialogOpen(nextOpen);
+            if (!nextOpen) {
+              setPendingRestoreItems([]);
+            }
+          }
+        }}
+        open={restoreDialogOpen}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <ArchiveRestoreIcon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>
+              {t("buckets.recycleBin.restoreConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("buckets.recycleBin.restoreConfirmDescription", {
+                count: pendingRestoreItems.length,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <ScrollArea className="max-h-56 rounded-lg border border-border/70">
+            <ul className="divide-y divide-border/60">
+              {pendingRestoreItems.map((item) => (
+                <li className="px-3 py-2 text-sm" key={item.id}>
+                  <div className="font-medium">{item.name}</div>
+                  <div className="break-all text-xs text-muted-foreground">
+                    {showBucketColumn
+                      ? `${item.bucket_name} / ${item.path}`
+                      : item.path}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMutation.isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <Button
+              disabled={restoreMutation.isPending}
+              onClick={() => void handleRestore()}
+              type="button"
+              variant="default"
+            >
+              {restoreMutation.isPending ? (
+                <LoaderCircleIcon
+                  className="animate-spin"
+                  data-icon="inline-start"
+                />
+              ) : null}
+              {t("buckets.recycleBin.restore")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        onOpenChange={(nextOpen) => {
           if (!deleteMutation.isPending) {
             setDeleteDialogOpen(nextOpen);
             if (!nextOpen) {
@@ -585,7 +695,9 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
                 <li className="px-3 py-2 text-sm" key={item.id}>
                   <div className="font-medium">{item.name}</div>
                   <div className="break-all text-xs text-muted-foreground">
-                    {showBucketColumn ? `${item.bucket_name} / ${item.path}` : item.path}
+                    {showBucketColumn
+                      ? `${item.bucket_name} / ${item.path}`
+                      : item.path}
                   </div>
                 </li>
               ))}
@@ -654,4 +766,30 @@ async function invalidateAffectedQueries(
       }),
     ),
   ]);
+}
+
+function removeRecycleBinItemsFromCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  recycleBinBaseQueryKey: readonly unknown[],
+  items: RecycleBinObjectItem[],
+) {
+  if (items.length === 0) {
+    return;
+  }
+
+  const itemIDs = new Set(items.map((item) => item.id));
+
+  queryClient.setQueriesData<RecycleBinObjectListResult>(
+    { queryKey: recycleBinBaseQueryKey },
+    (current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        items: current.items.filter((item) => !itemIDs.has(item.id)),
+      };
+    },
+  );
 }

@@ -186,6 +186,9 @@ const enUS = {
   "buckets.recycleBin.deleteSelected": "Delete selected",
   "buckets.recycleBin.clearSelection": "Clear selection",
   "buckets.recycleBin.pagination": "Page {page}",
+  "buckets.recycleBin.restoreConfirmTitle": "Restore recycle bin items?",
+  "buckets.recycleBin.restoreConfirmDescription":
+    "This will restore {count} recycle bin items to their original paths.",
   "buckets.recycleBin.deleteConfirmTitle": "Delete permanently?",
   "buckets.recycleBin.deleteConfirmDescription":
     "This will permanently delete {count} recycle bin items. This action cannot be undone.",
@@ -606,6 +609,9 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "buckets.recycleBin.deleteSelected": "删除所选",
   "buckets.recycleBin.clearSelection": "清空选择",
   "buckets.recycleBin.pagination": "第 {page} 页",
+  "buckets.recycleBin.restoreConfirmTitle": "还原这些项目？",
+  "buckets.recycleBin.restoreConfirmDescription":
+    "这会将 {count} 个回收站项目还原到原路径。",
   "buckets.recycleBin.deleteConfirmTitle": "永久删除这些项目？",
   "buckets.recycleBin.deleteConfirmDescription":
     "这会永久删除 {count} 个回收站项目，且无法恢复。",
