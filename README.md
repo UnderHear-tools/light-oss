@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./frontend/public/LOGO.svg" alt="Light OSS Logo" width="100" />
+  <img src="./frontend/public/LOGO.svg" alt="Light OSS Logo" width="192" />
 </p>
 
-# Light OSS
+<h1 align="center">light-oss</h1>
 
 轻量对象存储与静态站点托管 MVP，包含 Go 后端 API、React 管理台、MySQL 元数据，以及基于本地文件系统的对象内容存储。
 
