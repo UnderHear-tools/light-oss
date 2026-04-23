@@ -761,10 +761,10 @@ function ExplorerSortHeader({
               value={draftSortOrder ?? ""}
               variant="outline"
             >
-              <ToggleGroupItem className="flex-1" value="asc">
+              <ToggleGroupItem className="flex-1 cursor-pointer" value="asc">
                 {t("explorer.sort.option.asc")}
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="desc">
+              <ToggleGroupItem className="flex-1 cursor-pointer" value="desc">
                 {t("explorer.sort.option.desc")}
               </ToggleGroupItem>
             </ToggleGroup>
