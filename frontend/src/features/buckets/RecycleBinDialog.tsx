@@ -13,6 +13,7 @@ import {
   restoreRecycleBinObjects,
 } from "@/api/objects";
 import type {
+  RecycleBinFailedItem,
   RecycleBinObjectItem,
   RecycleBinObjectListResult,
 } from "@/api/types";
@@ -53,7 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBytes, formatDate } from "@/lib/format";
-import { useI18n } from "@/lib/i18n";
+import { translateRecycleBinFailureReason, useI18n } from "@/lib/i18n";
 import { useAppSettings } from "@/lib/settings";
 import { toast } from "sonner";
 
@@ -72,6 +73,11 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
     RecycleBinObjectItem[]
   >([]);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [restoreFailedItems, setRestoreFailedItems] = useState<
+    RecycleBinFailedItem[]
+  >([]);
+  const [restoreFailureDialogOpen, setRestoreFailureDialogOpen] =
+    useState(false);
   const [pendingDeleteItems, setPendingDeleteItems] = useState<
     RecycleBinObjectItem[]
   >([]);
@@ -108,6 +114,8 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
     setSelectedIds(new Set());
     setPendingRestoreItems([]);
     setRestoreDialogOpen(false);
+    setRestoreFailedItems([]);
+    setRestoreFailureDialogOpen(false);
     setPendingDeleteItems([]);
     setDeleteDialogOpen(false);
   }, [bucketName]);
@@ -178,6 +186,14 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
             failedCount: result.failed_count,
           }),
         );
+      }
+
+      if (result.failed_items.length > 0) {
+        setRestoreFailedItems(result.failed_items);
+        setRestoreFailureDialogOpen(true);
+      } else {
+        setRestoreFailedItems([]);
+        setRestoreFailureDialogOpen(false);
       }
 
       removeRecycleBinItemsFromCache(
@@ -256,6 +272,8 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
     setSelectedIds(new Set());
     setPendingRestoreItems([]);
     setRestoreDialogOpen(false);
+    setRestoreFailedItems([]);
+    setRestoreFailureDialogOpen(false);
     setPendingDeleteItems([]);
     setDeleteDialogOpen(false);
   }
@@ -659,6 +677,59 @@ export function RecycleBinDialog({ bucketName }: { bucketName: string }) {
               ) : null}
               {t("buckets.recycleBin.restore")}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        onOpenChange={(nextOpen) => {
+          setRestoreFailureDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setRestoreFailedItems([]);
+          }
+        }}
+        open={restoreFailureDialogOpen}
+      >
+        <AlertDialogContent className="sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <CircleAlertIcon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>
+              {t("buckets.recycleBin.restoreFailedTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("buckets.recycleBin.restoreFailedDescription", {
+                count: restoreFailedItems.length,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <ScrollArea className="max-h-72 rounded-lg border border-border/70">
+            <ul className="divide-y divide-border/60">
+              {restoreFailedItems.map((item) => (
+                <li className="px-3 py-2 text-sm" key={item.id}>
+                  <div className="break-all font-medium">
+                    {showBucketColumn
+                      ? `${item.bucket_name} / ${item.path}`
+                      : item.path}
+                  </div>
+                  <div className="mt-1 break-words text-xs text-muted-foreground">
+                    {item.message
+                      ? translateRecycleBinFailureReason(
+                          locale,
+                          item.code,
+                          item.message,
+                        )
+                      : t("buckets.recycleBin.restoreFailedUnknownMessage")}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.close")}</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -240,6 +240,115 @@ describe("BucketObjectsPage", () => {
     expect(listRecycleBinObjects).toHaveBeenCalledTimes(1);
   });
 
+  it("shows restore failure reasons in a dialog", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects).mockResolvedValue({
+      items: [createRecycleBinItem()],
+      next_cursor: "",
+    });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 0,
+      failed_count: 1,
+      failed_items: [
+        {
+          id: 101,
+          bucket_name: "demo",
+          path: "docs/report.txt",
+          code: "object_exists",
+          message: "object already exists",
+        },
+      ],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Recycle bin" }),
+    );
+
+    const row = (await screen.findByText("docs/report.txt")).closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: "Restore" }),
+    );
+
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Restore" }),
+    );
+
+    expect(await screen.findByText("Restore failed")).toBeInTheDocument();
+    expect(screen.getByText("Object already exists.")).toBeInTheDocument();
+    expect(screen.queryByText(/object_exists/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("docs/report.txt")).toHaveLength(2);
+    expect(listRecycleBinObjects).toHaveBeenCalledTimes(1);
+  });
+
+  it("localizes recycle bin restore failure reasons in Chinese", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+    vi.mocked(listRecycleBinObjects).mockResolvedValue({
+      items: [createRecycleBinItem()],
+      next_cursor: "",
+    });
+    vi.mocked(restoreRecycleBinObjects).mockResolvedValue({
+      restored_count: 0,
+      failed_count: 1,
+      failed_items: [
+        {
+          id: 101,
+          bucket_name: "demo",
+          path: "docs/report.txt",
+          code: "object_exists",
+          message: "object already exists",
+        },
+      ],
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      {
+        route: "/buckets/demo",
+        preferences: {
+          locale: "zh-CN",
+          theme: "light",
+        },
+      },
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "回收站" }),
+    );
+
+    const row = (await screen.findByText("docs/report.txt")).closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: "还原" }),
+    );
+
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(confirmDialog).getByRole("button", { name: "还原" }),
+    );
+
+    expect(await screen.findByText("还原失败")).toBeInTheDocument();
+    expect(screen.getByText("目标路径已存在对象。")).toBeInTheDocument();
+    expect(screen.queryByText("object already exists")).not.toBeInTheDocument();
+    expect(screen.queryByText(/object_exists/)).not.toBeInTheDocument();
+  });
+
   it("confirms permanent deletion for recycle bin items in the current bucket", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [],
@@ -993,7 +1102,9 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(
       await screen.findByRole("checkbox", { name: "Select alpha.txt" }),
     );
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select docs" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Select docs" }),
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "Download selected" }),
     );
@@ -1261,12 +1372,12 @@ describe("BucketObjectsPage", () => {
     expect(meetingName).toHaveClass("break-all");
     expect(meetingName).toHaveClass("[display:-webkit-box]");
     expect(meetingName).toHaveClass("[-webkit-line-clamp:3]");
-    expect(
-      within(dialog).getByText("articles/2026/meeting.md"),
-    ).toHaveClass("min-w-0");
-    expect(
-      within(dialog).getByText("articles/2026/meeting.md"),
-    ).toHaveClass("truncate");
+    expect(within(dialog).getByText("articles/2026/meeting.md")).toHaveClass(
+      "min-w-0",
+    );
+    expect(within(dialog).getByText("articles/2026/meeting.md")).toHaveClass(
+      "truncate",
+    );
     expect(within(dialog).getByText("icons")).toBeInTheDocument();
     expect(within(dialog).getByText("assets/icons/")).toBeInTheDocument();
     expect(

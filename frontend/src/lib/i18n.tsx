@@ -41,6 +41,7 @@ const enUS = {
   "common.edit": "Edit",
   "common.apply": "Apply",
   "common.open": "Open",
+  "common.close": "Close",
   "common.delete": "Delete",
   "common.enabled": "Enabled",
   "common.disabled": "Disabled",
@@ -189,6 +190,10 @@ const enUS = {
   "buckets.recycleBin.restoreConfirmTitle": "Restore recycle bin items?",
   "buckets.recycleBin.restoreConfirmDescription":
     "This will restore {count} recycle bin items to their original paths.",
+  "buckets.recycleBin.restoreFailedTitle": "Restore failed",
+  "buckets.recycleBin.restoreFailedDescription":
+    "{count} recycle bin items could not be restored. Review the returned reason below.",
+  "buckets.recycleBin.restoreFailedUnknownMessage": "No reason returned.",
   "buckets.recycleBin.deleteConfirmTitle": "Delete permanently?",
   "buckets.recycleBin.deleteConfirmDescription":
     "This will permanently delete {count} recycle bin items. This action cannot be undone.",
@@ -301,8 +306,7 @@ const enUS = {
   "explorer.sort.cancel": "Cancel",
   "explorer.sort.option.asc": "Ascending",
   "explorer.sort.option.desc": "Descending",
-  "explorer.sort.validation.required":
-    "Select a sort order before applying.",
+  "explorer.sort.validation.required": "Select a sort order before applying.",
   "explorer.sort.popover.title": "Sort by {label}",
   "explorer.sort.popover.description":
     "Choose an order and confirm to apply it.",
@@ -529,6 +533,7 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "common.cancel": "取消",
   "common.apply": "应用",
   "common.open": "打开",
+  "common.close": "关闭",
   "common.delete": "删除",
   "common.configure": "配置",
   "common.loading": "加载中...",
@@ -612,6 +617,10 @@ const zhCN: Record<keyof typeof enUS, string> = {
   "buckets.recycleBin.restoreConfirmTitle": "还原这些项目？",
   "buckets.recycleBin.restoreConfirmDescription":
     "这会将 {count} 个回收站项目还原到原路径。",
+  "buckets.recycleBin.restoreFailedTitle": "还原失败",
+  "buckets.recycleBin.restoreFailedDescription":
+    "{count} 个回收站项目未能还原，请查看返回原因。",
+  "buckets.recycleBin.restoreFailedUnknownMessage": "后端未返回具体原因。",
   "buckets.recycleBin.deleteConfirmTitle": "永久删除这些项目？",
   "buckets.recycleBin.deleteConfirmDescription":
     "这会永久删除 {count} 个回收站项目，且无法恢复。",
@@ -961,6 +970,53 @@ const dictionaries = {
 } as const;
 
 type TranslationKey = keyof typeof enUS;
+type LocalizedText = Record<AppLocale, string>;
+
+const recycleBinFailureReasonsByCode: Record<string, LocalizedText> = {
+  object_exists: {
+    "en-US": "Object already exists.",
+    "zh-CN": "目标路径已存在对象。",
+  },
+  bucket_not_found: {
+    "en-US": "Bucket not found.",
+    "zh-CN": "bucket 不存在。",
+  },
+  recycle_bin_item_not_found: {
+    "en-US": "Recycle bin item not found.",
+    "zh-CN": "回收站项目不存在。",
+  },
+  bucket_lookup_failed: {
+    "en-US": "Failed to look up the bucket.",
+    "zh-CN": "查询 bucket 失败。",
+  },
+  object_lookup_failed: {
+    "en-US": "Failed to look up the object.",
+    "zh-CN": "查询对象失败。",
+  },
+  recycle_bin_restore_failed: {
+    "en-US": "Failed to restore the recycle bin item.",
+    "zh-CN": "还原回收站项目失败。",
+  },
+};
+
+const recycleBinFailureReasonsByMessage: Record<string, LocalizedText> = {
+  "object already exists": recycleBinFailureReasonsByCode.object_exists,
+  "bucket not found": recycleBinFailureReasonsByCode.bucket_not_found,
+  "recycle bin item not found":
+    recycleBinFailureReasonsByCode.recycle_bin_item_not_found,
+  "failed to look up bucket":
+    recycleBinFailureReasonsByCode.bucket_lookup_failed,
+  "failed to look up object":
+    recycleBinFailureReasonsByCode.object_lookup_failed,
+  "failed to load recycle bin item":
+    recycleBinFailureReasonsByCode.recycle_bin_restore_failed,
+  "failed to load recycle bin item group":
+    recycleBinFailureReasonsByCode.recycle_bin_restore_failed,
+  "failed to restore object":
+    recycleBinFailureReasonsByCode.recycle_bin_restore_failed,
+  "failed to remove recycle bin item":
+    recycleBinFailureReasonsByCode.recycle_bin_restore_failed,
+};
 
 export function useI18n() {
   const {
@@ -988,4 +1044,27 @@ export function translate(
   return template.replace(/\{(\w+)\}/g, (_match, token) => {
     return String(values[token] ?? "");
   });
+}
+
+export function translateRecycleBinFailureReason(
+  locale: AppLocale,
+  code: string,
+  message: string,
+) {
+  const byCode = recycleBinFailureReasonsByCode[code];
+  if (byCode) {
+    return byCode[locale];
+  }
+
+  const byMessage =
+    recycleBinFailureReasonsByMessage[normalizeMessage(message)];
+  if (byMessage) {
+    return byMessage[locale];
+  }
+
+  return message;
+}
+
+function normalizeMessage(message: string) {
+  return message.trim().toLowerCase();
 }
