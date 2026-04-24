@@ -24,10 +24,32 @@ import { getApiHostLabel, hasBearerToken } from "@/lib/connection"
 import { useI18n } from "@/lib/i18n"
 import { useAppSettings } from "@/lib/settings"
 
+const lastBucketRouteStorageKey = "light-oss-last-bucket-route"
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const { settings } = useAppSettings()
   const { t } = useI18n()
+  const currentBucketRoute =
+    pathname.startsWith("/buckets/") ? `${pathname}${search}` : null
+  const [lastBucketRoute, setLastBucketRoute] = React.useState(() => {
+    if (typeof window === "undefined") {
+      return ""
+    }
+
+    return window.localStorage.getItem(lastBucketRouteStorageKey) ?? ""
+  })
+
+  React.useEffect(() => {
+    if (!currentBucketRoute) {
+      return
+    }
+
+    setLastBucketRoute(currentBucketRoute)
+    window.localStorage.setItem(lastBucketRouteStorageKey, currentBucketRoute)
+  }, [currentBucketRoute])
+
+  const bucketNavUrl = currentBucketRoute ?? lastBucketRoute ?? "/buckets"
 
   const data = {
     workspace: {
@@ -50,7 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       },
       {
         title: t("nav.buckets"),
-        url: "/buckets",
+        url: bucketNavUrl,
         icon: <HardDriveIcon />,
         isActive: pathname.startsWith("/buckets"),
       },
