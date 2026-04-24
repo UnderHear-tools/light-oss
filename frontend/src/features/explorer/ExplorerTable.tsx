@@ -1,7 +1,4 @@
 import {
-  ArrowBothIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
   CopyIcon,
   DownloadIcon,
   EyeIcon,
@@ -13,6 +10,9 @@ import {
   LockIcon,
   ScreenFullIcon,
   ShieldIcon,
+  FilterIcon,
+  SortAscIcon,
+  SortDescIcon,
   SyncIcon,
   TrashIcon,
   UnlockIcon,
@@ -711,10 +711,10 @@ function ExplorerSortHeader({
   const hasActiveSort = activeSortBy !== null;
   const clearDisabled = !hasActiveSort;
   const Icon = !active
-    ? ArrowBothIcon
+    ? FilterIcon
     : appliedSortOrder === "asc"
-      ? ArrowUpIcon
-      : ArrowDownIcon;
+      ? SortAscIcon
+      : SortDescIcon;
 
   useEffect(() => {
     if (!open) {
