@@ -1,22 +1,22 @@
 import {
+  ArrowBothIcon,
   ArrowDownIcon,
-  ArrowUpDownIcon,
   ArrowUpIcon,
   CopyIcon,
   DownloadIcon,
-  ExpandIcon,
   EyeIcon,
-  FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
+  FileDirectoryFillIcon,
+  FileDirectoryOpenFillIcon,
+  FileIcon,
   GlobeIcon,
-  LoaderCircleIcon,
-  MoreHorizontalIcon,
-  ShieldAlertIcon,
-  Trash2Icon,
-  LockOpenIcon,
+  KebabHorizontalIcon,
   LockIcon,
-} from "lucide-react";
+  ScreenFullIcon,
+  ShieldIcon,
+  SyncIcon,
+  TrashIcon,
+  UnlockIcon,
+} from "@primer/octicons-react";
 import { forwardRef, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -348,7 +348,7 @@ export function ExplorerTable({
                           >
                             {entry.visibility === "public" ? (
                               <>
-                                <LockOpenIcon />
+                                <UnlockIcon />
                                 {t("objects.visibility.public")}
                               </>
                             ) : (
@@ -442,13 +442,13 @@ function ExplorerEntryName({
   if (entry.type === "directory") {
     return (
       <Button
-        className="px-0 flex w-full min-w-0 justify-start items-center font-normal hover:bg-transparent"
+        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
         onClick={() => onOpenDirectory(entry.path)}
         type="button"
         variant="ghost"
       >
         <span className="inline-flex size-4 items-center justify-center text-amber-500 [&_svg]:size-4">
-          <FolderIcon />
+          <FileDirectoryFillIcon />
         </span>
         <span className="min-w-0 truncate">{entry.name}</span>
       </Button>
@@ -463,12 +463,12 @@ function ExplorerEntryName({
         onUpdateVisibility={onUpdateVisibility}
       >
         <Button
-          className="px-0 flex w-full min-w-0 justify-start items-center font-normal hover:bg-transparent"
+          className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
           type="button"
           variant="ghost"
         >
-          <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
-            <FileTextIcon />
+          <span className="inline-flex size-4 items-center justify-center text-gray-500 [&_svg]:size-4">
+            <FileIcon />
           </span>
           <span className="min-w-0 truncate">{entry.name}</span>
         </Button>
@@ -510,7 +510,7 @@ function ExplorerDirectoryActions({
         label={t("explorer.actions.openFolder")}
         onClick={() => onOpenDirectory(entry.path)}
       >
-        <FolderOpenIcon className="text-amber-500" />
+        <FileDirectoryOpenFillIcon className="text-amber-500" />
       </ExplorerIconButton>
 
       <DownloadFolderZipButton
@@ -540,9 +540,9 @@ function ExplorerDirectoryActions({
               variant="destructive"
             >
               {deleting ? (
-                <LoaderCircleIcon className="animate-spin" />
+                <SyncIcon className="animate-spin" />
               ) : (
-                <Trash2Icon />
+                <TrashIcon />
               )}
               {t("explorer.actions.deleteFolder")}
             </DropdownMenuItem>
@@ -609,7 +609,7 @@ function ExplorerFileActions({
         onClick={() => void onDownloadFile(entry)}
       >
         {downloading ? (
-          <LoaderCircleIcon className="animate-spin text-sky-500" />
+          <SyncIcon className="animate-spin text-sky-500" />
         ) : (
           <DownloadIcon className="text-sky-500" />
         )}
@@ -636,9 +636,9 @@ function ExplorerFileActions({
               variant="destructive"
             >
               {deleting ? (
-                <LoaderCircleIcon className="animate-spin" />
+                <SyncIcon className="animate-spin" />
               ) : (
-                <Trash2Icon />
+                <TrashIcon />
               )}
               {t("common.delete")}
             </DropdownMenuItem>
@@ -666,7 +666,7 @@ function ExplorerOverflowMenu({
           type="button"
           variant="ghost"
         >
-          <MoreHorizontalIcon />
+          <KebabHorizontalIcon />
           <span className="sr-only">{label}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -711,7 +711,7 @@ function ExplorerSortHeader({
   const hasActiveSort = activeSortBy !== null;
   const clearDisabled = !hasActiveSort;
   const Icon = !active
-    ? ArrowUpDownIcon
+    ? ArrowBothIcon
     : appliedSortOrder === "asc"
       ? ArrowUpIcon
       : ArrowDownIcon;
@@ -1023,7 +1023,7 @@ function FileDetailsButton({
                     variant="outline"
                   >
                     {isSavingVisibility ? (
-                      <LoaderCircleIcon
+                      <SyncIcon
                         className="animate-spin"
                         data-icon="inline-start"
                       />
@@ -1211,7 +1211,7 @@ function PreviewFullscreenButton({
           type="button"
           variant="ghost"
         >
-          <ExpandIcon />
+          <ScreenFullIcon />
           <span className="sr-only">{label}</span>
         </Button>
       </DialogTrigger>
@@ -1640,9 +1640,9 @@ function DeleteFolderButton({
               <AlertDialogTrigger asChild>
                 <ExplorerIconActionButton disabled={pending} label={label}>
                   {pending ? (
-                    <LoaderCircleIcon className="animate-spin text-destructive" />
+                    <SyncIcon className="animate-spin text-destructive" />
                   ) : (
-                    <Trash2Icon className="text-destructive" />
+                    <TrashIcon className="text-destructive" />
                   )}
                 </ExplorerIconActionButton>
               </AlertDialogTrigger>
@@ -1659,7 +1659,7 @@ function DeleteFolderButton({
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
-            <ShieldAlertIcon />
+            <ShieldIcon />
           </AlertDialogMedia>
           <AlertDialogTitle>
             {t("explorer.deleteFolder.title")}
@@ -1710,7 +1710,7 @@ function DownloadFolderZipButton({
       }}
     >
       {pending ? (
-        <LoaderCircleIcon className="animate-spin text-sky-500" />
+        <SyncIcon className="animate-spin text-sky-500" />
       ) : (
         <DownloadIcon className="text-sky-500" />
       )}
@@ -1742,7 +1742,7 @@ function PublishFolderSiteButton({
       trigger={
         <ExplorerIconActionButton disabled={pending} label={label}>
           {pending ? (
-            <LoaderCircleIcon className="animate-spin text-emerald-500" />
+            <SyncIcon className="animate-spin text-emerald-500" />
           ) : (
             <GlobeIcon className="text-emerald-500" />
           )}
@@ -1780,7 +1780,7 @@ function PublishObjectSiteButton({
       trigger={
         <ExplorerIconActionButton disabled={pending} label={label}>
           {pending ? (
-            <LoaderCircleIcon className="animate-spin text-emerald-500" />
+            <SyncIcon className="animate-spin text-emerald-500" />
           ) : (
             <GlobeIcon className="text-emerald-500" />
           )}
@@ -1819,9 +1819,9 @@ function DeleteFileButton({
               <AlertDialogTrigger asChild>
                 <ExplorerIconActionButton disabled={pending} label={label}>
                   {pending ? (
-                    <LoaderCircleIcon className="animate-spin text-destructive" />
+                    <SyncIcon className="animate-spin text-destructive" />
                   ) : (
-                    <Trash2Icon className="text-destructive" />
+                    <TrashIcon className="text-destructive" />
                   )}
                 </ExplorerIconActionButton>
               </AlertDialogTrigger>
@@ -1838,7 +1838,7 @@ function DeleteFileButton({
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
-            <ShieldAlertIcon />
+            <ShieldIcon />
           </AlertDialogMedia>
           <AlertDialogTitle>{t("objects.delete.title")}</AlertDialogTitle>
           <AlertDialogDescription>
