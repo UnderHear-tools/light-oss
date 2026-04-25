@@ -18,7 +18,7 @@ import {
   UnlockIcon,
 } from "@primer/octicons-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
@@ -168,6 +168,7 @@ export function ExplorerTable({
   const { locale, t } = useI18n();
   const [scrollContainerElement, setScrollContainerElement] =
     useState<HTMLDivElement | null>(null);
+  const [headerScrollbarOffset, setHeaderScrollbarOffset] = useState(0);
   const [fallbackScrollOffset, setFallbackScrollOffset] = useState(0);
   const [openSortBy, setOpenSortBy] = useState<ExplorerSortBy | null>(null);
   const [detailsPath, setDetailsPath] = useState<string | null>(null);
@@ -252,6 +253,29 @@ export function ExplorerTable({
     publishFolderPath,
   ]);
 
+  useLayoutEffect(() => {
+    if (!scrollContainerElement) {
+      setHeaderScrollbarOffset(0);
+      return;
+    }
+
+    const updateHeaderScrollbarOffset = () => {
+      setHeaderScrollbarOffset(
+        Math.max(
+          scrollContainerElement.offsetWidth - scrollContainerElement.clientWidth,
+          0,
+        ),
+      );
+    };
+
+    updateHeaderScrollbarOffset();
+    window.addEventListener("resize", updateHeaderScrollbarOffset);
+
+    return () => {
+      window.removeEventListener("resize", updateHeaderScrollbarOffset);
+    };
+  }, [scrollContainerElement, entries.length]);
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
@@ -261,109 +285,114 @@ export function ExplorerTable({
             explorerTableMinWidthClass,
           )}
         >
-          <table className="w-full table-fixed bg-card caption-bottom text-sm">
-            <ExplorerTableColGroup />
-            <TableHeader className="[&_tr]:border-b-0">
-              <TableRow>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    explorerSelectionColumnWidthClass,
-                  )}
-                >
-                  <Checkbox
-                    aria-label={t("explorer.selection.selectAll")}
-                    disabled={selectionDisabled}
-                    checked={
-                      allSelected
-                        ? true
-                        : partiallySelected
-                          ? "indeterminate"
-                          : false
-                    }
-                    onCheckedChange={onSelectAll}
-                  />
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[22.5rem] max-w-[22.5rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  <ExplorerSortHeader
-                    activeSortBy={sortBy}
-                    label={t("explorer.table.name")}
-                    onApply={onSortApply}
-                    onClear={onSortClear}
-                    open={openSortBy === "name"}
-                    onOpenChange={(open) => setOpenSortBy(open ? "name" : null)}
-                    sortBy="name"
-                    sortOrder={sortOrder}
-                  />
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[17.5rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  {t("explorer.table.url")}
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[7.5rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  <ExplorerSortHeader
-                    activeSortBy={sortBy}
-                    label={t("explorer.table.size")}
-                    onApply={onSortApply}
-                    onClear={onSortClear}
-                    open={openSortBy === "size"}
-                    onOpenChange={(open) => setOpenSortBy(open ? "size" : null)}
-                    sortBy="size"
-                    sortOrder={sortOrder}
-                  />
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[10rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  {t("objects.form.visibility.label")}
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[13.75rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  <ExplorerSortHeader
-                    activeSortBy={sortBy}
-                    label={t("objects.table.createdAt")}
-                    onApply={onSortApply}
-                    onClear={onSortClear}
-                    open={openSortBy === "created_at"}
-                    onOpenChange={(open) =>
-                      setOpenSortBy(open ? "created_at" : null)
-                    }
-                    sortBy="created_at"
-                    sortOrder={sortOrder}
-                  />
-                </TableHead>
-                <TableHead
-                  className={cn(
-                    explorerHeaderCellClass,
-                    "w-[11.25rem] text-base font-semibold text-muted-foreground",
-                  )}
-                >
-                  {t("explorer.table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-          </table>
+          <div
+            data-testid="explorer-table-header-container"
+            style={{ paddingRight: headerScrollbarOffset }}
+          >
+            <table className="w-full table-fixed bg-card caption-bottom text-sm">
+              <ExplorerTableColGroup />
+              <TableHeader className="[&_tr]:border-b-0">
+                <TableRow>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      explorerSelectionColumnWidthClass,
+                    )}
+                  >
+                    <Checkbox
+                      aria-label={t("explorer.selection.selectAll")}
+                      disabled={selectionDisabled}
+                      checked={
+                        allSelected
+                          ? true
+                          : partiallySelected
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={onSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[22.5rem] max-w-[22.5rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    <ExplorerSortHeader
+                      activeSortBy={sortBy}
+                      label={t("explorer.table.name")}
+                      onApply={onSortApply}
+                      onClear={onSortClear}
+                      open={openSortBy === "name"}
+                      onOpenChange={(open) => setOpenSortBy(open ? "name" : null)}
+                      sortBy="name"
+                      sortOrder={sortOrder}
+                    />
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[17.5rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    {t("explorer.table.url")}
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[7.5rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    <ExplorerSortHeader
+                      activeSortBy={sortBy}
+                      label={t("explorer.table.size")}
+                      onApply={onSortApply}
+                      onClear={onSortClear}
+                      open={openSortBy === "size"}
+                      onOpenChange={(open) => setOpenSortBy(open ? "size" : null)}
+                      sortBy="size"
+                      sortOrder={sortOrder}
+                    />
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[10rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    {t("objects.form.visibility.label")}
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[13.75rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    <ExplorerSortHeader
+                      activeSortBy={sortBy}
+                      label={t("objects.table.createdAt")}
+                      onApply={onSortApply}
+                      onClear={onSortClear}
+                      open={openSortBy === "created_at"}
+                      onOpenChange={(open) =>
+                        setOpenSortBy(open ? "created_at" : null)
+                      }
+                      sortBy="created_at"
+                      sortOrder={sortOrder}
+                    />
+                  </TableHead>
+                  <TableHead
+                    className={cn(
+                      explorerHeaderCellClass,
+                      "w-[11.25rem] text-base font-semibold text-muted-foreground",
+                    )}
+                  >
+                    {t("explorer.table.actions")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+            </table>
+          </div>
           <div
             ref={setScrollContainerElement}
             className="min-h-0 flex-1 overflow-auto"
