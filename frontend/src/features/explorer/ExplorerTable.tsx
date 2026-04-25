@@ -707,7 +707,7 @@ function ExplorerEntryName({
   if (entry.type === "directory") {
     return (
       <Button
-        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
+        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal select-text hover:bg-transparent"
         onClick={() => onOpenDirectory(entry.path)}
         type="button"
         variant="ghost"
@@ -723,7 +723,7 @@ function ExplorerEntryName({
   if (entry.type === "file") {
     return (
       <Button
-        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
+        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal select-text hover:bg-transparent"
         onClick={() => onOpenDetails(entry.path)}
         type="button"
         variant="ghost"

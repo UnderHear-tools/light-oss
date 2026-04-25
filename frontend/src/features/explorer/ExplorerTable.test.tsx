@@ -139,6 +139,14 @@ describe("ExplorerTable", () => {
     expect(row).not.toHaveAttribute("data-state", "selected");
   });
 
+  it("allows selecting entry names as text", () => {
+    renderExplorerTable(createFileEntry({}));
+
+    expect(screen.getByRole("button", { name: "file.txt" })).toHaveClass(
+      "select-text",
+    );
+  });
+
   it("supports select all and indeterminate selection states", async () => {
     renderExplorerTable([
       createFileEntry({
