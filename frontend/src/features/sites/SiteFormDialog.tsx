@@ -77,7 +77,9 @@ export function SiteFormDialog({
   initialValue,
   lockedFields,
   mode,
+  open,
   pending,
+  onOpenChange,
   onSubmit,
   submitLabel,
   title,
@@ -93,7 +95,9 @@ export function SiteFormDialog({
     indexDocument?: boolean;
   };
   mode: "create" | "edit";
+  open?: boolean;
   pending: boolean;
+  onOpenChange?: (open: boolean) => void;
   onSubmit: (value: SiteFormValue) => Promise<void>;
   submitLabel?: string;
   title: string;
@@ -101,7 +105,7 @@ export function SiteFormDialog({
   triggerTooltipLabel?: string;
 }) {
   const resolvedBuckets = buckets ?? emptyBuckets;
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [formValue, setFormValue] = useState<SiteFormValue>(() =>
     buildSiteFormValue(initialValue),
   );
@@ -116,9 +120,11 @@ export function SiteFormDialog({
     [initialValueSnapshot],
   );
   const defaultBucketName = resolvedBuckets[0]?.name ?? "";
+  const dialogOpen = open ?? uncontrolledOpen;
+  const handleOpenChange = onOpenChange ?? setUncontrolledOpen;
 
   useEffect(() => {
-    if (!open) {
+    if (!dialogOpen) {
       return;
     }
 
@@ -129,7 +135,7 @@ export function SiteFormDialog({
 
     setFormValue(nextValue);
     setDomainsInput(nextValue.domains.join(", "));
-  }, [bucketLocked, defaultBucketName, initialDialogValue, open]);
+  }, [bucketLocked, defaultBucketName, dialogOpen, initialDialogValue]);
 
   const parsedDomains = domainsInput
     .split(",")
@@ -142,12 +148,15 @@ export function SiteFormDialog({
     (mode === "create"
       ? t("sites.form.submitCreate")
       : t("sites.form.submitUpdate"));
-  const resolvedTrigger = trigger ?? (
-    <Button type="button" variant="outline">
-      <GlobeIcon />
-      {resolvedSubmitLabel}
-    </Button>
-  );
+  const resolvedTrigger =
+    trigger === undefined && open === undefined ? (
+      <Button type="button" variant="outline">
+        <GlobeIcon />
+        {resolvedSubmitLabel}
+      </Button>
+    ) : (
+      trigger
+    );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -165,31 +174,33 @@ export function SiteFormDialog({
         indexDocument: formValue.indexDocument.trim() || "index.html",
         errorDocument: formValue.errorDocument.trim(),
       });
-      setOpen(false);
+      handleOpenChange(false);
     } catch {
       return;
     }
   }
 
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
-      {triggerTooltipLabel ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent
-            className="whitespace-nowrap leading-none"
-            sideOffset={6}
-          >
-            {triggerTooltipLabel}
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
-      )}
+    <Dialog onOpenChange={handleOpenChange} open={dialogOpen}>
+      {resolvedTrigger ? (
+        triggerTooltipLabel ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              className="whitespace-nowrap leading-none"
+              sideOffset={6}
+            >
+              {triggerTooltipLabel}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <DialogTrigger asChild>{resolvedTrigger}</DialogTrigger>
+        )
+      ) : null}
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

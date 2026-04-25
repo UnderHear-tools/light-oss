@@ -17,6 +17,7 @@ import {
   TrashIcon,
   UnlockIcon,
 } from "@primer/octicons-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { forwardRef, useEffect, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -37,7 +38,6 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   TableBody,
   TableCell,
@@ -97,12 +96,16 @@ import {
   PublishSiteDialog,
   type PublishSiteValue,
 } from "@/features/explorer/PublishSiteDialog";
+import type { AppLocale } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
 
 const explorerTableMinWidthClass = "min-w-[85.5rem]";
 const explorerSelectionColumnWidthClass = "w-6";
 const explorerHeaderCellClass =
   "bg-card shadow-[inset_0_-1px_0_var(--color-border)]";
+const explorerTableColumnCount = 7;
+const explorerTableRowEstimate = 49;
+const explorerTableOverscan = 10;
 
 export function ExplorerTable({
   bucket,
@@ -163,12 +166,91 @@ export function ExplorerTable({
   sortOrder: ExplorerSortOrder | null;
 }) {
   const { locale, t } = useI18n();
+  const [scrollContainerElement, setScrollContainerElement] =
+    useState<HTMLDivElement | null>(null);
+  const [fallbackScrollOffset, setFallbackScrollOffset] = useState(0);
   const [openSortBy, setOpenSortBy] = useState<ExplorerSortBy | null>(null);
+  const [detailsPath, setDetailsPath] = useState<string | null>(null);
+  const [deleteFilePath, setDeleteFilePath] = useState<string | null>(null);
+  const [deleteFolderPath, setDeleteFolderPath] = useState<string | null>(null);
+  const [publishFilePath, setPublishFilePath] = useState<string | null>(null);
+  const [publishFolderPath, setPublishFolderPath] = useState<string | null>(null);
   const selectedCount = entries.filter((entry) =>
     selectedPaths.has(entry.path),
   ).length;
   const allSelected = entries.length > 0 && selectedCount === entries.length;
   const partiallySelected = selectedCount > 0 && !allSelected;
+  const detailsEntry = findFileEntry(entries, detailsPath);
+  const deleteFileEntry = findFileEntry(entries, deleteFilePath);
+  const deleteFolderEntry = findDirectoryEntry(entries, deleteFolderPath);
+  const publishFileEntry = findFileEntry(entries, publishFilePath);
+  const publishFolderEntry = findDirectoryEntry(entries, publishFolderPath);
+  const rowVirtualizer = useVirtualizer({
+    count: entries.length,
+    getScrollElement: () => scrollContainerElement,
+    estimateSize: () => explorerTableRowEstimate,
+    getItemKey: (index) => entries[index]?.path ?? index,
+    initialRect: {
+      width: 0,
+      height: 512,
+    },
+    overscan: explorerTableOverscan,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const fallbackRowCount = Math.min(entries.length, explorerTableOverscan * 2 + 1);
+  const fallbackStartIndex = Math.min(
+    Math.floor(fallbackScrollOffset / explorerTableRowEstimate),
+    Math.max(entries.length - fallbackRowCount, 0),
+  );
+  const fallbackEndIndex = Math.min(
+    fallbackStartIndex + fallbackRowCount,
+    entries.length,
+  );
+  const visibleRowIndexes =
+    virtualRows.length > 0
+      ? virtualRows.map((virtualRow) => virtualRow.index)
+      : Array.from(
+          { length: fallbackEndIndex - fallbackStartIndex },
+          (_, index) => fallbackStartIndex + index,
+        );
+  const topSpacerHeight = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
+  const bottomSpacerHeight =
+    virtualRows.length > 0
+      ? Math.max(
+          rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1]!.end,
+          0,
+        )
+      : Math.max(entries.length - fallbackEndIndex, 0) * explorerTableRowEstimate;
+  const fallbackTopSpacerHeight = fallbackStartIndex * explorerTableRowEstimate;
+
+  useEffect(() => {
+    if (detailsPath && !detailsEntry) {
+      setDetailsPath(null);
+    }
+    if (deleteFilePath && !deleteFileEntry) {
+      setDeleteFilePath(null);
+    }
+    if (deleteFolderPath && !deleteFolderEntry) {
+      setDeleteFolderPath(null);
+    }
+    if (publishFilePath && !publishFileEntry) {
+      setPublishFilePath(null);
+    }
+    if (publishFolderPath && !publishFolderEntry) {
+      setPublishFolderPath(null);
+    }
+  }, [
+    deleteFileEntry,
+    deleteFilePath,
+    deleteFolderEntry,
+    deleteFolderPath,
+    detailsEntry,
+    detailsPath,
+    publishFileEntry,
+    publishFilePath,
+    publishFolderEntry,
+    publishFolderPath,
+  ]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -282,135 +364,137 @@ export function ExplorerTable({
               </TableRow>
             </TableHeader>
           </table>
-          <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+          <div
+            ref={setScrollContainerElement}
+            className="min-h-0 flex-1 overflow-auto"
+            data-testid="explorer-table-scroll-container"
+            onScroll={(event) => {
+              if (virtualRows.length === 0) {
+                setFallbackScrollOffset(event.currentTarget.scrollTop);
+              }
+            }}
+          >
             <table className="w-full table-fixed border-b border-border/70 bg-card caption-bottom text-sm">
               <ExplorerTableColGroup />
               <TableBody className="[&_tr:last-child]:border-b">
-                {entries.map((entry) => {
-                  const selected = selectedPaths.has(entry.path);
+                {(virtualRows.length > 0
+                  ? topSpacerHeight
+                  : fallbackTopSpacerHeight) > 0 ? (
+                  <ExplorerTableSpacerRow
+                    height={
+                      virtualRows.length > 0
+                        ? topSpacerHeight
+                        : fallbackTopSpacerHeight
+                    }
+                  />
+                ) : null}
+                {visibleRowIndexes.map((rowIndex) => {
+                  const entry = entries[rowIndex];
+                  if (!entry) {
+                    return null;
+                  }
 
                   return (
-                    <TableRow
-                      data-state={selected ? "selected" : undefined}
+                    <ExplorerTableEntryRow
+                      buildPublicUrl={buildPublicUrl}
+                      deletingPath={deletingPath}
+                      downloadingFilePath={downloadingFilePath}
+                      downloadingFolderPath={downloadingFolderPath}
+                      entry={entry}
                       key={entry.path}
-                    >
-                      <TableCell className={explorerSelectionColumnWidthClass}>
-                        <Checkbox
-                          aria-label={t("explorer.selection.selectRow", {
-                            name: entry.name,
-                          })}
-                          disabled={selectionDisabled}
-                          checked={selected}
-                          onCheckedChange={(checked) =>
-                            onSelectEntry(entry.path, checked)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="w-[22.5rem] max-w-[22.5rem]">
-                        <ExplorerEntryName
-                          entry={entry}
-                          buildPublicUrl={buildPublicUrl}
-                          onOpenDirectory={onOpenDirectory}
-                          onUpdateVisibility={onUpdateVisibility}
-                        />
-                      </TableCell>
-                      <TableCell className="max-w-[17.5rem]">
-                        <ExplorerEntryUrlCell
-                          buildPublicUrl={buildPublicUrl}
-                          copyLabel={t("explorer.actions.copyUrl")}
-                          entry={entry}
-                        />
-                      </TableCell>
-                      <TableCell
-                        className={
-                          entry.type === "directory"
-                            ? "text-muted-foreground"
-                            : undefined
-                        }
-                      >
-                        {entry.type === "directory"
-                          ? "-"
-                          : formatBytes(entry.size)}
-                      </TableCell>
-                      <TableCell
-                        className={
-                          entry.type === "directory"
-                            ? "text-muted-foreground"
-                            : undefined
-                        }
-                      >
-                        {entry.type === "directory" ? (
-                          "-"
-                        ) : (
-                          <Badge
-                            variant={
-                              entry.visibility === "public"
-                                ? "outline"
-                                : "secondary"
-                            }
-                            className="flex items-center"
-                          >
-                            {entry.visibility === "public" ? (
-                              <>
-                                <UnlockIcon />
-                                {t("objects.visibility.public")}
-                              </>
-                            ) : (
-                              <>
-                                <LockIcon />
-                                {t("objects.visibility.private")}
-                              </>
-                            )}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell
-                        className={
-                          entry.type === "directory"
-                            ? "text-muted-foreground"
-                            : undefined
-                        }
-                      >
-                        {entry.type === "directory"
-                          ? "-"
-                          : formatDate(entry.created_at ?? entry.updated_at, locale)}
-                      </TableCell>
-                      <TableCell>
-                        {entry.type === "directory" ? (
-                          <ExplorerDirectoryActions
-                            bucket={bucket}
-                            deletingPath={deletingPath}
-                            downloadingFolderPath={downloadingFolderPath}
-                            entry={entry}
-                            onDeleteFolder={onDeleteFolder}
-                            onDownloadFolder={onDownloadFolder}
-                            onOpenDirectory={onOpenDirectory}
-                            onPublishSite={onPublishSite}
-                            publishingPath={publishingPath}
-                          />
-                        ) : (
-                          <ExplorerFileActions
-                            bucket={bucket}
-                            buildPublicUrl={buildPublicUrl}
-                            deletingPath={deletingPath}
-                            downloadingFilePath={downloadingFilePath}
-                            entry={entry}
-                            onDeleteFile={onDeleteFile}
-                            onDownloadFile={onDownloadFile}
-                            onPublishObjectSite={onPublishObjectSite}
-                            onUpdateVisibility={onUpdateVisibility}
-                            publishingPath={publishingPath}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
+                      locale={locale}
+                      onDownloadFile={onDownloadFile}
+                      onDownloadFolder={onDownloadFolder}
+                      onOpenDeleteFile={setDeleteFilePath}
+                      onOpenDeleteFolder={setDeleteFolderPath}
+                      onOpenDetails={setDetailsPath}
+                      onOpenDirectory={onOpenDirectory}
+                      onOpenPublishFile={setPublishFilePath}
+                      onOpenPublishFolder={setPublishFolderPath}
+                      onSelectEntry={onSelectEntry}
+                      publishingPath={publishingPath}
+                      selected={selectedPaths.has(entry.path)}
+                      selectionDisabled={selectionDisabled}
+                    />
                   );
                 })}
+                {bottomSpacerHeight > 0 ? (
+                  <ExplorerTableSpacerRow height={bottomSpacerHeight} />
+                ) : null}
               </TableBody>
             </table>
-          </ScrollArea>
+          </div>
         </div>
       </div>
+      <FileDetailsDialog
+        buildPublicUrl={buildPublicUrl}
+        entry={detailsEntry}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailsPath(null);
+          }
+        }}
+        onUpdateVisibility={onUpdateVisibility}
+        open={detailsEntry !== null}
+      />
+      <DeleteFileDialog
+        bucket={bucket}
+        entry={deleteFileEntry}
+        onDeleteFile={async (objectKey) => {
+          setDeleteFilePath(null);
+          await onDeleteFile(objectKey);
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteFilePath(null);
+          }
+        }}
+      />
+      <DeleteFolderDialog
+        bucket={bucket}
+        entry={deleteFolderEntry}
+        onDeleteFolder={async (folderPath) => {
+          setDeleteFolderPath(null);
+          await onDeleteFolder(folderPath);
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteFolderPath(null);
+          }
+        }}
+      />
+      {publishFolderEntry ? (
+        <PublishSiteDialog
+          bucket={bucket}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPublishFolderPath(null);
+            }
+          }}
+          onSubmit={(value) => onPublishSite(publishFolderEntry.path, value)}
+          open
+          pending={publishingPath === publishFolderEntry.path}
+          prefix={publishFolderEntry.path}
+          trigger={null}
+        />
+      ) : null}
+      {publishFileEntry ? (
+        <PublishObjectSiteDialog
+          bucket={bucket}
+          objectKey={publishFileEntry.object_key}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPublishFilePath(null);
+            }
+          }}
+          onSubmit={(value) =>
+            onPublishObjectSite(publishFileEntry.object_key, value)
+          }
+          open
+          pending={publishingPath === publishFileEntry.path}
+          trigger={null}
+        />
+      ) : null}
     </div>
   );
 }
@@ -429,19 +513,167 @@ function ExplorerTableColGroup() {
   );
 }
 
+function ExplorerTableSpacerRow({ height }: { height: number }) {
+  return (
+    <TableRow aria-hidden="true" className="hover:bg-transparent">
+      <TableCell
+        className="p-0"
+        colSpan={explorerTableColumnCount}
+        style={{ height }}
+      />
+    </TableRow>
+  );
+}
+
+function ExplorerTableEntryRow({
+  buildPublicUrl,
+  deletingPath,
+  downloadingFilePath,
+  downloadingFolderPath,
+  entry,
+  locale,
+  onDownloadFile,
+  onDownloadFolder,
+  onOpenDeleteFile,
+  onOpenDeleteFolder,
+  onOpenDetails,
+  onOpenDirectory,
+  onOpenPublishFile,
+  onOpenPublishFolder,
+  onSelectEntry,
+  publishingPath,
+  selected,
+  selectionDisabled,
+}: {
+  buildPublicUrl: (objectKey: string) => string;
+  deletingPath: string;
+  downloadingFilePath: string;
+  downloadingFolderPath: string;
+  entry: ExplorerEntry;
+  locale: AppLocale;
+  onDownloadFile: (entry: ExplorerFileEntry) => Promise<void>;
+  onDownloadFolder: (folderPath: string) => Promise<void>;
+  onOpenDeleteFile: (entryPath: string) => void;
+  onOpenDeleteFolder: (entryPath: string) => void;
+  onOpenDetails: (entryPath: string) => void;
+  onOpenDirectory: (folderPath: string) => void;
+  onOpenPublishFile: (entryPath: string) => void;
+  onOpenPublishFolder: (entryPath: string) => void;
+  onSelectEntry: (
+    entryPath: string,
+    checked: boolean | "indeterminate",
+  ) => void;
+  publishingPath: string;
+  selected: boolean;
+  selectionDisabled: boolean;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <TableRow data-state={selected ? "selected" : undefined}>
+      <TableCell className={explorerSelectionColumnWidthClass}>
+        <Checkbox
+          aria-label={t("explorer.selection.selectRow", {
+            name: entry.name,
+          })}
+          checked={selected}
+          disabled={selectionDisabled}
+          onCheckedChange={(checked) => onSelectEntry(entry.path, checked)}
+        />
+      </TableCell>
+      <TableCell className="w-[22.5rem] max-w-[22.5rem]">
+        <ExplorerEntryName
+          entry={entry}
+          onOpenDetails={onOpenDetails}
+          onOpenDirectory={onOpenDirectory}
+        />
+      </TableCell>
+      <TableCell className="max-w-[17.5rem]">
+        <ExplorerEntryUrlCell
+          buildPublicUrl={buildPublicUrl}
+          copyLabel={t("explorer.actions.copyUrl")}
+          entry={entry}
+        />
+      </TableCell>
+      <TableCell
+        className={
+          entry.type === "directory" ? "text-muted-foreground" : undefined
+        }
+      >
+        {entry.type === "directory" ? "-" : formatBytes(entry.size)}
+      </TableCell>
+      <TableCell
+        className={
+          entry.type === "directory" ? "text-muted-foreground" : undefined
+        }
+      >
+        {entry.type === "directory" ? (
+          "-"
+        ) : (
+          <Badge
+            className="flex items-center"
+            variant={entry.visibility === "public" ? "outline" : "secondary"}
+          >
+            {entry.visibility === "public" ? (
+              <>
+                <UnlockIcon />
+                {t("objects.visibility.public")}
+              </>
+            ) : (
+              <>
+                <LockIcon />
+                {t("objects.visibility.private")}
+              </>
+            )}
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell
+        className={
+          entry.type === "directory" ? "text-muted-foreground" : undefined
+        }
+      >
+        {entry.type === "directory"
+          ? "-"
+          : formatDate(entry.created_at ?? entry.updated_at, locale)}
+      </TableCell>
+      <TableCell>
+        {entry.type === "directory" ? (
+          <ExplorerDirectoryActions
+            deletingPath={deletingPath}
+            downloadingFolderPath={downloadingFolderPath}
+            entry={entry}
+            onDownloadFolder={onDownloadFolder}
+            onOpenDeleteFolder={onOpenDeleteFolder}
+            onOpenDirectory={onOpenDirectory}
+            onOpenPublishSite={onOpenPublishFolder}
+            publishingPath={publishingPath}
+          />
+        ) : (
+          <ExplorerFileActions
+            deletingPath={deletingPath}
+            downloadingFilePath={downloadingFilePath}
+            entry={entry}
+            onDownloadFile={onDownloadFile}
+            onOpenDeleteFile={onOpenDeleteFile}
+            onOpenDetails={onOpenDetails}
+            onOpenPublishObjectSite={onOpenPublishFile}
+            publishingPath={publishingPath}
+          />
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function ExplorerEntryName({
   entry,
-  buildPublicUrl,
+  onOpenDetails,
   onOpenDirectory,
-  onUpdateVisibility,
 }: {
   entry: ExplorerEntry;
-  buildPublicUrl: (objectKey: string) => string;
+  onOpenDetails: (entryPath: string) => void;
   onOpenDirectory: (folderPath: string) => void;
-  onUpdateVisibility: (
-    objectKey: string,
-    visibility: ObjectVisibility,
-  ) => Promise<void>;
 }) {
   if (entry.type === "directory") {
     return (
@@ -461,22 +693,17 @@ function ExplorerEntryName({
 
   if (entry.type === "file") {
     return (
-      <FileDetailsButton
-        buildPublicUrl={buildPublicUrl}
-        entry={entry}
-        onUpdateVisibility={onUpdateVisibility}
+      <Button
+        className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
+        onClick={() => onOpenDetails(entry.path)}
+        type="button"
+        variant="ghost"
       >
-        <Button
-          className="px-0 gap-3 flex max-w-full w-fit min-w-0 justify-start items-center font-normal hover:bg-transparent"
-          type="button"
-          variant="ghost"
-        >
-          <span className="inline-flex size-4 items-center justify-center text-gray-500 [&_svg]:size-4">
-            <FileIcon />
-          </span>
-          <span className="min-w-0 truncate">{entry.name}</span>
-        </Button>
-      </FileDetailsButton>
+        <span className="inline-flex size-4 items-center justify-center text-gray-500 [&_svg]:size-4">
+          <FileIcon />
+        </span>
+        <span className="min-w-0 truncate">{entry.name}</span>
+      </Button>
     );
   }
 
@@ -485,24 +712,22 @@ function ExplorerEntryName({
 }
 
 function ExplorerDirectoryActions({
-  bucket,
   deletingPath,
   downloadingFolderPath,
   entry,
-  onDeleteFolder,
   onDownloadFolder,
+  onOpenDeleteFolder,
   onOpenDirectory,
-  onPublishSite,
+  onOpenPublishSite,
   publishingPath,
 }: {
-  bucket: string;
   deletingPath: string;
   downloadingFolderPath: string;
   entry: ExplorerDirectoryEntry;
-  onDeleteFolder: (folderPath: string) => Promise<void>;
   onDownloadFolder: (folderPath: string) => Promise<void>;
+  onOpenDeleteFolder: (entryPath: string) => void;
   onOpenDirectory: (folderPath: string) => void;
-  onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
+  onOpenPublishSite: (entryPath: string) => void;
   publishingPath: string;
 }) {
   const { t } = useI18n();
@@ -524,66 +749,43 @@ function ExplorerDirectoryActions({
       />
 
       <PublishFolderSiteButton
-        bucket={bucket}
         entry={entry}
-        onPublishSite={onPublishSite}
+        onOpenPublishSite={onOpenPublishSite}
         publishingPath={publishingPath}
       />
 
       <ExplorerOverflowMenu label={t("explorer.actions.more")}>
-        <DeleteFolderButton
-          bucket={bucket}
-          deletingPath={deletingPath}
-          entry={entry}
-          onDeleteFolder={onDeleteFolder}
-          trigger={
-            <DropdownMenuItem
-              className="cursor-pointer"
-              disabled={deleting}
-              onSelect={(event) => event.preventDefault()}
-              variant="destructive"
-            >
-              {deleting ? (
-                <SyncIcon className="animate-spin" />
-              ) : (
-                <TrashIcon />
-              )}
-              {t("explorer.actions.deleteFolder")}
-            </DropdownMenuItem>
-          }
-        />
+        <DropdownMenuItem
+          className="cursor-pointer"
+          disabled={deleting}
+          onSelect={() => onOpenDeleteFolder(entry.path)}
+          variant="destructive"
+        >
+          {deleting ? <SyncIcon className="animate-spin" /> : <TrashIcon />}
+          {t("explorer.actions.deleteFolder")}
+        </DropdownMenuItem>
       </ExplorerOverflowMenu>
     </div>
   );
 }
 
 function ExplorerFileActions({
-  bucket,
-  buildPublicUrl,
   deletingPath,
   downloadingFilePath,
   entry,
-  onDeleteFile,
   onDownloadFile,
-  onPublishObjectSite,
-  onUpdateVisibility,
+  onOpenDeleteFile,
+  onOpenDetails,
+  onOpenPublishObjectSite,
   publishingPath,
 }: {
-  bucket: string;
-  buildPublicUrl: (objectKey: string) => string;
   deletingPath: string;
   downloadingFilePath: string;
   entry: ExplorerFileEntry;
-  onDeleteFile: (objectKey: string) => Promise<void>;
   onDownloadFile: (entry: ExplorerFileEntry) => Promise<void>;
-  onPublishObjectSite: (
-    objectKey: string,
-    value: PublishObjectSiteValue,
-  ) => Promise<void>;
-  onUpdateVisibility: (
-    objectKey: string,
-    visibility: ObjectVisibility,
-  ) => Promise<void>;
+  onOpenDeleteFile: (entryPath: string) => void;
+  onOpenDetails: (entryPath: string) => void;
+  onOpenPublishObjectSite: (entryPath: string) => void;
   publishingPath: string;
 }) {
   const { t } = useI18n();
@@ -597,15 +799,12 @@ function ExplorerFileActions({
 
   return (
     <div className="flex items-center justify-start gap-1">
-      <FileDetailsButton
-        buildPublicUrl={buildPublicUrl}
-        entry={entry}
-        onUpdateVisibility={onUpdateVisibility}
+      <ExplorerIconButton
+        label={t("explorer.actions.viewDetails")}
+        onClick={() => onOpenDetails(entry.path)}
       >
-        <ExplorerIconButton label={t("explorer.actions.viewDetails")}>
-          <EyeIcon className="text-muted-foreground" />
-        </ExplorerIconButton>
-      </FileDetailsButton>
+        <EyeIcon className="text-muted-foreground" />
+      </ExplorerIconButton>
 
       <ExplorerIconButton
         disabled={downloading}
@@ -620,34 +819,21 @@ function ExplorerFileActions({
       </ExplorerIconButton>
 
       <PublishObjectSiteButton
-        bucket={bucket}
         entry={entry}
-        onPublishObjectSite={onPublishObjectSite}
+        onOpenPublishObjectSite={onOpenPublishObjectSite}
         publishingPath={publishingPath}
       />
 
       <ExplorerOverflowMenu label={t("explorer.actions.more")}>
-        <DeleteFileButton
-          bucket={bucket}
-          deletingPath={deletingPath}
-          entry={entry}
-          onDeleteFile={onDeleteFile}
-          trigger={
-            <DropdownMenuItem
-              className="cursor-pointer"
-              disabled={deleting}
-              onSelect={(event) => event.preventDefault()}
-              variant="destructive"
-            >
-              {deleting ? (
-                <SyncIcon className="animate-spin" />
-              ) : (
-                <TrashIcon />
-              )}
-              {t("common.delete")}
-            </DropdownMenuItem>
-          }
-        />
+        <DropdownMenuItem
+          className="cursor-pointer"
+          disabled={deleting}
+          onSelect={() => onOpenDeleteFile(entry.path)}
+          variant="destructive"
+        >
+          {deleting ? <SyncIcon className="animate-spin" /> : <TrashIcon />}
+          {t("common.delete")}
+        </DropdownMenuItem>
       </ExplorerOverflowMenu>
     </div>
   );
@@ -883,41 +1069,51 @@ function ExplorerEntryUrlCell({
   );
 }
 
-function FileDetailsButton({
-  children,
+function FileDetailsDialog({
   buildPublicUrl,
   entry,
+  onOpenChange,
   onUpdateVisibility,
+  open,
 }: {
-  children: React.ReactNode;
   buildPublicUrl: (objectKey: string) => string;
-  entry: ExplorerFileEntry;
+  entry: ExplorerFileEntry | null;
+  onOpenChange: (open: boolean) => void;
   onUpdateVisibility: (
     objectKey: string,
     visibility: ObjectVisibility,
   ) => Promise<void>;
+  open: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [selectedVisibility, setSelectedVisibility] =
-    useState<ObjectVisibility>(entry.visibility);
-  const [currentVisibility, setCurrentVisibility] = useState<ObjectVisibility>(
-    entry.visibility,
-  );
+    useState<ObjectVisibility>("private");
+  const [currentVisibility, setCurrentVisibility] =
+    useState<ObjectVisibility>("private");
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const { locale, t } = useI18n();
   const publicUrl =
-    currentVisibility === "public" ? buildPublicUrl(entry.object_key) : "";
-  const previewType = getPreviewType(entry);
+    entry && currentVisibility === "public" ? buildPublicUrl(entry.object_key) : "";
+  const previewType = entry ? getPreviewType(entry) : null;
   const markdownPreviewTooLarge =
-    previewType === "markdown" && entry.size > MAX_MARKDOWN_PREVIEW_BYTES;
+    entry !== null &&
+    previewType === "markdown" &&
+    entry.size > MAX_MARKDOWN_PREVIEW_BYTES;
 
   useEffect(() => {
+    if (!entry) {
+      return;
+    }
+
     setSelectedVisibility(entry.visibility);
     setCurrentVisibility(entry.visibility);
-  }, [entry.visibility, entry.object_key]);
+  }, [entry]);
+
+  if (!entry) {
+    return null;
+  }
 
   async function handleSaveVisibility() {
-    if (selectedVisibility === currentVisibility || isSavingVisibility) {
+    if (!entry || selectedVisibility === currentVisibility || isSavingVisibility) {
       return;
     }
 
@@ -938,9 +1134,7 @@ function FileDetailsButton({
   }
 
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
         aria-describedby={undefined}
         className="max-h-[85vh] min-w-0 sm:max-w-xl"
@@ -1616,50 +1810,55 @@ function isOpenXmlOfficeExtension(name: string) {
   );
 }
 
-function DeleteFolderButton({
+function findFileEntry(
+  entries: ExplorerEntry[],
+  entryPath: string | null,
+): ExplorerFileEntry | null {
+  if (!entryPath) {
+    return null;
+  }
+
+  const entry = entries.find(
+    (candidate) => candidate.type === "file" && candidate.path === entryPath,
+  );
+
+  return entry?.type === "file" ? entry : null;
+}
+
+function findDirectoryEntry(
+  entries: ExplorerEntry[],
+  entryPath: string | null,
+): ExplorerDirectoryEntry | null {
+  if (!entryPath) {
+    return null;
+  }
+
+  const entry = entries.find(
+    (candidate) =>
+      candidate.type === "directory" && candidate.path === entryPath,
+  );
+
+  return entry?.type === "directory" ? entry : null;
+}
+
+function DeleteFolderDialog({
   bucket,
-  deletingPath,
   entry,
+  onOpenChange,
   onDeleteFolder,
-  trigger,
 }: {
   bucket: string;
-  deletingPath: string;
-  entry: ExplorerDirectoryEntry;
+  entry: ExplorerDirectoryEntry | null;
+  onOpenChange: (open: boolean) => void;
   onDeleteFolder: (folderPath: string) => Promise<void>;
-  trigger?: React.ReactNode;
 }) {
   const { t } = useI18n();
-  const label = t("explorer.actions.deleteFolder");
-  const pending = deletingPath === entry.path;
+  if (!entry) {
+    return null;
+  }
 
   return (
-    <AlertDialog>
-      {trigger ? (
-        <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <AlertDialogTrigger asChild>
-                <ExplorerIconActionButton disabled={pending} label={label}>
-                  {pending ? (
-                    <SyncIcon className="animate-spin text-destructive" />
-                  ) : (
-                    <TrashIcon className="text-destructive" />
-                  )}
-                </ExplorerIconActionButton>
-              </AlertDialogTrigger>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent
-            className="whitespace-nowrap leading-none"
-            sideOffset={6}
-          >
-            {label}
-          </TooltipContent>
-        </Tooltip>
-      )}
+    <AlertDialog onOpenChange={onOpenChange} open>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>
@@ -1723,14 +1922,12 @@ function DownloadFolderZipButton({
 }
 
 function PublishFolderSiteButton({
-  bucket,
   entry,
-  onPublishSite,
+  onOpenPublishSite,
   publishingPath,
 }: {
-  bucket: string;
   entry: ExplorerDirectoryEntry;
-  onPublishSite: (folderPath: string, value: PublishSiteValue) => Promise<void>;
+  onOpenPublishSite: (entryPath: string) => void;
   publishingPath: string;
 }) {
   const { t } = useI18n();
@@ -1738,37 +1935,27 @@ function PublishFolderSiteButton({
   const label = t("explorer.actions.publishSite");
 
   return (
-    <PublishSiteDialog
-      bucket={bucket}
-      onSubmit={(value) => onPublishSite(entry.path, value)}
-      pending={pending}
-      prefix={entry.path}
-      trigger={
-        <ExplorerIconActionButton disabled={pending} label={label}>
-          {pending ? (
-            <SyncIcon className="animate-spin text-emerald-500" />
-          ) : (
-            <GlobeIcon className="text-emerald-500" />
-          )}
-        </ExplorerIconActionButton>
-      }
-      triggerTooltipLabel={label}
-    />
+    <ExplorerIconButton
+      disabled={pending}
+      label={label}
+      onClick={() => onOpenPublishSite(entry.path)}
+    >
+      {pending ? (
+        <SyncIcon className="animate-spin text-emerald-500" />
+      ) : (
+        <GlobeIcon className="text-emerald-500" />
+      )}
+    </ExplorerIconButton>
   );
 }
 
 function PublishObjectSiteButton({
-  bucket,
   entry,
-  onPublishObjectSite,
+  onOpenPublishObjectSite,
   publishingPath,
 }: {
-  bucket: string;
   entry: ExplorerFileEntry;
-  onPublishObjectSite: (
-    objectKey: string,
-    value: PublishObjectSiteValue,
-  ) => Promise<void>;
+  onOpenPublishObjectSite: (entryPath: string) => void;
   publishingPath: string;
 }) {
   const { t } = useI18n();
@@ -1776,69 +1963,38 @@ function PublishObjectSiteButton({
   const label = t("explorer.actions.publishSite");
 
   return (
-    <PublishObjectSiteDialog
-      bucket={bucket}
-      objectKey={entry.object_key}
-      onSubmit={(value) => onPublishObjectSite(entry.object_key, value)}
-      pending={pending}
-      trigger={
-        <ExplorerIconActionButton disabled={pending} label={label}>
-          {pending ? (
-            <SyncIcon className="animate-spin text-emerald-500" />
-          ) : (
-            <GlobeIcon className="text-emerald-500" />
-          )}
-        </ExplorerIconActionButton>
-      }
-      triggerTooltipLabel={label}
-    />
+    <ExplorerIconButton
+      disabled={pending}
+      label={label}
+      onClick={() => onOpenPublishObjectSite(entry.path)}
+    >
+      {pending ? (
+        <SyncIcon className="animate-spin text-emerald-500" />
+      ) : (
+        <GlobeIcon className="text-emerald-500" />
+      )}
+    </ExplorerIconButton>
   );
 }
 
-function DeleteFileButton({
+function DeleteFileDialog({
   bucket,
-  deletingPath,
   entry,
+  onOpenChange,
   onDeleteFile,
-  trigger,
 }: {
   bucket: string;
-  deletingPath: string;
-  entry: ExplorerFileEntry;
+  entry: ExplorerFileEntry | null;
+  onOpenChange: (open: boolean) => void;
   onDeleteFile: (objectKey: string) => Promise<void>;
-  trigger?: React.ReactNode;
 }) {
   const { t } = useI18n();
-  const label = t("common.delete");
-  const pending = deletingPath === entry.object_key;
+  if (!entry) {
+    return null;
+  }
 
   return (
-    <AlertDialog>
-      {trigger ? (
-        <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <AlertDialogTrigger asChild>
-                <ExplorerIconActionButton disabled={pending} label={label}>
-                  {pending ? (
-                    <SyncIcon className="animate-spin text-destructive" />
-                  ) : (
-                    <TrashIcon className="text-destructive" />
-                  )}
-                </ExplorerIconActionButton>
-              </AlertDialogTrigger>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent
-            className="whitespace-nowrap leading-none"
-            sideOffset={6}
-          >
-            {label}
-          </TooltipContent>
-        </Tooltip>
-      )}
+    <AlertDialog onOpenChange={onOpenChange} open>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogMedia>

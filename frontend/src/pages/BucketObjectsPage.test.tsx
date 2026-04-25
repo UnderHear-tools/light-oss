@@ -690,6 +690,80 @@ describe("BucketObjectsPage", () => {
     });
   });
 
+  it("clears previous rows immediately when navigating into another directory", async () => {
+    let resolveNestedDirectory:
+      | ((value: { items: typeof nestedFileItems; next_cursor: string }) => void)
+      | undefined;
+    const nestedFileItems = [
+      {
+        type: "file" as const,
+        path: "docs/readme.txt",
+        name: "readme.txt",
+        is_empty: null,
+        object_key: "docs/readme.txt",
+        original_filename: "readme.txt",
+        size: 12,
+        content_type: "text/plain",
+        etag: "abcdef1234567890",
+        visibility: "public" as const,
+        updated_at: "2026-03-25T00:00:00Z",
+      },
+    ];
+
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            type: "directory",
+            path: "docs/",
+            name: "docs",
+            is_empty: false,
+            object_key: null,
+            original_filename: null,
+            size: null,
+            content_type: null,
+            etag: null,
+            visibility: null,
+            updated_at: null,
+          },
+        ],
+        next_cursor: "",
+      })
+      .mockImplementationOnce(
+        async () =>
+          await new Promise((resolve) => {
+            resolveNestedDirectory = resolve;
+          }),
+      );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    const tables = await screen.findAllByRole("table");
+    const table = tables[tables.length - 1];
+
+    expect(table).toBeDefined();
+    await userEvent.click(within(table!).getByRole("button", { name: "docs" }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "docs" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText("readme.txt")).not.toBeInTheDocument();
+
+    resolveNestedDirectory?.({
+      items: nestedFileItems,
+      next_cursor: "",
+    });
+
+    expect(await screen.findByText("readme.txt")).toBeInTheDocument();
+  });
+
   it("applies explorer sorting from the popover and only refetches after confirmation", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [
@@ -1548,6 +1622,101 @@ describe("BucketObjectsPage", () => {
           objectKey: "docs/new.txt",
         }),
       );
+    });
+
+    expect(await screen.findByText("new.txt")).toBeInTheDocument();
+  });
+
+  it("keeps the existing table visible while entries refetch after upload", async () => {
+    const existingItem = {
+      type: "file" as const,
+      path: "docs/existing.txt",
+      name: "existing.txt",
+      is_empty: null,
+      object_key: "docs/existing.txt",
+      original_filename: "existing.txt",
+      size: 12,
+      content_type: "text/plain",
+      etag: "existing12345678",
+      visibility: "private" as const,
+      updated_at: "2026-03-25T00:01:00Z",
+    };
+    const uploadedItem = {
+      type: "file" as const,
+      path: "docs/new.txt",
+      name: "new.txt",
+      is_empty: null,
+      object_key: "docs/new.txt",
+      original_filename: "new.txt",
+      size: 16,
+      content_type: "text/plain",
+      etag: "feedface12345678",
+      visibility: "private" as const,
+      updated_at: "2026-03-25T00:02:00Z",
+    };
+    let listExplorerEntriesCallCount = 0;
+    let resolveRefetch:
+      | ((value: { items: typeof uploadedItem[]; next_cursor: string }) => void)
+      | undefined;
+
+    vi.mocked(listExplorerEntries).mockImplementation(async () => {
+      listExplorerEntriesCallCount += 1;
+
+      if (listExplorerEntriesCallCount === 1) {
+        return { items: [existingItem], next_cursor: "" };
+      }
+
+      if (listExplorerEntriesCallCount === 2) {
+        return await new Promise((resolve) => {
+          resolveRefetch = resolve;
+        });
+      }
+
+      return { items: [existingItem, uploadedItem], next_cursor: "" };
+    });
+
+    vi.mocked(uploadObject).mockResolvedValue({
+      id: 2,
+      bucket_name: "demo",
+      object_key: "docs/new.txt",
+      original_filename: "new.txt",
+      size: 16,
+      content_type: "text/plain",
+      etag: "feedface12345678",
+      visibility: "private",
+      created_at: "2026-03-25T00:02:00Z",
+      updated_at: "2026-03-25T00:02:00Z",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    expect(await screen.findByText("existing.txt")).toBeInTheDocument();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Upload" }),
+    );
+
+    const file = new File(["hello"], "new.txt", { type: "text/plain" });
+    await userEvent.upload(await screen.findByLabelText("File"), file);
+    await userEvent.type(screen.getByLabelText("Object name"), "new.txt");
+    await userEvent.click(screen.getByRole("button", { name: "Start upload" }));
+
+    await waitFor(() => {
+      expect(uploadObject).toHaveBeenCalledTimes(1);
+      expect(listExplorerEntries).toHaveBeenCalledTimes(2);
+    });
+
+    expect(screen.getByText("existing.txt")).toBeInTheDocument();
+    expect(document.querySelectorAll("table")).toHaveLength(2);
+
+    resolveRefetch?.({
+      items: [existingItem, uploadedItem],
+      next_cursor: "",
     });
 
     expect(await screen.findByText("new.txt")).toBeInTheDocument();

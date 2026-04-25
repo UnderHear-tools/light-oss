@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
@@ -196,14 +196,57 @@ describe("ExplorerTable", () => {
     renderExplorerTable(createFileEntry({}));
 
     const tables = screen.getAllByRole("table");
-    const scrollArea = document.querySelector("[data-slot='scroll-area']");
+    const scrollContainer = screen.getByTestId("explorer-table-scroll-container");
 
     expect(tables).toHaveLength(2);
-    expect(scrollArea).not.toBeNull();
-    expect(scrollArea?.className).toContain("flex-1");
-    expect(scrollArea?.className).toContain("overflow-hidden");
-    expect(scrollArea).toContainElement(tables[1]);
-    expect(scrollArea).not.toContainElement(tables[0]);
+    expect(scrollContainer.className).toContain("flex-1");
+    expect(scrollContainer.className).toContain("overflow-auto");
+    expect(scrollContainer).toContainElement(tables[1]);
+    expect(scrollContainer).not.toContainElement(tables[0]);
+  });
+
+  it("virtualizes large result sets instead of rendering every row at once", () => {
+    renderExplorerTable(createManyFileEntries(120));
+
+    const rowCheckboxes = screen
+      .getAllByRole("checkbox")
+      .filter((checkbox) => checkbox.getAttribute("aria-label") !== "Select all items");
+
+    expect(rowCheckboxes.length).toBeLessThan(40);
+    expect(
+      screen.queryByRole("button", { name: "file-119.txt" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders later rows after scrolling and keeps row actions interactive", async () => {
+    renderExplorerTable(createManyFileEntries(120));
+
+    const scrollContainer = screen.getByTestId("explorer-table-scroll-container");
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      configurable: true,
+      value: 49 * 100,
+      writable: true,
+    });
+
+    fireEvent.scroll(scrollContainer);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "file-110.txt" }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "file-110.txt" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText((_, element) => {
+        return (
+          element?.tagName === "DD" &&
+          element.textContent === "file-110.txt"
+        );
+      }),
+    ).toBeInTheDocument();
   });
 
   it("routes public and private file download actions through the shared callback", async () => {
@@ -686,6 +729,17 @@ function createDirectoryEntry(
     updated_at: null,
     ...overrides,
   };
+}
+
+function createManyFileEntries(count: number): ExplorerFileEntry[] {
+  return Array.from({ length: count }, (_, index) =>
+    createFileEntry({
+      name: `file-${index}.txt`,
+      object_key: `docs/file-${index}.txt`,
+      original_filename: `file-${index}.txt`,
+      path: `docs/file-${index}.txt`,
+    }),
+  );
 }
 
 function renderExplorerTable(

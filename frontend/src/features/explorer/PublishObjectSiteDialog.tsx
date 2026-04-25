@@ -12,14 +12,18 @@ export interface PublishObjectSiteValue {
 export function PublishObjectSiteDialog({
   bucket,
   objectKey,
+  open,
   pending,
+  onOpenChange,
   onSubmit,
   trigger,
   triggerTooltipLabel,
 }: {
   bucket: string;
   objectKey: string;
+  open?: boolean;
   pending: boolean;
+  onOpenChange?: (open: boolean) => void;
   onSubmit: (value: PublishObjectSiteValue) => Promise<void>;
   trigger?: ReactNode;
   triggerTooltipLabel?: string;
@@ -41,6 +45,7 @@ export function PublishObjectSiteDialog({
       }}
       lockedFields={{ bucket: true, rootPrefix: true, indexDocument: true }}
       mode="create"
+      onOpenChange={onOpenChange}
       onSubmit={(value) =>
         onSubmit({
           domains: value.domains,
@@ -49,6 +54,7 @@ export function PublishObjectSiteDialog({
           spaFallback: value.spaFallback,
         })
       }
+      open={open}
       pending={pending}
       submitLabel={t("explorer.actions.publishSite")}
       title={t("sites.publishObject.title")}

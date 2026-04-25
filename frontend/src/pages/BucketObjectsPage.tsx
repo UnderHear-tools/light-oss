@@ -77,6 +77,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -120,6 +121,18 @@ type PendingOverwriteUpload = {
   value: UploadDialogValue;
   target?: string;
 };
+
+function ExplorerTableLoadingSkeleton() {
+  return (
+    <div className="p-4">
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 8 }, (_, index) => (
+          <Skeleton className="h-12 w-full" key={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function BucketObjectsPage() {
   const { bucket = "" } = useParams();
@@ -495,6 +508,8 @@ export function BucketObjectsPage() {
     uploadAndPublishSiteMutation.isPending ||
     isCheckingOverwrite ||
     isRetryingOverwrite;
+  const showInitialEntriesLoading = entriesQuery.isLoading && !entriesQuery.data;
+  const entriesRefreshing = entriesQuery.isFetching && !!entriesQuery.data;
   const bucketMissing = isBucketNotFoundError(entriesQuery.error);
   const overwriteTarget = pendingOverwriteUpload
     ? pendingOverwriteUpload.target ??
@@ -1075,7 +1090,9 @@ export function BucketObjectsPage() {
                         variant="ghost"
                         size="icon-sm"
                       >
-                        <RefreshCcwIcon className="size-4" />
+                        <RefreshCcwIcon
+                          className={cn("size-4", entriesRefreshing && "animate-spin")}
+                        />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent
@@ -1140,10 +1157,8 @@ export function BucketObjectsPage() {
               </div>
             ) : null}
 
-            {entriesQuery.isLoading || entriesQuery.isFetching ? (
-              <div className="flex min-h-[320px] items-center justify-center p-4">
-                <LoaderCircleIcon className="animate-spin text-muted-foreground" />
-              </div>
+            {showInitialEntriesLoading ? (
+              <ExplorerTableLoadingSkeleton />
             ) : entries.length > 0 ? (
               <>
                 <div className="min-h-0 flex-1 overflow-auto">
