@@ -10,7 +10,13 @@ import { PreferencesProvider } from "./lib/preferences";
 import { TooltipProvider } from "./components/ui/tooltip";
 import "./styles.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
