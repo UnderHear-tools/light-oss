@@ -26,6 +26,10 @@ import { useAppSettings } from "@/lib/settings"
 
 const lastBucketRouteStorageKey = "light-oss-last-bucket-route"
 
+function isBucketRoute(route: string) {
+  return route === "/buckets" || route.startsWith("/buckets/")
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { pathname, search } = useLocation()
   const { settings } = useAppSettings()
@@ -37,7 +41,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return ""
     }
 
-    return window.localStorage.getItem(lastBucketRouteStorageKey) ?? ""
+    const storedRoute = window.localStorage.getItem(lastBucketRouteStorageKey) ?? ""
+
+    return isBucketRoute(storedRoute) ? storedRoute : ""
   })
 
   React.useEffect(() => {
@@ -49,7 +55,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     window.localStorage.setItem(lastBucketRouteStorageKey, currentBucketRoute)
   }, [currentBucketRoute])
 
-  const bucketNavUrl = currentBucketRoute ?? lastBucketRoute ?? "/buckets"
+  const bucketNavUrl = currentBucketRoute ?? (lastBucketRoute || "/buckets")
 
   const data = {
     workspace: {

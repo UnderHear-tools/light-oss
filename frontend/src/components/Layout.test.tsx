@@ -12,6 +12,7 @@ vi.mock("../api/health", () => ({
 describe("Layout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it("renders the sidebar shell, breadcrumb header, and healthy connection state", async () => {
@@ -107,6 +108,56 @@ describe("Layout", () => {
     expect(screen.getAllByText("Site management")[0]).toBeInTheDocument();
     expect(screen.getByText("Sites body")).toBeInTheDocument();
     expect(await screen.findByText("Service OK")).toBeInTheDocument();
+  });
+
+  it("ignores a non-bucket cached sidebar bucket route", async () => {
+    vi.mocked(getHealthStatus).mockResolvedValueOnce({
+      status: {
+        service: "ok",
+        db: "ok",
+      },
+      version: "mvp",
+    });
+    window.localStorage.setItem("light-oss-last-bucket-route", "/dashboard");
+
+    renderWithApp(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
+        </Route>
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    expect(screen.getByRole("link", { name: "bucket" })).toHaveAttribute("href", "/buckets");
+  });
+
+  it("keeps a valid cached sidebar bucket route", async () => {
+    vi.mocked(getHealthStatus).mockResolvedValueOnce({
+      status: {
+        service: "ok",
+        db: "ok",
+      },
+      version: "mvp",
+    });
+    window.localStorage.setItem(
+      "light-oss-last-bucket-route",
+      "/buckets/media?prefix=avatars",
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<div>Dashboard body</div>} />
+        </Route>
+      </Routes>,
+      { route: "/dashboard" },
+    );
+
+    expect(screen.getByRole("link", { name: "bucket" })).toHaveAttribute(
+      "href",
+      "/buckets/media?prefix=avatars",
+    );
   });
 
   it("uses a viewport-height shell so route overflow stays inside the layout scroll area", async () => {
