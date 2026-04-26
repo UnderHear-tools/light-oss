@@ -542,6 +542,66 @@ describe("ExplorerTable", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("does not preview txt files larger than 100 KB", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderExplorerTable(
+      createFileEntry({
+        content_type: "text/plain",
+        name: "large.txt",
+        object_key: "docs/large.txt",
+        original_filename: "large.txt",
+        path: "docs/large.txt",
+        size: 100 * 1024 + 1,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "large.txt" }));
+
+    const dialog = await screen.findByRole("dialog");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      within(dialog).getByText(
+        "This file is too large to preview. Text preview is not supported above 100 KB.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Fullscreen preview" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not preview other text files larger than 100 KB", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderExplorerTable(
+      createFileEntry({
+        content_type: "application/json",
+        name: "large.json",
+        object_key: "docs/large.json",
+        original_filename: "large.json",
+        path: "docs/large.json",
+        size: 100 * 1024 + 1,
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "large.json" }));
+
+    const dialog = await screen.findByRole("dialog");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      within(dialog).getByText(
+        "This file is too large to preview. Text preview is not supported above 100 KB.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Fullscreen preview" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("opens image previews in a fullscreen dialog", async () => {
     renderExplorerTable(
       createFileEntry({

@@ -2396,6 +2396,63 @@ describe("BucketObjectsPage", () => {
     expect(await screen.findByText("folder upload failed")).toBeInTheDocument();
   });
 
+  it("navigates explorer back and forward by prefix history", async () => {
+    vi.mocked(listExplorerEntries).mockResolvedValue({
+      items: [],
+      next_cursor: "",
+    });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/assets/" },
+    );
+
+    const backButton = await screen.findByRole("button", { name: "Go back" });
+    expect(backButton).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Go forward" }),
+    ).toBeDisabled();
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          prefix: "docs/assets/",
+        }),
+      );
+    });
+
+    await userEvent.click(backButton);
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          prefix: "docs/",
+        }),
+      );
+    });
+
+    expect(screen.queryByText("assets")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go forward" })).toBeEnabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Go forward" }));
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenLastCalledWith(
+        { apiBaseUrl: "http://localhost:8080", bearerToken: "dev-token" },
+        expect.objectContaining({
+          bucket: "demo",
+          prefix: "docs/assets/",
+        }),
+      );
+    });
+  });
+
   it("creates a folder from the toolbar dialog", async () => {
     vi.mocked(listExplorerEntries).mockResolvedValue({
       items: [],

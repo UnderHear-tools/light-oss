@@ -1127,6 +1127,10 @@ function FileDetailsDialog({
     entry !== null &&
     previewType === "markdown" &&
     entry.size > MAX_MARKDOWN_PREVIEW_BYTES;
+  const textPreviewTooLarge =
+    entry !== null &&
+    previewType === "text" &&
+    entry.size > MAX_TEXT_PREVIEW_BYTES;
 
   useEffect(() => {
     if (!entry) {
@@ -1182,6 +1186,7 @@ function FileDetailsDialog({
                   markdownPreviewTooLarge={markdownPreviewTooLarge}
                   previewType={previewType}
                   publicUrl={publicUrl}
+                  textPreviewTooLarge={textPreviewTooLarge}
                 />
               </div>
             </DetailField>
@@ -1324,6 +1329,7 @@ type PreviewType =
   | null;
 type PreviewDisplayMode = "inline" | "fullscreen";
 const MAX_MARKDOWN_PREVIEW_BYTES = 100 * 1024;
+const MAX_TEXT_PREVIEW_BYTES = 100 * 1024;
 
 const openXmlOfficeExtensions = new Set([
   ".docx",
@@ -1420,11 +1426,13 @@ function PreviewFullscreenButton({
   markdownPreviewTooLarge = false,
   previewType,
   publicUrl,
+  textPreviewTooLarge = false,
 }: {
   fileName: string;
   markdownPreviewTooLarge?: boolean;
   previewType: PreviewType;
   publicUrl: string;
+  textPreviewTooLarge?: boolean;
 }) {
   const { t } = useI18n();
   const label = t("explorer.actions.fullscreenPreview");
@@ -1456,6 +1464,7 @@ function PreviewFullscreenButton({
             markdownPreviewTooLarge={markdownPreviewTooLarge}
             previewType={previewType}
             publicUrl={publicUrl}
+            textPreviewTooLarge={textPreviewTooLarge}
           />
         </div>
       </DialogContent>
@@ -1469,24 +1478,28 @@ function FilePreview({
   markdownPreviewTooLarge = false,
   previewType,
   publicUrl,
+  textPreviewTooLarge = false,
 }: {
   fileName: string;
   displayMode?: PreviewDisplayMode;
   markdownPreviewTooLarge?: boolean;
   previewType: PreviewType;
   publicUrl: string;
+  textPreviewTooLarge?: boolean;
 }) {
   const { t } = useI18n();
   const isFullscreen = displayMode === "fullscreen";
   const inlineAction =
     !isFullscreen &&
     previewType !== "audio" &&
-    !(previewType === "markdown" && markdownPreviewTooLarge) ? (
+    !(previewType === "markdown" && markdownPreviewTooLarge) &&
+    !(previewType === "text" && textPreviewTooLarge) ? (
       <PreviewFullscreenButton
         fileName={fileName}
         markdownPreviewTooLarge={markdownPreviewTooLarge}
         previewType={previewType}
         publicUrl={publicUrl}
+        textPreviewTooLarge={textPreviewTooLarge}
       />
     ) : null;
 
@@ -1556,6 +1569,7 @@ function FilePreview({
         markdownPreviewTooLarge={markdownPreviewTooLarge}
         mode="markdown"
         publicUrl={publicUrl}
+        textPreviewTooLarge={textPreviewTooLarge}
       />
     );
   }
@@ -1567,6 +1581,7 @@ function FilePreview({
         displayMode={displayMode}
         mode="text"
         publicUrl={publicUrl}
+        textPreviewTooLarge={textPreviewTooLarge}
       />
     );
   }
@@ -1611,12 +1626,14 @@ function RemoteTextPreview({
   markdownPreviewTooLarge = false,
   mode,
   publicUrl,
+  textPreviewTooLarge = false,
 }: {
   action?: React.ReactNode;
   displayMode: PreviewDisplayMode;
   markdownPreviewTooLarge?: boolean;
   mode: "markdown" | "text";
   publicUrl: string;
+  textPreviewTooLarge?: boolean;
 }) {
   const { t } = useI18n();
   const [previewText, setPreviewText] = useState("");
@@ -1625,7 +1642,10 @@ function RemoteTextPreview({
   );
 
   useEffect(() => {
-    if (mode === "markdown" && markdownPreviewTooLarge) {
+    if (
+      (mode === "markdown" && markdownPreviewTooLarge) ||
+      (mode === "text" && textPreviewTooLarge)
+    ) {
       setPreviewText("");
       setStatus("ready");
       return;
@@ -1661,10 +1681,16 @@ function RemoteTextPreview({
     return () => {
       controller.abort();
     };
-  }, [markdownPreviewTooLarge, mode, publicUrl]);
+  }, [markdownPreviewTooLarge, mode, publicUrl, textPreviewTooLarge]);
 
-  if (mode === "markdown" && markdownPreviewTooLarge) {
-    const tooLargeMessage = t("explorer.preview.markdownTooLarge");
+  if (
+    (mode === "markdown" && markdownPreviewTooLarge) ||
+    (mode === "text" && textPreviewTooLarge)
+  ) {
+    const tooLargeMessage =
+      mode === "markdown"
+        ? t("explorer.preview.markdownTooLarge")
+        : t("explorer.preview.textTooLarge");
 
     if (displayMode === "inline") {
       return (

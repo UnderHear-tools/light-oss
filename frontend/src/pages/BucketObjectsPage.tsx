@@ -20,7 +20,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   buildPublicObjectURL,
   checkObjectExists,
@@ -108,6 +108,7 @@ import { RecycleBinDialog } from "@/features/buckets/RecycleBinDialog";
 import {
   explorerPageSizes,
   getExplorerBreadcrumbs,
+  getParentExplorerPrefix,
   normalizeExplorerPrefix,
   normalizeExplorerSearch,
   normalizeExplorerSortBy,
@@ -155,13 +156,16 @@ function ExplorerEntriesLoadingOverlay({
 
 export function BucketObjectsPage() {
   const { bucket = "" } = useParams();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings } = useAppSettings();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [prefixBackHistory, setPrefixBackHistory] = useState<string[]>([]);
+  const [prefixForwardHistory, setPrefixForwardHistory] = useState<string[]>(
+    [],
+  );
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadDialogResetSignal, setUploadDialogResetSignal] = useState(0);
   const [isCheckingOverwrite, setIsCheckingOverwrite] = useState(false);
@@ -215,6 +219,11 @@ export function BucketObjectsPage() {
   useEffect(() => {
     setCursorHistory([]);
   }, [bucket, prefix, search, limit, sortBy, sortOrder]);
+
+  useEffect(() => {
+    setPrefixBackHistory([]);
+    setPrefixForwardHistory([]);
+  }, [bucket]);
 
   useEffect(() => {
     setSelectedPaths(new Set());
@@ -583,7 +592,7 @@ export function BucketObjectsPage() {
     setSearchParams(next, { replace: false });
   }
 
-  function handleNavigatePrefix(nextPrefix: string) {
+  function applyPrefixNavigation(nextPrefix: string) {
     setCursorHistory([]);
     setSearchInput("");
     updateSearchParams({
@@ -592,6 +601,61 @@ export function BucketObjectsPage() {
       cursor: "",
     });
   }
+
+  function handleNavigatePrefix(
+    nextPrefix: string,
+    options?: {
+      clearForwardHistory?: boolean;
+      recordHistory?: boolean;
+    },
+  ) {
+    const normalizedNextPrefix = normalizeExplorerPrefix(nextPrefix);
+    const recordHistory = options?.recordHistory ?? true;
+    const clearForwardHistory = options?.clearForwardHistory ?? true;
+
+    if (normalizedNextPrefix !== prefix) {
+      if (recordHistory) {
+        setPrefixBackHistory((history) => [...history, prefix]);
+      }
+      if (clearForwardHistory) {
+        setPrefixForwardHistory([]);
+      }
+    }
+
+    applyPrefixNavigation(normalizedNextPrefix);
+  }
+
+  function handlePrefixBack() {
+    if (prefixBackHistory.length > 0) {
+      const previousPrefix = prefixBackHistory[prefixBackHistory.length - 1] ?? "";
+      setPrefixBackHistory((history) => history.slice(0, -1));
+      setPrefixForwardHistory((history) => [...history, prefix]);
+      applyPrefixNavigation(previousPrefix);
+      return;
+    }
+
+    const parentPrefix = getParentExplorerPrefix(prefix);
+    if (parentPrefix === prefix) {
+      return;
+    }
+
+    setPrefixForwardHistory((history) => [...history, prefix]);
+    applyPrefixNavigation(parentPrefix);
+  }
+
+  function handlePrefixForward() {
+    if (prefixForwardHistory.length === 0) {
+      return;
+    }
+
+    const nextPrefix = prefixForwardHistory[prefixForwardHistory.length - 1] ?? "";
+    setPrefixForwardHistory((history) => history.slice(0, -1));
+    setPrefixBackHistory((history) => [...history, prefix]);
+    applyPrefixNavigation(nextPrefix);
+  }
+
+  const canNavigatePrefixBack = prefixBackHistory.length > 0 || prefix !== "";
+  const canNavigatePrefixForward = prefixForwardHistory.length > 0;
 
   async function handleUpload(value: UploadDialogValue) {
     setUploadProgress(0);
@@ -994,7 +1058,8 @@ export function BucketObjectsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => navigate(-1)}
+                disabled={!canNavigatePrefixBack}
+                onClick={handlePrefixBack}
                 size="icon-sm"
                 type="button"
                 variant="outline"
@@ -1003,7 +1068,8 @@ export function BucketObjectsPage() {
                 <span className="sr-only">{t("explorer.actions.goBack")}</span>
               </Button>
               <Button
-                onClick={() => navigate(1)}
+                disabled={!canNavigatePrefixForward}
+                onClick={handlePrefixForward}
                 size="icon-sm"
                 type="button"
                 variant="outline"
