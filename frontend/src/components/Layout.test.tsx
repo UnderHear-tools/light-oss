@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
 import { Layout } from "./Layout";
@@ -158,6 +158,38 @@ describe("Layout", () => {
       "href",
       "/buckets/media?prefix=avatars",
     );
+  });
+
+  it("stores the bucket list route over a cached bucket detail route", async () => {
+    vi.mocked(getHealthStatus).mockResolvedValueOnce({
+      status: {
+        service: "ok",
+        db: "ok",
+      },
+      version: "mvp",
+    });
+    window.localStorage.setItem(
+      "light-oss-last-bucket-route",
+      "/buckets/media?prefix=avatars",
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/buckets" element={<div>Buckets body</div>} />
+        </Route>
+      </Routes>,
+      { route: "/buckets" },
+    );
+
+    const bucketLink = screen
+      .getAllByRole("link", { name: "bucket" })
+      .find((element) => element.getAttribute("href") === "/buckets");
+
+    expect(bucketLink).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.localStorage.getItem("light-oss-last-bucket-route")).toBe("/buckets");
+    });
   });
 
   it("uses a viewport-height shell so route overflow stays inside the layout scroll area", async () => {

@@ -27,7 +27,11 @@ import { useAppSettings } from "@/lib/settings"
 const lastBucketRouteStorageKey = "light-oss-last-bucket-route"
 
 function isBucketRoute(route: string) {
-  return route === "/buckets" || route.startsWith("/buckets/")
+  return (
+    route === "/buckets" ||
+    route.startsWith("/buckets/") ||
+    route.startsWith("/buckets?")
+  )
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -35,7 +39,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { settings } = useAppSettings()
   const { t } = useI18n()
   const currentBucketRoute =
-    pathname.startsWith("/buckets/") ? `${pathname}${search}` : null
+    isBucketRoute(pathname) ? `${pathname}${search}` : null
   const [lastBucketRoute, setLastBucketRoute] = React.useState(() => {
     if (typeof window === "undefined") {
       return ""
