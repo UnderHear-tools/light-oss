@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { AliveScope } from "react-activation";
 import { AppToaster } from "../components/AppToaster";
 import { PreferencesProvider, type AppPreferences } from "../lib/preferences";
 import { SettingsProvider, type AppSettings } from "../lib/settings";
@@ -48,7 +49,7 @@ export function renderWithApp(
               }}
               initialEntries={[route]}
             >
-              {ui}
+              <AliveScope>{ui}</AliveScope>
             </MemoryRouter>
           </TooltipProvider>
           <AppToaster />
