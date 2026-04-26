@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
@@ -136,6 +136,79 @@ describe("BucketObjectsPage", () => {
     expect(
       screen.queryByText("Failed to load folder entries"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the entries spinner while the initial entries request is pending", async () => {
+    const emptyEntries = { items: [], next_cursor: "" };
+    let resolveEntries: ((value: typeof emptyEntries) => void) | undefined;
+
+    vi.mocked(listExplorerEntries).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveEntries = resolve;
+        }),
+    );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo" },
+    );
+
+    expect(
+      (await screen.findAllByRole("status", { name: "Loading" })).length,
+    ).toBeGreaterThan(0);
+
+    resolveEntries?.(emptyEntries);
+
+    expect(await screen.findByText("This folder is empty")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("status", { name: "Loading" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("renders initial entries content without waiting for a minimum spinner duration", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const emptyEntries = { items: [], next_cursor: "" };
+    let resolveEntries: ((value: typeof emptyEntries) => void) | undefined;
+
+    try {
+      vi.mocked(listExplorerEntries).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveEntries = resolve;
+          }),
+      );
+
+      renderWithApp(
+        <Routes>
+          <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+        </Routes>,
+        { route: "/buckets/demo" },
+      );
+
+      expect(
+        screen.getAllByRole("status", { name: "Loading" }).length,
+      ).toBeGreaterThan(0);
+
+      await act(async () => {
+        resolveEntries?.(emptyEntries);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(screen.getByText("This folder is empty")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("status", { name: "Loading" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens a bucket-scoped recycle bin dialog from the explorer toolbar", async () => {
@@ -690,7 +763,7 @@ describe("BucketObjectsPage", () => {
     });
   });
 
-  it("clears previous rows immediately when navigating into another directory", async () => {
+  it("keeps previous rows covered while navigating into another directory", async () => {
     let resolveNestedDirectory:
       | ((value: { items: typeof nestedFileItems; next_cursor: string }) => void)
       | undefined;
@@ -750,11 +823,13 @@ describe("BucketObjectsPage", () => {
     await userEvent.click(within(table!).getByRole("button", { name: "docs" }));
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "docs" }),
-      ).not.toBeInTheDocument();
+      expect(listExplorerEntries).toHaveBeenCalledTimes(2);
     });
+    expect(screen.getByRole("button", { name: "docs" })).toBeInTheDocument();
     expect(screen.queryByText("readme.txt")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("status", { name: "Loading" }).length,
+    ).toBeGreaterThan(0);
 
     resolveNestedDirectory?.({
       items: nestedFileItems,
@@ -1713,6 +1788,10 @@ describe("BucketObjectsPage", () => {
 
     expect(screen.getByText("existing.txt")).toBeInTheDocument();
     expect(document.querySelectorAll("table")).toHaveLength(2);
+    expect(
+      document.querySelectorAll('svg[role="status"][aria-label="Loading"]')
+        .length,
+    ).toBeGreaterThan(0);
 
     resolveRefetch?.({
       items: [existingItem, uploadedItem],
@@ -1720,6 +1799,82 @@ describe("BucketObjectsPage", () => {
     });
 
     expect(await screen.findByText("new.txt")).toBeInTheDocument();
+  });
+
+  it("shows only the entries loading overlay while entries refetch", async () => {
+    const existingItem = {
+      type: "file" as const,
+      path: "docs/existing.txt",
+      name: "existing.txt",
+      is_empty: null,
+      object_key: "docs/existing.txt",
+      original_filename: "existing.txt",
+      size: 12,
+      content_type: "text/plain",
+      etag: "existing12345678",
+      visibility: "private" as const,
+      updated_at: "2026-03-25T00:01:00Z",
+    };
+    const refreshedItems = [
+      {
+        type: "file" as const,
+        path: "docs/refreshed.txt",
+        name: "refreshed.txt",
+        is_empty: null,
+        object_key: "docs/refreshed.txt",
+        original_filename: "refreshed.txt",
+        size: 16,
+        content_type: "text/plain",
+        etag: "refreshed123456",
+        visibility: "private" as const,
+        updated_at: "2026-03-25T00:02:00Z",
+      },
+    ];
+    let resolveRefetch:
+      | ((value: { items: typeof refreshedItems; next_cursor: string }) => void)
+      | undefined;
+
+    vi.mocked(listExplorerEntries)
+      .mockResolvedValueOnce({ items: [existingItem], next_cursor: "" })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefetch = resolve;
+          }),
+      );
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets/:bucket" element={<BucketObjectsPage />} />
+      </Routes>,
+      { route: "/buckets/demo?prefix=docs/" },
+    );
+
+    expect(await screen.findByText("existing.txt")).toBeInTheDocument();
+
+    const refreshButton = screen.getByRole("button", { name: "Refresh" });
+    await userEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(listExplorerEntries).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      within(refreshButton).queryByRole("status", { name: "Loading" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("status", { name: "Loading" })).toHaveLength(1);
+    expect(screen.getByText("existing.txt")).toBeInTheDocument();
+
+    resolveRefetch?.({
+      items: refreshedItems,
+      next_cursor: "",
+    });
+
+    expect(await screen.findByText("refreshed.txt")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("status", { name: "Loading" }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("prompts overwrite before object upload when a conflict is detected", async () => {

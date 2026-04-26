@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
 import {
   ChevronLeftIcon,
@@ -77,7 +82,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Tooltip,
   TooltipContent,
@@ -122,14 +127,28 @@ type PendingOverwriteUpload = {
   target?: string;
 };
 
-function ExplorerTableLoadingSkeleton() {
-  return (
-    <div className="p-4">
-      <div className="flex flex-col gap-2">
-        {Array.from({ length: 8 }, (_, index) => (
-          <Skeleton className="h-12 w-full" key={index} />
-        ))}
+function ExplorerEntriesLoadingOverlay({
+  absolute = false,
+}: {
+  absolute?: boolean;
+}) {
+  const content = (
+    <div className="flex items-center justify-center rounded-md bg-background/80 p-3 text-muted-foreground shadow-sm ring-1 ring-border/70">
+      <Spinner className="size-5" />
+    </div>
+  );
+
+  if (absolute) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-card/70 backdrop-blur-[1px]">
+        {content}
       </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-[320px] flex-1 items-center justify-center p-6">
+      {content}
     </div>
   );
 }
@@ -214,6 +233,7 @@ export function BucketObjectsPage() {
         sortOrder,
       }),
     enabled: bucket !== "",
+    placeholderData: keepPreviousData,
   });
 
   const entryItems = entriesQuery.data?.items;
@@ -508,8 +528,10 @@ export function BucketObjectsPage() {
     uploadAndPublishSiteMutation.isPending ||
     isCheckingOverwrite ||
     isRetryingOverwrite;
-  const showInitialEntriesLoading = entriesQuery.isLoading && !entriesQuery.data;
-  const entriesRefreshing = entriesQuery.isFetching && !!entriesQuery.data;
+  const entriesLoading = entriesQuery.isFetching;
+  const hasEntriesData = entriesQuery.data !== undefined;
+  const showEntriesInitialLoading = !hasEntriesData && entriesLoading;
+  const showEntriesLoadingOverlay = hasEntriesData && entriesLoading;
   const bucketMissing = isBucketNotFoundError(entriesQuery.error);
   const overwriteTarget = pendingOverwriteUpload
     ? pendingOverwriteUpload.target ??
@@ -519,6 +541,7 @@ export function BucketObjectsPage() {
           pendingOverwriteUpload.value.file.name,
       )
     : "";
+
   if (!bucket) {
     return (
       <EmptyState
@@ -895,6 +918,10 @@ export function BucketObjectsPage() {
     });
   }
 
+  function handleRefreshEntries() {
+    void entriesQuery.refetch();
+  }
+
   function handleNextPage() {
     if (!entriesQuery.data?.next_cursor) {
       return;
@@ -1081,18 +1108,13 @@ export function BucketObjectsPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        onClick={() => {
-                          void queryClient.invalidateQueries({
-                            queryKey: entriesBaseQueryKey,
-                          });
-                        }}
+                        aria-label={t("explorer.toolbar.refresh")}
+                        onClick={handleRefreshEntries}
                         type="button"
                         variant="ghost"
                         size="icon-sm"
                       >
-                        <RefreshCcwIcon
-                          className={cn("size-4", entriesRefreshing && "animate-spin")}
-                        />
+                        <RefreshCcwIcon />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent
@@ -1157,128 +1179,134 @@ export function BucketObjectsPage() {
               </div>
             ) : null}
 
-            {showInitialEntriesLoading ? (
-              <ExplorerTableLoadingSkeleton />
-            ) : entries.length > 0 ? (
-              <>
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <ExplorerTable
-                    bucket={bucket}
-                    buildPublicUrl={(objectKey) =>
-                      buildPublicObjectURL(
-                        settings.apiBaseUrl,
-                        bucket,
-                        objectKey,
-                      )
-                    }
-                    deletingPath={deletingPath}
-                    downloadingFilePath={downloadingFilePath}
-                    downloadingFolderPath={downloadingFolderPath}
-                    entries={entries}
-                    onDeleteFile={handleDeleteFile}
-                    onDeleteFolder={handleDeleteFolder}
-                    onDownloadFile={handleDownloadFile}
-                    onDownloadFolder={handleDownloadFolder}
-                    onOpenDirectory={handleNavigatePrefix}
-                    onPublishObjectSite={handlePublishObjectSite}
-                    onPublishSite={handlePublishSite}
-                    onSelectAll={handleSelectAll}
-                    onSelectEntry={handleSelectEntry}
-                    onSortApply={handleSortApply}
-                    onSortClear={handleSortClear}
-                    onUpdateVisibility={handleUpdateVisibility}
-                    publishingPath={publishingPath}
-                    selectedPaths={selectedPaths}
-                    selectionDisabled={bulkActionsPending}
-                    sortBy={sortBy}
-                    sortOrder={sortOrder}
-                  />
-                </div>
-                <div className="flex flex-col gap-4 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center">
-                  {selectedCount > 0 ? (
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <div className="mr-1 text-sm font-medium text-foreground">
-                        {t("explorer.bulk.selectedCount", {
-                          count: selectedCount,
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              {showEntriesInitialLoading ? (
+                <ExplorerEntriesLoadingOverlay />
+              ) : entries.length > 0 ? (
+                <>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <ExplorerTable
+                      bucket={bucket}
+                      buildPublicUrl={(objectKey) =>
+                        buildPublicObjectURL(
+                          settings.apiBaseUrl,
+                          bucket,
+                          objectKey,
+                        )
+                      }
+                      deletingPath={deletingPath}
+                      downloadingFilePath={downloadingFilePath}
+                      downloadingFolderPath={downloadingFolderPath}
+                      entries={entries}
+                      onDeleteFile={handleDeleteFile}
+                      onDeleteFolder={handleDeleteFolder}
+                      onDownloadFile={handleDownloadFile}
+                      onDownloadFolder={handleDownloadFolder}
+                      onOpenDirectory={handleNavigatePrefix}
+                      onPublishObjectSite={handlePublishObjectSite}
+                      onPublishSite={handlePublishSite}
+                      onSelectAll={handleSelectAll}
+                      onSelectEntry={handleSelectEntry}
+                      onSortApply={handleSortApply}
+                      onSortClear={handleSortClear}
+                      onUpdateVisibility={handleUpdateVisibility}
+                      publishingPath={publishingPath}
+                      selectedPaths={selectedPaths}
+                      selectionDisabled={bulkActionsPending}
+                      sortBy={sortBy}
+                      sortOrder={sortOrder}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-4 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center">
+                    {selectedCount > 0 ? (
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                        <div className="mr-1 text-sm font-medium text-foreground">
+                          {t("explorer.bulk.selectedCount", {
+                            count: selectedCount,
+                          })}
+                        </div>
+                        {bulkActionButtons.map((action) => (
+                          <Button
+                            key={action.key}
+                            disabled={action.disabled}
+                            onClick={action.onClick}
+                            type="button"
+                            variant={action.variant}
+                          >
+                            {action.icon}
+                            {action.label}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:justify-end">
+                      <div className="text-sm text-muted-foreground">
+                        {t("explorer.pagination.summary", {
+                          count: entries.length,
+                          page: cursorHistory.length + 1,
                         })}
                       </div>
-                      {bulkActionButtons.map((action) => (
-                        <Button
-                          key={action.key}
-                          disabled={action.disabled}
-                          onClick={action.onClick}
-                          type="button"
-                          variant={action.variant}
+                      <Select
+                        onValueChange={(value) =>
+                          updateSearchParams({
+                            limit: value,
+                            cursor: "",
+                          })
+                        }
+                        value={String(limit)}
+                      >
+                        <SelectTrigger
+                          aria-label={t("explorer.toolbar.limit")}
+                          className="w-full sm:w-[140px]"
                         >
-                          {action.icon}
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:justify-end">
-                    <div className="text-sm text-muted-foreground">
-                      {t("explorer.pagination.summary", {
-                        count: entries.length,
-                        page: cursorHistory.length + 1,
-                      })}
-                    </div>
-                    <Select
-                      onValueChange={(value) =>
-                        updateSearchParams({
-                          limit: value,
-                          cursor: "",
-                        })
-                      }
-                      value={String(limit)}
-                    >
-                      <SelectTrigger
-                        aria-label={t("explorer.toolbar.limit")}
-                        className="w-full sm:w-[140px]"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent align="end" position="popper">
-                        <SelectGroup>
-                          {explorerPageSizes.map((size) => (
-                            <SelectItem key={size} value={String(size)}>
-                              {t("explorer.limit.option", { count: size })}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end" position="popper">
+                          <SelectGroup>
+                            {explorerPageSizes.map((size) => (
+                              <SelectItem key={size} value={String(size)}>
+                                {t("explorer.limit.option", { count: size })}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
 
-                    <div className="flex gap-2">
-                      <Button
-                        disabled={cursorHistory.length === 0}
-                        onClick={handlePrevPage}
-                        type="button"
-                        variant="outline"
-                      >
-                        {t("objects.pagination.previous")}
-                      </Button>
-                      <Button
-                        disabled={!entriesQuery.data?.next_cursor}
-                        onClick={handleNextPage}
-                        type="button"
-                        variant="outline"
-                      >
-                        {t("objects.pagination.next")}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          disabled={cursorHistory.length === 0}
+                          onClick={handlePrevPage}
+                          type="button"
+                          variant="outline"
+                        >
+                          {t("objects.pagination.previous")}
+                        </Button>
+                        <Button
+                          disabled={!entriesQuery.data?.next_cursor}
+                          onClick={handleNextPage}
+                          type="button"
+                          variant="outline"
+                        >
+                          {t("objects.pagination.next")}
+                        </Button>
+                      </div>
                     </div>
                   </div>
+                </>
+              ) : (
+                <div className="p-6">
+                  <EmptyState
+                    description={t("explorer.empty.description")}
+                    icon={FolderSearchIcon}
+                    title={t("explorer.empty.title")}
+                  />
                 </div>
-              </>
-            ) : (
-              <div className="p-6">
-                <EmptyState
-                  description={t("explorer.empty.description")}
-                  icon={FolderSearchIcon}
-                  title={t("explorer.empty.title")}
-                />
-              </div>
-            )}
+              )}
+
+              {showEntriesLoadingOverlay ? (
+                <ExplorerEntriesLoadingOverlay absolute />
+              ) : null}
+            </div>
           </div>
         </div>
       </Card>
