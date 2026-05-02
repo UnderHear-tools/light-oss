@@ -359,6 +359,49 @@ describe("BucketsPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("refreshes the bucket list from the search toolbar", async () => {
+    vi.mocked(listBuckets)
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 1,
+            name: "alpha",
+            created_at: "2026-03-25T00:00:00Z",
+            updated_at: "2026-03-25T00:00:00Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 2,
+            name: "beta",
+            created_at: "2026-03-26T00:00:00Z",
+            updated_at: "2026-03-26T00:00:00Z",
+          },
+        ],
+      });
+    vi.mocked(listSites).mockResolvedValue({ items: [] });
+
+    renderWithApp(
+      <Routes>
+        <Route path="/buckets" element={<BucketsPage />} />
+      </Routes>,
+      { route: "/buckets" },
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "alpha" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    expect(
+      await screen.findByRole("link", { name: "beta" }),
+    ).toBeInTheDocument();
+    expect(listBuckets).toHaveBeenCalledTimes(2);
+  });
+
   it("shows a search-specific empty state and keeps the create action", async () => {
     vi.mocked(listBuckets).mockResolvedValue({ items: [] });
     vi.mocked(listSites).mockResolvedValue({ items: [] });

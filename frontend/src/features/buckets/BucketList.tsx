@@ -3,6 +3,7 @@ import {
   ArrowUpRightIcon,
   HardDriveIcon,
   LoaderCircleIcon,
+  RefreshCcwIcon,
   SearchIcon,
   ShieldAlertIcon,
   Trash2Icon,
@@ -40,6 +41,11 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CreateBucketDialog } from "@/features/buckets/CreateBucketForm";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
@@ -52,8 +58,10 @@ export function BucketList({
   loading = false,
   onCreateBucket,
   onDeleteBucket,
+  onRefreshBuckets,
   onSearchInputChange,
   onSearchSubmit,
+  refreshPending = false,
   search,
   searchInput,
   sitesByBucket,
@@ -65,8 +73,10 @@ export function BucketList({
   loading?: boolean;
   onCreateBucket: (name: string) => Promise<void>;
   onDeleteBucket: (bucketName: string) => Promise<void>;
+  onRefreshBuckets: () => Promise<void>;
   onSearchInputChange: (value: string) => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  refreshPending?: boolean;
   search: string;
   searchInput: string;
   sitesByBucket: Record<string, Site[]>;
@@ -93,6 +103,31 @@ export function BucketList({
             className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-sm"
             onSubmit={onSearchSubmit}
           >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label={t("common.refresh")}
+                  className="shrink-0"
+                  disabled={refreshPending}
+                  onClick={() => void onRefreshBuckets()}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  {refreshPending ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : (
+                    <RefreshCcwIcon />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent
+                className="whitespace-nowrap leading-none"
+                sideOffset={6}
+              >
+                {t("common.refresh")}
+              </TooltipContent>
+            </Tooltip>
             <FieldGroup className="min-w-0 flex-1">
               <Field className="min-w-0" orientation="responsive">
                 <FieldLabel className="sr-only" htmlFor="bucket-search">

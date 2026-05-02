@@ -115,6 +115,13 @@ export function BucketsPage() {
     updateSearchParams(searchInput.trim());
   }
 
+  async function handleRefreshBuckets() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: bucketsBaseQueryKey }),
+      queryClient.invalidateQueries({ queryKey: sitesQueryKey }),
+    ]);
+  }
+
   const buckets = bucketsQuery.data?.items ?? [];
   const sites = sitesQuery.data?.items ?? [];
   const sitesByBucket: Record<string, Site[]> = {};
@@ -163,8 +170,10 @@ export function BucketsPage() {
         loading={bucketsQuery.isLoading}
         onCreateBucket={handleCreateBucket}
         onDeleteBucket={handleDeleteBucket}
+        onRefreshBuckets={handleRefreshBuckets}
         onSearchInputChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
+        refreshPending={bucketsQuery.isFetching || sitesQuery.isFetching}
         search={search}
         searchInput={searchInput}
         sitesByBucket={sitesByBucket}

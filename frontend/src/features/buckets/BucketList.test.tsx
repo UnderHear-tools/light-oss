@@ -41,6 +41,7 @@ describe("BucketList", () => {
         deletePendingBucket=""
         onCreateBucket={vi.fn().mockResolvedValue(undefined)}
         onDeleteBucket={vi.fn().mockResolvedValue(undefined)}
+        onRefreshBuckets={vi.fn().mockResolvedValue(undefined)}
         onSearchInputChange={vi.fn()}
         onSearchSubmit={vi.fn()}
         search=""
